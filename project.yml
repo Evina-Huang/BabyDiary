@@ -1,0 +1,42 @@
+name: BabyDiary
+options:
+  bundleIdPrefix: com.evina
+  deploymentTarget:
+    iOS: "18.0"
+  xcodeVersion: "16.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: 5.10
+
+targets:
+  BabyDiary:
+    type: application
+    platform: iOS
+    sources:
+      - path: BabyDiary/Sources
+      - path: BabyDiary/Resources
+        excludes:
+          - "Info.plist"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.evina.BabyDiary
+        INFOPLIST_FILE: BabyDiary/Resources/Info.plist
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: 5WF2DNSHC6
+    scheme:
+      testTargets:
+        - BabyDiaryTests
+
+  BabyDiaryTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - BabyDiaryTests
+    dependencies:
+      - target: BabyDiary
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.evina.BabyDiaryTests

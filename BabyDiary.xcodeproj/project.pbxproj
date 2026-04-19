@@ -1,0 +1,511 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		057C5512709EBE465CED3E96 /* GrowthPoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F76EAD923BE8FA56D20274E /* GrowthPoint.swift */; };
+		06B4E6F4B3F1348B99D0E3BF /* SleepView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C61F3580FA78D7EEF0F4C739 /* SleepView.swift */; };
+		0B54D372872352EDD0E81C3E /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F32A661F9551A563B09C6653 /* HomeView.swift */; };
+		104C48F6EB4128DF961E251B /* SolidView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2E3BE778F004091A6BFD447 /* SolidView.swift */; };
+		3508026DD2969F26B069677F /* Icons.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D500E176081E9F39321BC6F /* Icons.swift */; };
+		38084E6AF5C55B0345AF5E92 /* Primitives.swift in Sources */ = {isa = PBXBuildFile; fileRef = C42524527BFAA06E62EA17DF /* Primitives.swift */; };
+		3CA11A2C3704EBDEBCAA2E75 /* FeedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFE78E7D4207C0B0F803CD81 /* FeedView.swift */; };
+		49338A5D7D855A968B61839F /* RecordsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 846242867B8E637561712FE3 /* RecordsView.swift */; };
+		614260B1B6950989AEFB7AB0 /* StatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D263718D27C28E0CF528F25F /* StatsView.swift */; };
+		67035A757992B9AFE73AE03C /* VaccineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC8D0F2DAE3C93A66E2FF521 /* VaccineView.swift */; };
+		6AEECBD51C09CB2312324295 /* BabyDiaryApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D03ECC892748E58446D60717 /* BabyDiaryApp.swift */; };
+		72768378CE6D0262BB6CF9F5 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65AC155878DF39E04CA789EA /* ContentView.swift */; };
+		8425AB80FEAA16C5595DBF3A /* GrowthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E906265959DF67553653CC27 /* GrowthView.swift */; };
+		8761C4018D55BF3AD2A03BAB /* FoodListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5491D057510332F88BFA9834 /* FoodListView.swift */; };
+		972A70388DA4655BA6F1198D /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5BA15EF9E3E52299271C1A3 /* Theme.swift */; };
+		A15C5809230D08E7735D9957 /* Vaccine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0707DB66BE6B3F5B718679C3 /* Vaccine.swift */; };
+		BCEC5DB360E3B0F899717BB2 /* DiaperView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2C7AC0ABADFB4E8B1D479A4 /* DiaperView.swift */; };
+		C8ABA57A566961EC9833ABF7 /* FoodItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0181DA81854724D428DE31A5 /* FoodItem.swift */; };
+		C9EE5DEC31801EB78F0521B2 /* AppStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA9831391FD58F873506339A /* AppStore.swift */; };
+		DC77C5471B6A77860BA20FA9 /* Event.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2183741F6B070696BCE37F88 /* Event.swift */; };
+		F54BB321D8CEA42CFCC4412E /* BabyDiaryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11499DE74B462B78A849A44F /* BabyDiaryTests.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		DB021637444A4E81A69B308A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 06C240B629E5435D8A0B05AD /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A68AA7335EC1761E9A73A6DB;
+			remoteInfo = BabyDiary;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		0181DA81854724D428DE31A5 /* FoodItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoodItem.swift; sourceTree = "<group>"; };
+		0707DB66BE6B3F5B718679C3 /* Vaccine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Vaccine.swift; sourceTree = "<group>"; };
+		11499DE74B462B78A849A44F /* BabyDiaryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BabyDiaryTests.swift; sourceTree = "<group>"; };
+		2183741F6B070696BCE37F88 /* Event.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Event.swift; sourceTree = "<group>"; };
+		5491D057510332F88BFA9834 /* FoodListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoodListView.swift; sourceTree = "<group>"; };
+		65AC155878DF39E04CA789EA /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		6D500E176081E9F39321BC6F /* Icons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Icons.swift; sourceTree = "<group>"; };
+		6F76EAD923BE8FA56D20274E /* GrowthPoint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GrowthPoint.swift; sourceTree = "<group>"; };
+		75A3C34D1CA00285FB7EA36C /* BabyDiary.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = BabyDiary.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		846242867B8E637561712FE3 /* RecordsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordsView.swift; sourceTree = "<group>"; };
+		AA9831391FD58F873506339A /* AppStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStore.swift; sourceTree = "<group>"; };
+		BA3E4AAE44A1EB50CB7798E7 /* BabyDiaryTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = BabyDiaryTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		BC8D0F2DAE3C93A66E2FF521 /* VaccineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaccineView.swift; sourceTree = "<group>"; };
+		C2C7AC0ABADFB4E8B1D479A4 /* DiaperView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaperView.swift; sourceTree = "<group>"; };
+		C42524527BFAA06E62EA17DF /* Primitives.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Primitives.swift; sourceTree = "<group>"; };
+		C5BA15EF9E3E52299271C1A3 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		C61F3580FA78D7EEF0F4C739 /* SleepView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepView.swift; sourceTree = "<group>"; };
+		D03ECC892748E58446D60717 /* BabyDiaryApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BabyDiaryApp.swift; sourceTree = "<group>"; };
+		D263718D27C28E0CF528F25F /* StatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsView.swift; sourceTree = "<group>"; };
+		E906265959DF67553653CC27 /* GrowthView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GrowthView.swift; sourceTree = "<group>"; };
+		EFE78E7D4207C0B0F803CD81 /* FeedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedView.swift; sourceTree = "<group>"; };
+		F2E3BE778F004091A6BFD447 /* SolidView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SolidView.swift; sourceTree = "<group>"; };
+		F32A661F9551A563B09C6653 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		20967C073C06F93BBB8065D0 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				AA9831391FD58F873506339A /* AppStore.swift */,
+				D03ECC892748E58446D60717 /* BabyDiaryApp.swift */,
+				65AC155878DF39E04CA789EA /* ContentView.swift */,
+				C5BA15EF9E3E52299271C1A3 /* Theme.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		34B95A1E567FC2A10BADDD27 /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				6D500E176081E9F39321BC6F /* Icons.swift */,
+				C42524527BFAA06E62EA17DF /* Primitives.swift */,
+			);
+			path = Components;
+			sourceTree = "<group>";
+		};
+		42E531F801D0438C7FE233A1 /* BabyDiary */ = {
+			isa = PBXGroup;
+			children = (
+				A314F73EDC210E0ECB183A54 /* Resources */,
+				BA925477D9003BED64C2990A /* Sources */,
+			);
+			path = BabyDiary;
+			sourceTree = "<group>";
+		};
+		76DF2B9A6275AD0CB5378085 /* BabyDiaryTests */ = {
+			isa = PBXGroup;
+			children = (
+				11499DE74B462B78A849A44F /* BabyDiaryTests.swift */,
+			);
+			path = BabyDiaryTests;
+			sourceTree = "<group>";
+		};
+		A314F73EDC210E0ECB183A54 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		BA925477D9003BED64C2990A /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				20967C073C06F93BBB8065D0 /* App */,
+				34B95A1E567FC2A10BADDD27 /* Components */,
+				CF2507EF6C6E1C70D3649112 /* Models */,
+				F922C2A069BCFD27BD1FEB6D /* Views */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		CF2507EF6C6E1C70D3649112 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				2183741F6B070696BCE37F88 /* Event.swift */,
+				0181DA81854724D428DE31A5 /* FoodItem.swift */,
+				6F76EAD923BE8FA56D20274E /* GrowthPoint.swift */,
+				0707DB66BE6B3F5B718679C3 /* Vaccine.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		E1FDFEE244D20E1409F49340 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				75A3C34D1CA00285FB7EA36C /* BabyDiary.app */,
+				BA3E4AAE44A1EB50CB7798E7 /* BabyDiaryTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		EFC868DDFBC9C2FFE0EF59FC = {
+			isa = PBXGroup;
+			children = (
+				42E531F801D0438C7FE233A1 /* BabyDiary */,
+				76DF2B9A6275AD0CB5378085 /* BabyDiaryTests */,
+				E1FDFEE244D20E1409F49340 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		F922C2A069BCFD27BD1FEB6D /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				C2C7AC0ABADFB4E8B1D479A4 /* DiaperView.swift */,
+				EFE78E7D4207C0B0F803CD81 /* FeedView.swift */,
+				5491D057510332F88BFA9834 /* FoodListView.swift */,
+				E906265959DF67553653CC27 /* GrowthView.swift */,
+				F32A661F9551A563B09C6653 /* HomeView.swift */,
+				846242867B8E637561712FE3 /* RecordsView.swift */,
+				C61F3580FA78D7EEF0F4C739 /* SleepView.swift */,
+				F2E3BE778F004091A6BFD447 /* SolidView.swift */,
+				D263718D27C28E0CF528F25F /* StatsView.swift */,
+				BC8D0F2DAE3C93A66E2FF521 /* VaccineView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A68AA7335EC1761E9A73A6DB /* BabyDiary */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D581B9285B4AEF45A683C15B /* Build configuration list for PBXNativeTarget "BabyDiary" */;
+			buildPhases = (
+				C9A85C57BBDD0F5F1BE27B25 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = BabyDiary;
+			packageProductDependencies = (
+			);
+			productName = BabyDiary;
+			productReference = 75A3C34D1CA00285FB7EA36C /* BabyDiary.app */;
+			productType = "com.apple.product-type.application";
+		};
+		D6FD393B187215BEE607EF20 /* BabyDiaryTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E49590932681389F04A83F22 /* Build configuration list for PBXNativeTarget "BabyDiaryTests" */;
+			buildPhases = (
+				46926E7ED48D800DAE86BBD7 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				0F7DE5077AB86D090174AA0D /* PBXTargetDependency */,
+			);
+			name = BabyDiaryTests;
+			packageProductDependencies = (
+			);
+			productName = BabyDiaryTests;
+			productReference = BA3E4AAE44A1EB50CB7798E7 /* BabyDiaryTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		06C240B629E5435D8A0B05AD /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					A68AA7335EC1761E9A73A6DB = {
+						DevelopmentTeam = 5WF2DNSHC6;
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = C8ABFBA6B1579CF90C36924B /* Build configuration list for PBXProject "BabyDiary" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = EFC868DDFBC9C2FFE0EF59FC;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = E1FDFEE244D20E1409F49340 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A68AA7335EC1761E9A73A6DB /* BabyDiary */,
+				D6FD393B187215BEE607EF20 /* BabyDiaryTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		46926E7ED48D800DAE86BBD7 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F54BB321D8CEA42CFCC4412E /* BabyDiaryTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C9A85C57BBDD0F5F1BE27B25 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C9EE5DEC31801EB78F0521B2 /* AppStore.swift in Sources */,
+				6AEECBD51C09CB2312324295 /* BabyDiaryApp.swift in Sources */,
+				72768378CE6D0262BB6CF9F5 /* ContentView.swift in Sources */,
+				BCEC5DB360E3B0F899717BB2 /* DiaperView.swift in Sources */,
+				DC77C5471B6A77860BA20FA9 /* Event.swift in Sources */,
+				3CA11A2C3704EBDEBCAA2E75 /* FeedView.swift in Sources */,
+				C8ABA57A566961EC9833ABF7 /* FoodItem.swift in Sources */,
+				8761C4018D55BF3AD2A03BAB /* FoodListView.swift in Sources */,
+				057C5512709EBE465CED3E96 /* GrowthPoint.swift in Sources */,
+				8425AB80FEAA16C5595DBF3A /* GrowthView.swift in Sources */,
+				0B54D372872352EDD0E81C3E /* HomeView.swift in Sources */,
+				3508026DD2969F26B069677F /* Icons.swift in Sources */,
+				38084E6AF5C55B0345AF5E92 /* Primitives.swift in Sources */,
+				49338A5D7D855A968B61839F /* RecordsView.swift in Sources */,
+				06B4E6F4B3F1348B99D0E3BF /* SleepView.swift in Sources */,
+				104C48F6EB4128DF961E251B /* SolidView.swift in Sources */,
+				614260B1B6950989AEFB7AB0 /* StatsView.swift in Sources */,
+				972A70388DA4655BA6F1198D /* Theme.swift in Sources */,
+				A15C5809230D08E7735D9957 /* Vaccine.swift in Sources */,
+				67035A757992B9AFE73AE03C /* VaccineView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		0F7DE5077AB86D090174AA0D /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A68AA7335EC1761E9A73A6DB /* BabyDiary */;
+			targetProxy = DB021637444A4E81A69B308A /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		32E79ED49CC35CF7F772608F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.1;
+			};
+			name = Release;
+		};
+		5B7DF6DB4CCBFD26296FD43A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.evina.BabyDiaryTests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/BabyDiary.app/BabyDiary";
+			};
+			name = Release;
+		};
+		73AAD12738CD57326437FC7D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.evina.BabyDiaryTests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/BabyDiary.app/BabyDiary";
+			};
+			name = Debug;
+		};
+		A3846F42D31AB66BC603DF45 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.1;
+			};
+			name = Debug;
+		};
+		E61851B5346EAD58CDB9FA9F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 5WF2DNSHC6;
+				INFOPLIST_FILE = BabyDiary/Resources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.evina.BabyDiary;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		EEF33B2D90F25C625B527055 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 5WF2DNSHC6;
+				INFOPLIST_FILE = BabyDiary/Resources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.evina.BabyDiary;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		C8ABFBA6B1579CF90C36924B /* Build configuration list for PBXProject "BabyDiary" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A3846F42D31AB66BC603DF45 /* Debug */,
+				32E79ED49CC35CF7F772608F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		D581B9285B4AEF45A683C15B /* Build configuration list for PBXNativeTarget "BabyDiary" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E61851B5346EAD58CDB9FA9F /* Debug */,
+				EEF33B2D90F25C625B527055 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		E49590932681389F04A83F22 /* Build configuration list for PBXNativeTarget "BabyDiaryTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				73AAD12738CD57326437FC7D /* Debug */,
+				5B7DF6DB4CCBFD26296FD43A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 06C240B629E5435D8A0B05AD /* Project object */;
+}

@@ -1,0 +1,14 @@
+# macOS
+.DS_Store
+
+# Xcode
+*.xcuserstate
+xcuserdata/
+*.moved-aside
+*.xccheckout
+*.orig
+DerivedData/
+build/
+
+# Claude Code project memory
+.claude/

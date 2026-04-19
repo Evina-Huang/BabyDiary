@@ -1,0 +1,420 @@
+import SwiftUI
+
+struct HomeView: View {
+    @Environment(AppStore.self) private var store
+    var onOpen: (SubScreen) -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Greeting block
+            VStack(alignment: .leading, spacing: 2) {
+                Text(dateLine())
+                    .font(.system(size: 12, weight: .bold))
+                    .tracking(0.72)
+                    .textCase(.uppercase)
+                    .foregroundStyle(Palette.ink3)
+                Text("你好呀 👋")
+                    .font(.system(size: 24, weight: .black))
+                    .tracking(-0.72)
+                    .foregroundStyle(Palette.ink)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 20).padding(.top, 10).padding(.bottom, 2)
+
+            ScreenBody {
+                BabyBadge()
+                    .padding(.top, 10)
+
+                // 2×2 quick-add grid
+                let cols = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
+                LazyVGrid(columns: cols, spacing: 12) {
+                    QuickTile(kind: .sleep,  onTap: { onOpen(.sleep) })
+                    QuickTile(kind: .feed,   onTap: { onOpen(.feed) })
+                    QuickTile(kind: .diaper, onTap: { onOpen(.diaper) })
+                    QuickTile(kind: .solid,  onTap: { onOpen(.solid) })
+                }
+                .padding(.top, 12)
+
+                if let start = store.timerStart {
+                    TimerBanner(start: start).padding(.top, 14)
+                }
+
+                DailySummaryStrip().padding(.top, 14)
+
+                SinceLastRow().padding(.top, 10)
+
+                VaccineEntry { onOpen(.vaccine) }
+                    .padding(.top, 16)
+
+                FoodListEntry { onOpen(.foodList) }
+                    .padding(.top, 12)
+            }
+        }
+        .background(Palette.bg)
+    }
+
+    private func dateLine() -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "zh_CN")
+        f.dateFormat = "M月d日 EEEE"
+        return f.string(from: Date())
+    }
+}
+
+// MARK: — Baby badge header card
+
+private struct BabyBadge: View {
+    @Environment(AppStore.self) private var store
+    var body: some View {
+        Card(padding: 16) {
+            HStack(spacing: 14) {
+                BabyAvatar()
+                    .frame(width: 56, height: 56)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(store.baby.ageLabel)
+                        .font(.system(size: 13, weight: .bold))
+                        .tracking(0.52)
+                        .foregroundStyle(store.theme.primary600)
+                    Text(store.baby.name)
+                        .font(.system(size: 22, weight: .black))
+                        .tracking(-0.44)
+                        .foregroundStyle(Palette.ink)
+                    Text("出生 \(store.baby.birthLabel)")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Palette.ink3)
+                }
+                Spacer(minLength: 0)
+                Button { } label: {
+                    Image(systemName: "pencil")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Palette.ink2)
+                        .frame(width: 36, height: 36)
+                        .background(Color.white.opacity(0.7), in: Circle())
+                }
+                .buttonStyle(PressableStyle())
+            }
+        }
+        .background(
+            LinearGradient(
+                colors: [Color(hex: 0xFFF5EE), Color(hex: 0xFFE8E0)],
+                startPoint: .topLeading, endPoint: .bottomTrailing
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        )
+    }
+}
+
+private struct BabyAvatar: View {
+    var body: some View {
+        ZStack {
+            Circle().fill(Color(hex: 0xFFC7B5))
+            Canvas { ctx, size in
+                let s = size.width / 56
+                func pt(_ x: Double, _ y: Double) -> CGPoint { .init(x: x * s, y: y * s) }
+                ctx.fill(Path(ellipseIn: CGRect(x: 12*s, y: 10*s, width: 32*s, height: 32*s)),
+                         with: .color(Color(hex: 0xFFE0D2)))
+                // Hair tuft
+                var hair = Path()
+                hair.move(to: pt(20, 16))
+                hair.addQuadCurve(to: pt(36, 16), control: pt(28, 10))
+                ctx.stroke(hair, with: .color(Color(hex: 0x8B5A3C)),
+                           style: StrokeStyle(lineWidth: 3 * s, lineCap: .round))
+                // Eyes
+                var e1 = Path(); e1.move(to: pt(22, 26)); e1.addQuadCurve(to: pt(26, 26), control: pt(24, 28))
+                var e2 = Path(); e2.move(to: pt(30, 26)); e2.addQuadCurve(to: pt(34, 26), control: pt(32, 28))
+                ctx.stroke(e1, with: .color(Color(hex: 0x2B2520)), style: StrokeStyle(lineWidth: 1.8 * s, lineCap: .round))
+                ctx.stroke(e2, with: .color(Color(hex: 0x2B2520)), style: StrokeStyle(lineWidth: 1.8 * s, lineCap: .round))
+                // Blush
+                ctx.fill(Path(ellipseIn: CGRect(x: 20*s, y: 30*s, width: 4*s, height: 4*s)),
+                         with: .color(Color(hex: 0xFF9B85).opacity(0.55)))
+                ctx.fill(Path(ellipseIn: CGRect(x: 32*s, y: 30*s, width: 4*s, height: 4*s)),
+                         with: .color(Color(hex: 0xFF9B85).opacity(0.55)))
+                // Smile
+                var smile = Path()
+                smile.move(to: pt(25, 32))
+                smile.addQuadCurve(to: pt(31, 32), control: pt(28, 34))
+                ctx.stroke(smile, with: .color(Color(hex: 0x2B2520)),
+                           style: StrokeStyle(lineWidth: 1.8 * s, lineCap: .round))
+            }
+        }
+    }
+}
+
+// MARK: — Quick-action tile
+
+private struct QuickTile: View {
+    let kind: EventKind
+    let onTap: () -> Void
+
+    var body: some View {
+        let style = CategoryStyle.forKind(kind, iconSize: 30)
+        Button(action: onTap) {
+            ZStack(alignment: .topTrailing) {
+                VStack(alignment: .leading, spacing: 10) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .fill(Color.white.opacity(0.55))
+                        style.icon
+                    }
+                    .frame(width: 52, height: 52)
+                    Text(style.label)
+                        .font(.system(size: 17, weight: .heavy))
+                        .tracking(-0.17)
+                        .foregroundStyle(style.ink)
+                    Spacer(minLength: 0)
+                }
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+                .aspectRatio(1.05, contentMode: .fit)
+
+                // Plus badge
+                ZStack {
+                    Circle().fill(Color.white.opacity(0.6))
+                    AppIcon.Plus(size: 16, color: style.ink)
+                }
+                .frame(width: 26, height: 26)
+                .padding(14)
+            }
+            .background(style.tint, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        }
+        .buttonStyle(PressableStyle())
+    }
+}
+
+// MARK: — Live sleep timer banner
+
+private struct TimerBanner: View {
+    let start: Date
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { ctx in
+            let dur = ctx.date.timeIntervalSince(start)
+            HStack(spacing: 12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(Color.white.opacity(0.6))
+                    AppIcon.Moon(size: 26, color: Palette.lavenderInk)
+                }
+                .frame(width: 42, height: 42)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 8) {
+                        PulseDot(color: Palette.lavenderInk)
+                        Text("正在睡觉")
+                            .font(.system(size: 12, weight: .heavy))
+                            .tracking(0.72)
+                            .textCase(.uppercase)
+                            .foregroundStyle(Palette.lavenderInk)
+                    }
+                    Text(formatDur(dur))
+                        .font(.system(size: 22, weight: .black))
+                        .tracking(-0.44)
+                        .monospacedDigit()
+                        .foregroundStyle(Palette.lavenderInk)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 16).padding(.vertical, 14)
+            .background(Palette.lavender, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        }
+    }
+}
+
+private struct PulseDot: View {
+    let color: Color
+    @State private var on: Bool = false
+    var body: some View {
+        Circle()
+            .fill(color)
+            .frame(width: 8, height: 8)
+            .opacity(on ? 0.4 : 1.0)
+            .scaleEffect(on ? 0.8 : 1.0)
+            .animation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true), value: on)
+            .onAppear { on = true }
+    }
+}
+
+// MARK: — Daily summary strip (4 tinted pills)
+
+private struct DailySummaryStrip: View {
+    @Environment(AppStore.self) private var store
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 30)) { ctx in
+            let cal = Calendar.current
+            let todays = store.events.filter { cal.isDateInToday($0.at) }
+            let feed = todays.filter { $0.kind == .feed }.count
+            let diaper = todays.filter { $0.kind == .diaper }.count
+            let solid = todays.filter { $0.kind == .solid }.count
+            let sleepSec: TimeInterval = todays
+                .filter { $0.kind == .sleep }
+                .compactMap(\.duration)
+                .reduce(0, +) + (store.timerStart.map { ctx.date.timeIntervalSince($0) } ?? 0)
+
+            HStack(spacing: 8) {
+                SummaryCell(tint: Palette.lavender, ink: Palette.lavenderInk,
+                            value: formatDurShort(sleepSec), label: "睡眠")
+                SummaryCell(tint: Palette.pink, ink: Palette.pinkInk,
+                            value: "\(feed)次", label: "喂奶")
+                SummaryCell(tint: Palette.blue, ink: Palette.blueInk,
+                            value: "\(diaper)次", label: "尿布")
+                SummaryCell(tint: Palette.yellow, ink: Palette.yellowInk,
+                            value: "\(solid)次", label: "辅食")
+            }
+        }
+    }
+
+    private struct SummaryCell: View {
+        let tint: Color, ink: Color, value: String, label: String
+        var body: some View {
+            VStack(spacing: 2) {
+                Text(value)
+                    .font(.system(size: 16, weight: .black))
+                    .tracking(-0.32)
+                    .monospacedDigit()
+                    .foregroundStyle(ink)
+                Text(label)
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(ink.opacity(0.75))
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 10).padding(.horizontal, 6)
+            .background(tint, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
+    }
+}
+
+// MARK: — Since-last row (小字行)
+
+private struct SinceLastRow: View {
+    @Environment(AppStore.self) private var store
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 60)) { ctx in
+            let now = ctx.date
+            let lastFeed   = store.events.filter { $0.kind == .feed   }.max(by: { $0.at < $1.at })
+            let lastDiaper = store.events.filter { $0.kind == .diaper }.max(by: { $0.at < $1.at })
+            let lastSleepEnd = store.timerStart == nil
+                ? store.events.filter { $0.kind == .sleep && $0.endAt != nil }.max(by: { ($0.endAt ?? .distantPast) < ($1.endAt ?? .distantPast) })
+                : nil
+
+            let items: [(String, String, Color)] = [
+                lastFeed.map   { ("喂奶", fmt(now.timeIntervalSince($0.at)), Palette.pinkInk) },
+                lastSleepEnd.map { ("睡眠", fmt(now.timeIntervalSince($0.endAt ?? now)), Palette.lavenderInk) },
+                lastDiaper.map { ("尿布", fmt(now.timeIntervalSince($0.at)), Palette.blueInk) },
+            ].compactMap { $0 }
+
+            if !items.isEmpty {
+                HStack(spacing: 10) {
+                    Text("距上次")
+                        .font(.system(size: 10, weight: .heavy))
+                        .tracking(0.6)
+                        .textCase(.uppercase)
+                    ForEach(Array(items.enumerated()), id: \.offset) { (i, it) in
+                        HStack(spacing: 4) {
+                            Text(it.0).font(.system(size: 11, weight: .heavy)).foregroundStyle(it.2)
+                            Text(it.1).font(.system(size: 11, weight: .bold)).monospacedDigit()
+                            if i < items.count - 1 {
+                                Text("·").opacity(0.4).padding(.leading, 6)
+                            }
+                        }
+                    }
+                }
+                .foregroundStyle(Palette.ink3)
+                .padding(.horizontal, 14).padding(.vertical, 8)
+                .frame(maxWidth: .infinity)
+            }
+        }
+    }
+
+    private func fmt(_ s: TimeInterval) -> String {
+        let sec = Int(max(0, s))
+        let h = sec / 3600
+        let m = (sec % 3600) / 60
+        return h > 0 ? "\(h)h\(m)m" : "\(m)分"
+    }
+}
+
+// MARK: — Bottom-of-home food list entry
+
+private struct FoodListEntry: View {
+    let onTap: () -> Void
+    @Environment(AppStore.self) private var store
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 14) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(Palette.yellow)
+                    AppIcon.Bowl(size: 24, color: Palette.yellowInk)
+                }
+                .frame(width: 44, height: 44)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("食物清单")
+                        .font(.system(size: 15, weight: .heavy))
+                        .tracking(-0.15)
+                        .foregroundStyle(Palette.ink)
+                    Text(subtitle)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Palette.ink3)
+                }
+                Spacer(minLength: 0)
+                AppIcon.Chevron(size: 16, color: Palette.ink3)
+            }
+            .padding(.horizontal, 18).padding(.vertical, 14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Palette.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .shadowCard()
+        }
+        .buttonStyle(PressableStyle())
+    }
+
+    private var subtitle: String {
+        let safe      = store.foods.filter { $0.status == .safe }.count
+        let allergic  = store.foods.filter { $0.status == .allergic }.count
+        let observing = store.foods.filter { $0.status == .observing }.count
+        var parts: [String] = []
+        if safe      > 0 { parts.append("已排敏 \(safe)") }
+        if allergic  > 0 { parts.append("过敏 \(allergic)") }
+        if observing > 0 { parts.append("观察中 \(observing)") }
+        return parts.isEmpty ? "暂无记录" : parts.joined(separator: " · ")
+    }
+}
+
+// MARK: — Bottom-of-home vaccine entry
+
+private struct VaccineEntry: View {
+    let onTap: () -> Void
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 14) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(Palette.mintTint)
+                    AppIcon.Shield(size: 24, color: Palette.mint600)
+                }
+                .frame(width: 44, height: 44)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("疫苗接种")
+                        .font(.system(size: 15, weight: .heavy))
+                        .tracking(-0.15)
+                        .foregroundStyle(Palette.ink)
+                    Text("查看接种计划与进度")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Palette.ink3)
+                }
+                Spacer(minLength: 0)
+                AppIcon.Chevron(size: 16, color: Palette.ink3)
+            }
+            .padding(.horizontal, 18).padding(.vertical, 14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Palette.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .shadowCard()
+        }
+        .buttonStyle(PressableStyle())
+    }
+}
+
+#Preview("首页") {
+    HomeView(onOpen: { _ in })
+        .environment(AppStore.preview)
+}
