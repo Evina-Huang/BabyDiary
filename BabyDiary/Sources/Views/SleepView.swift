@@ -18,14 +18,16 @@ struct SleepScreen: View {
 
     @ViewBuilder
     private func content(now: Date) -> some View {
-        let running = store.timerStart != nil
-        let dur: TimeInterval = running ? now.timeIntervalSince(store.timerStart!) : 0
-        heroCard(running: running, dur: dur)
+        let timer = store.activeTimer
+        let running = timer != nil
+        let dur: TimeInterval = timer.map { now.timeIntervalSince($0.startedAt) } ?? 0
+        heroCard(startedAt: timer?.startedAt, dur: dur)
         lastNightCard
         historySection.padding(.top, 26)
     }
 
-    private func heroCard(running: Bool, dur: TimeInterval) -> some View {
+    private func heroCard(startedAt: Date?, dur: TimeInterval) -> some View {
+        let running = startedAt != nil
         let gradient: LinearGradient = running
             ? LinearGradient(colors: [Color(hex: 0xE4D8F5), Color(hex: 0xF3EBFB)],
                              startPoint: .topLeading, endPoint: .bottomTrailing)
@@ -62,9 +64,7 @@ struct SleepScreen: View {
                     .foregroundStyle(running ? Palette.lavenderInk : Palette.ink)
                     .padding(.top, 16)
 
-                Text(running
-                     ? "开始于 \(formatTime(store.timerStart!))"
-                     : "轻触下方按钮记录睡眠开始时间")
+                Text(startedAt.map { "开始于 \(formatTime($0))" } ?? "轻触下方按钮记录睡眠开始时间")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Palette.ink2)
                     .padding(.top, 10)
@@ -151,17 +151,17 @@ struct SleepScreen: View {
     }
 
     private func toggle() {
-        if let start = store.timerStart {
+        if let timer = store.activeTimer {
             let end = Date()
-            let dur = end.timeIntervalSince(start)
+            let dur = end.timeIntervalSince(timer.startedAt)
             store.addEvent(.init(
-                kind: .sleep, at: start, endAt: end,
+                kind: timer.kind, at: timer.startedAt, endAt: end,
                 title: "睡眠 \(formatDurShort(dur))",
-                sub: "\(formatTime(start)) — \(formatTime(end))"
+                sub: "\(formatTime(timer.startedAt)) — \(formatTime(end))"
             ))
-            store.timerStart = nil
+            store.stopTimer()
         } else {
-            store.timerStart = Date()
+            store.startTimer(kind: .sleep)
         }
     }
 

@@ -1,4 +1,5 @@
 import SwiftUI
+import PhotosUI
 
 struct HomeView: View {
     @Environment(AppStore.self) private var store
@@ -35,8 +36,8 @@ struct HomeView: View {
                 }
                 .padding(.top, 12)
 
-                if let start = store.timerStart {
-                    TimerBanner(start: start).padding(.top, 14)
+                if let timer = store.activeTimer {
+                    TimerBanner(start: timer.startedAt).padding(.top, 14)
                 }
 
                 DailySummaryStrip().padding(.top, 14)
@@ -65,11 +66,19 @@ struct HomeView: View {
 
 private struct BabyBadge: View {
     @Environment(AppStore.self) private var store
+    @State private var editing = false
     var body: some View {
         Card(padding: 16) {
             HStack(spacing: 14) {
-                BabyAvatar()
-                    .frame(width: 56, height: 56)
+                Group {
+                    if let data = store.baby.avatarData, let ui = UIImage(data: data) {
+                        Image(uiImage: ui).resizable().scaledToFill()
+                    } else {
+                        BabyAvatar()
+                    }
+                }
+                .frame(width: 56, height: 56)
+                .clipShape(Circle())
                 VStack(alignment: .leading, spacing: 2) {
                     Text(store.baby.ageLabel)
                         .font(.system(size: 13, weight: .bold))
@@ -84,7 +93,7 @@ private struct BabyBadge: View {
                         .foregroundStyle(Palette.ink3)
                 }
                 Spacer(minLength: 0)
-                Button { } label: {
+                Button { editing = true } label: {
                     Image(systemName: "pencil")
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(Palette.ink2)
@@ -93,6 +102,10 @@ private struct BabyBadge: View {
                 }
                 .buttonStyle(PressableStyle())
             }
+        }
+        .sheet(isPresented: $editing) {
+            EditBabyScreen(onClose: { editing = false })
+                .environment(store)
         }
         .background(
             LinearGradient(
@@ -247,7 +260,7 @@ private struct DailySummaryStrip: View {
             let sleepSec: TimeInterval = todays
                 .filter { $0.kind == .sleep }
                 .compactMap(\.duration)
-                .reduce(0, +) + (store.timerStart.map { ctx.date.timeIntervalSince($0) } ?? 0)
+                .reduce(0, +) + (store.activeTimer.map { ctx.date.timeIntervalSince($0.startedAt) } ?? 0)
 
             HStack(spacing: 8) {
                 SummaryCell(tint: Palette.lavender, ink: Palette.lavenderInk,
@@ -292,7 +305,7 @@ private struct SinceLastRow: View {
             let now = ctx.date
             let lastFeed   = store.events.filter { $0.kind == .feed   }.max(by: { $0.at < $1.at })
             let lastDiaper = store.events.filter { $0.kind == .diaper }.max(by: { $0.at < $1.at })
-            let lastSleepEnd = store.timerStart == nil
+            let lastSleepEnd = store.activeTimer == nil
                 ? store.events.filter { $0.kind == .sleep && $0.endAt != nil }.max(by: { ($0.endAt ?? .distantPast) < ($1.endAt ?? .distantPast) })
                 : nil
 
@@ -409,6 +422,116 @@ private struct VaccineEntry: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Palette.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
             .shadowCard()
+        }
+        .buttonStyle(PressableStyle())
+    }
+}
+
+// MARK: — Edit baby profile sheet
+
+private struct EditBabyScreen: View {
+    @Environment(AppStore.self) private var store
+    let onClose: () -> Void
+
+    @State private var name: String = ""
+    @State private var birthDate: Date = Date()
+    @State private var gender: BabyGender = .unspecified
+    @State private var avatarData: Data? = nil
+    @State private var pickerItem: PhotosPickerItem? = nil
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ScreenHeader(title: "编辑宝宝资料", onBack: onClose)
+
+            ScreenBody {
+                VStack(spacing: 18) {
+                    avatarPicker
+                        .padding(.top, 6)
+
+                    FormField(label: "姓名") {
+                        TextField("请输入宝宝姓名", text: $name)
+                            .textInputAutocapitalization(.never)
+                    }
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        FieldLabel(text: "出生日期")
+                        DatePicker("", selection: $birthDate, in: ...Date(), displayedComponents: .date)
+                            .labelsHidden()
+                            .datePickerStyle(.compact)
+                            .environment(\.locale, Locale(identifier: "zh_CN"))
+                            .padding(.horizontal, 12).padding(.vertical, 8)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    }
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        FieldLabel(text: "性别")
+                        SegPill(selection: $gender, options: [
+                            (.girl, "女宝"),
+                            (.boy, "男宝"),
+                            (.unspecified, "未设置"),
+                        ])
+                    }
+
+                    CTAButton(title: "保存", theme: store.theme) {
+                        var b = store.baby
+                        b.name = name.trimmingCharacters(in: .whitespaces).isEmpty ? b.name : name
+                        b.birthDate = birthDate
+                        b.gender = gender
+                        b.avatarData = avatarData
+                        store.baby = b
+                        onClose()
+                    }
+                    .padding(.top, 6)
+                }
+            }
+        }
+        .background(Palette.bg)
+        .onAppear {
+            name = store.baby.name
+            birthDate = store.baby.birthDate
+            gender = store.baby.gender
+            avatarData = store.baby.avatarData
+        }
+        .onChange(of: pickerItem) { _, item in
+            guard let item else { return }
+            Task {
+                if let data = try? await item.loadTransferable(type: Data.self) {
+                    avatarData = data
+                }
+            }
+        }
+    }
+
+    private var avatarPicker: some View {
+        PhotosPicker(selection: $pickerItem, matching: .images, photoLibrary: .shared()) {
+            VStack(spacing: 10) {
+                ZStack(alignment: .bottomTrailing) {
+                    Group {
+                        if let data = avatarData, let ui = UIImage(data: data) {
+                            Image(uiImage: ui).resizable().scaledToFill()
+                        } else {
+                            BabyAvatar()
+                        }
+                    }
+                    .frame(width: 96, height: 96)
+                    .clipShape(Circle())
+                    .overlay(Circle().stroke(Color.white, lineWidth: 3))
+                    .shadowCard()
+
+                    ZStack {
+                        Circle().fill(store.theme.primary)
+                        Image(systemName: "camera.fill")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
+                    .frame(width: 30, height: 30)
+                }
+                Text("点击更换头像")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(Palette.ink3)
+            }
+            .frame(maxWidth: .infinity)
         }
         .buttonStyle(PressableStyle())
     }
