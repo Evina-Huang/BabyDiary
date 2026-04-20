@@ -6,7 +6,7 @@ enum FoodStatus: String, Codable, Hashable {
     case allergic   // 过敏
 }
 
-struct FoodItem: Identifiable, Hashable {
+struct FoodItem: Identifiable, Hashable, Codable {
     let id: String
     var name: String
     var firstUsedAt: Date

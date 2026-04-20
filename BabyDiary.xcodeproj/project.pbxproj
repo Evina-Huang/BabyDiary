@@ -25,7 +25,9 @@
 		972A70388DA4655BA6F1198D /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5BA15EF9E3E52299271C1A3 /* Theme.swift */; };
 		A15C5809230D08E7735D9957 /* Vaccine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0707DB66BE6B3F5B718679C3 /* Vaccine.swift */; };
 		B38A9B9C9F2E3B8C0F6D7771 /* EventEditSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95D1A27D017DACA51051A40E /* EventEditSheet.swift */; };
+		B8645C91E2EE03B9EA940B5A /* Backup.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3792BD5CAF341914797907E /* Backup.swift */; };
 		BCEC5DB360E3B0F899717BB2 /* DiaperView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2C7AC0ABADFB4E8B1D479A4 /* DiaperView.swift */; };
+		BE937337B54F44B51D0E139F /* BackupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEEA5B6B67F89989A1EB85EF /* BackupView.swift */; };
 		C8ABA57A566961EC9833ABF7 /* FoodItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0181DA81854724D428DE31A5 /* FoodItem.swift */; };
 		C9EE5DEC31801EB78F0521B2 /* AppStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA9831391FD58F873506339A /* AppStore.swift */; };
 		DC77C5471B6A77860BA20FA9 /* Event.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2183741F6B070696BCE37F88 /* Event.swift */; };
@@ -55,6 +57,7 @@
 		75A3C34D1CA00285FB7EA36C /* BabyDiary.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = BabyDiary.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		846242867B8E637561712FE3 /* RecordsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordsView.swift; sourceTree = "<group>"; };
 		95D1A27D017DACA51051A40E /* EventEditSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventEditSheet.swift; sourceTree = "<group>"; };
+		A3792BD5CAF341914797907E /* Backup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Backup.swift; sourceTree = "<group>"; };
 		AA9831391FD58F873506339A /* AppStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStore.swift; sourceTree = "<group>"; };
 		BA3E4AAE44A1EB50CB7798E7 /* BabyDiaryTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = BabyDiaryTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		BC8D0F2DAE3C93A66E2FF521 /* VaccineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaccineView.swift; sourceTree = "<group>"; };
@@ -65,6 +68,7 @@
 		D03ECC892748E58446D60717 /* BabyDiaryApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BabyDiaryApp.swift; sourceTree = "<group>"; };
 		D263718D27C28E0CF528F25F /* StatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsView.swift; sourceTree = "<group>"; };
 		E906265959DF67553653CC27 /* GrowthView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GrowthView.swift; sourceTree = "<group>"; };
+		EEEA5B6B67F89989A1EB85EF /* BackupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupView.swift; sourceTree = "<group>"; };
 		EFE78E7D4207C0B0F803CD81 /* FeedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedView.swift; sourceTree = "<group>"; };
 		F2E3BE778F004091A6BFD447 /* SolidView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SolidView.swift; sourceTree = "<group>"; };
 		F32A661F9551A563B09C6653 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
@@ -76,6 +80,7 @@
 			children = (
 				AA9831391FD58F873506339A /* AppStore.swift */,
 				D03ECC892748E58446D60717 /* BabyDiaryApp.swift */,
+				A3792BD5CAF341914797907E /* Backup.swift */,
 				65AC155878DF39E04CA789EA /* ContentView.swift */,
 				C5BA15EF9E3E52299271C1A3 /* Theme.swift */,
 			);
@@ -158,6 +163,7 @@
 		F922C2A069BCFD27BD1FEB6D /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				EEEA5B6B67F89989A1EB85EF /* BackupView.swift */,
 				C2C7AC0ABADFB4E8B1D479A4 /* DiaperView.swift */,
 				95D1A27D017DACA51051A40E /* EventEditSheet.swift */,
 				EFE78E7D4207C0B0F803CD81 /* FeedView.swift */,
@@ -262,6 +268,8 @@
 			files = (
 				C9EE5DEC31801EB78F0521B2 /* AppStore.swift in Sources */,
 				6AEECBD51C09CB2312324295 /* BabyDiaryApp.swift in Sources */,
+				B8645C91E2EE03B9EA940B5A /* Backup.swift in Sources */,
+				BE937337B54F44B51D0E139F /* BackupView.swift in Sources */,
 				72768378CE6D0262BB6CF9F5 /* ContentView.swift in Sources */,
 				BCEC5DB360E3B0F899717BB2 /* DiaperView.swift in Sources */,
 				DC77C5471B6A77860BA20FA9 /* Event.swift in Sources */,

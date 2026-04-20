@@ -16,7 +16,7 @@ enum EventKind: String, Codable, CaseIterable, Hashable {
     }
 }
 
-struct Event: Identifiable, Hashable {
+struct Event: Identifiable, Hashable, Codable {
     let id: String
     var kind: EventKind
     var at: Date

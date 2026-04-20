@@ -26,17 +26,19 @@ final class AppStore {
         return s
     }()
 
-    func addEvent(_ e: Event) { events.insert(e, at: 0) }
-    func deleteEvent(_ e: Event) { events.removeAll { $0.id == e.id } }
+    func addEvent(_ e: Event) { events.insert(e, at: 0); persist() }
+    func deleteEvent(_ e: Event) { events.removeAll { $0.id == e.id }; persist() }
 
     func updateEvent(_ e: Event) {
         guard let idx = events.firstIndex(where: { $0.id == e.id }) else { return }
         events[idx] = e
+        persist()
     }
 
     func updateGrowth(_ g: GrowthPoint) {
         guard let idx = growth.firstIndex(where: { $0.id == g.id }) else { return }
         growth[idx] = g
+        persist()
     }
 
     func startTimer(kind: EventKind, at date: Date = Date()) {
@@ -50,22 +52,73 @@ final class AppStore {
         return t
     }
 
-    func toggleVaccine(_ id: String) {
-        guard let idx = vaccines.firstIndex(where: { $0.id == id }) else { return }
-        var v = vaccines[idx]
-        v.done.toggle()
-        if v.done {
-            let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
-            v.doneDate = f.string(from: Date())
-            v.status = .done
-        } else {
-            v.doneDate = nil
-            v.status = .due
-        }
-        vaccines[idx] = v
+    // MARK: — Vaccine plan management
+
+    /// 备选模板中尚未加入用户计划的那些。
+    var availableVaccineTemplates: [VaccineTemplate] {
+        VaccineCatalog.presets.filter { t in !vaccines.contains { $0.id == t.id } }
     }
 
-    func addGrowth(_ g: GrowthPoint) { growth.append(g) }
+    func recommendedDate(forMonths months: Int) -> Date {
+        Calendar.current.date(byAdding: .month, value: months, to: baby.birthDate) ?? baby.birthDate
+    }
+
+    func addVaccineFromTemplate(_ t: VaccineTemplate) {
+        guard !vaccines.contains(where: { $0.id == t.id }) else { return }
+        vaccines.append(Vaccine(
+            id: t.id, name: t.name, ageLabel: t.ageLabel, ageMonths: t.ageMonths,
+            scheduledDate: recommendedDate(forMonths: t.ageMonths),
+            doneDate: nil, isCustom: false
+        ))
+        sortVaccines()
+        persist()
+    }
+
+    func addCustomVaccine(name: String, ageMonths: Int, scheduledDate: Date?) {
+        let id = "vc_" + UUID().uuidString.prefix(6).lowercased()
+        vaccines.append(Vaccine(
+            id: id, name: name, ageLabel: vaccineAgeLabel(months: ageMonths),
+            ageMonths: ageMonths,
+            scheduledDate: scheduledDate ?? recommendedDate(forMonths: ageMonths),
+            doneDate: nil, isCustom: true
+        ))
+        sortVaccines()
+        persist()
+    }
+
+    func updateVaccine(_ v: Vaccine) {
+        guard let idx = vaccines.firstIndex(where: { $0.id == v.id }) else { return }
+        vaccines[idx] = v
+        sortVaccines()
+        persist()
+    }
+
+    func removeVaccine(_ id: String) {
+        vaccines.removeAll { $0.id == id }
+        persist()
+    }
+
+    func toggleVaccine(_ id: String) {
+        guard let idx = vaccines.firstIndex(where: { $0.id == id }) else { return }
+        if vaccines[idx].done {
+            vaccines[idx].doneDate = nil
+        } else {
+            vaccines[idx].doneDate = vaccines[idx].scheduledDate ?? Date()
+        }
+        persist()
+    }
+
+    private func sortVaccines() {
+        vaccines.sort { (a, b) in
+            // 已完成放后面；按推荐日期/月龄排序
+            if a.done != b.done { return !a.done && b.done }
+            let ad = a.scheduledDate ?? Calendar.current.date(byAdding: .month, value: a.ageMonths, to: baby.birthDate) ?? Date()
+            let bd = b.scheduledDate ?? Calendar.current.date(byAdding: .month, value: b.ageMonths, to: baby.birthDate) ?? Date()
+            return ad < bd
+        }
+    }
+
+    func addGrowth(_ g: GrowthPoint) { growth.append(g); persist() }
 
     func recordSolidFood(_ name: String, at date: Date = .now, observationDays: Int = 3) {
         if let idx = foods.firstIndex(where: { $0.name == name }) {
@@ -80,11 +133,13 @@ final class AppStore {
                 observationDays: observationDays
             ))
         }
+        persist()
     }
 
     func updateFoodStatus(_ id: String, _ status: FoodStatus) {
         guard let idx = foods.firstIndex(where: { $0.id == id }) else { return }
         foods[idx].status = status
+        persist()
     }
 
     private func seed() {
@@ -114,19 +169,19 @@ final class AppStore {
             .init(id: "e12", kind: .sleep,  at: daysAgo(2, 13), endAt: daysAgo(2, 15), title: "睡眠 2h", sub: "13:00 — 15:00"),
         ]
 
+        let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"
+        let ipv3  = cal.date(byAdding: .month, value: 4, to: baby.birthDate) ?? now
+        let dtp3  = cal.date(byAdding: .month, value: 5, to: baby.birthDate) ?? now
+        let mmr   = cal.date(byAdding: .month, value: 8, to: baby.birthDate) ?? now
         vaccines = [
-            .init(id: "v1",  name: "卡介苗 (BCG)",       age: "出生时",  status: .done,     done: true,  doneDate: "2025-10-18"),
-            .init(id: "v2",  name: "乙肝疫苗 第1剂",     age: "出生时",  status: .done,     done: true,  doneDate: "2025-10-18"),
-            .init(id: "v3",  name: "乙肝疫苗 第2剂",     age: "1 月龄",  status: .done,     done: true,  doneDate: "2025-11-20"),
-            .init(id: "v4",  name: "脊灰疫苗 第1剂",     age: "2 月龄",  status: .done,     done: true,  doneDate: "2025-12-19"),
-            .init(id: "v5",  name: "脊灰疫苗 第2剂",     age: "3 月龄",  status: .done,     done: true,  doneDate: "2026-01-20"),
-            .init(id: "v6",  name: "百白破疫苗 第1剂",   age: "3 月龄",  status: .done,     done: true,  doneDate: "2026-01-20"),
-            .init(id: "v7",  name: "百白破疫苗 第2剂",   age: "4 月龄",  status: .done,     done: true,  doneDate: "2026-02-18"),
-            .init(id: "v8",  name: "脊灰疫苗 第3剂",     age: "4 月龄",  status: .overdue,  done: false),
-            .init(id: "v9",  name: "百白破疫苗 第3剂",   age: "5 月龄",  status: .due,      done: false),
-            .init(id: "v10", name: "麻腮风疫苗",         age: "8 月龄",  status: .upcoming, done: false),
-            .init(id: "v11", name: "乙脑疫苗",           age: "8 月龄",  status: .upcoming, done: false),
-            .init(id: "v12", name: "甲肝疫苗",           age: "18 月龄", status: .upcoming, done: false),
+            .init(id: "t_bcg",   name: "卡介苗 (BCG)",     ageLabel: "出生时", ageMonths: 0, scheduledDate: baby.birthDate,            doneDate: df.date(from: "2025-10-18")),
+            .init(id: "t_hepb1", name: "乙肝疫苗 第1剂",   ageLabel: "出生时", ageMonths: 0, scheduledDate: baby.birthDate,            doneDate: df.date(from: "2025-10-18")),
+            .init(id: "t_hepb2", name: "乙肝疫苗 第2剂",   ageLabel: "1 月龄", ageMonths: 1, scheduledDate: cal.date(byAdding: .month, value: 1, to: baby.birthDate), doneDate: df.date(from: "2025-11-20")),
+            .init(id: "t_ipv1",  name: "脊灰疫苗 第1剂",   ageLabel: "2 月龄", ageMonths: 2, scheduledDate: cal.date(byAdding: .month, value: 2, to: baby.birthDate), doneDate: df.date(from: "2025-12-19")),
+            .init(id: "t_dtp1",  name: "百白破疫苗 第1剂", ageLabel: "3 月龄", ageMonths: 3, scheduledDate: cal.date(byAdding: .month, value: 3, to: baby.birthDate), doneDate: df.date(from: "2026-01-20")),
+            .init(id: "t_ipv3",  name: "脊灰疫苗 第3剂",   ageLabel: "4 月龄", ageMonths: 4, scheduledDate: ipv3, doneDate: nil),
+            .init(id: "t_dtp3",  name: "百白破疫苗 第3剂", ageLabel: "5 月龄", ageMonths: 5, scheduledDate: dtp3, doneDate: nil),
+            .init(id: "t_mmr",   name: "麻腮风疫苗",       ageLabel: "8 月龄", ageMonths: 8, scheduledDate: mmr,  doneDate: nil),
         ]
 
         let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
@@ -163,7 +218,7 @@ struct RunningTimer: Equatable, Codable {
 }
 
 enum SubScreen: String, Identifiable {
-    case sleep, feed, diaper, solid, vaccine, foodList
+    case sleep, feed, diaper, solid, vaccine, foodList, backup
     var id: String { rawValue }
 }
 

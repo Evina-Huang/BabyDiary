@@ -1,6 +1,6 @@
 import Foundation
 
-struct GrowthPoint: Identifiable, Hashable {
+struct GrowthPoint: Identifiable, Hashable, Codable {
     let id: String
     var date: Date
     var ageMonths: Double
@@ -9,7 +9,7 @@ struct GrowthPoint: Identifiable, Hashable {
     var headCm: Double?
 }
 
-enum BabyGender: String, CaseIterable, Hashable {
+enum BabyGender: String, CaseIterable, Hashable, Codable {
     case girl, boy, unspecified
     var label: String {
         switch self {
@@ -20,7 +20,7 @@ enum BabyGender: String, CaseIterable, Hashable {
     }
 }
 
-struct Baby: Hashable {
+struct Baby: Hashable, Codable {
     var name: String
     var birthDate: Date
     var gender: BabyGender = .unspecified

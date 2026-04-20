@@ -2,7 +2,7 @@ import SwiftUI
 
 @main
 struct BabyDiaryApp: App {
-    @State private var store = AppStore()
+    @State private var store = AppStore.loadedOrSeeded()
 
     var body: some Scene {
         WindowGroup {

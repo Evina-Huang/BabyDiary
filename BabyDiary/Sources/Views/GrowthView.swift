@@ -57,7 +57,7 @@ private func refFor(_ m: GrowthMetric) -> [GrowthRef] {
 }
 
 struct GrowthView: View {
-    let onOpenVaccines: () -> Void
+    let onOpen: (SubScreen) -> Void
     @Environment(AppStore.self) private var store
 
     @State private var metric: GrowthMetric = .weight
@@ -96,7 +96,7 @@ struct GrowthView: View {
                 chartCard.padding(.top, 14)
                 addButton.padding(.top, 14)
                 historyBlock.padding(.top, 22)
-                vaccinesEntry.padding(.top, 22)
+                healthEntries.padding(.top, 22)
             }
         }
         .background(Palette.bg)
@@ -501,22 +501,67 @@ struct GrowthView: View {
         return f.string(from: d)
     }
 
-    // MARK: — Vaccines entry card
+    // MARK: — 健康入口卡片组(疫苗 + 食物清单)
 
-    private var vaccinesEntry: some View {
-        Button(action: onOpenVaccines) {
+    private var healthEntries: some View {
+        VStack(spacing: 10) {
+            EntryCard(
+                title: "疫苗接种",
+                subtitle: vaccineSubtitle,
+                iconBg: Palette.mintTint,
+                icon: { AppIcon.Shield(size: 24, color: Palette.mint600) },
+                onTap: { onOpen(.vaccine) }
+            )
+            EntryCard(
+                title: "食物清单",
+                subtitle: foodSubtitle,
+                iconBg: Palette.yellow,
+                icon: { AppIcon.Bowl(size: 24, color: Palette.yellowInk) },
+                onTap: { onOpen(.foodList) }
+            )
+        }
+    }
+
+    private var vaccineSubtitle: String {
+        let done = store.vaccines.filter(\.done).count
+        let total = store.vaccines.count
+        if total == 0 { return "添加接种计划与进度" }
+        return "已完成 \(done) / \(total)"
+    }
+
+    private var foodSubtitle: String {
+        let safe      = store.foods.filter { $0.status == .safe }.count
+        let allergic  = store.foods.filter { $0.status == .allergic }.count
+        let observing = store.foods.filter { $0.status == .observing }.count
+        var parts: [String] = []
+        if safe      > 0 { parts.append("已排敏 \(safe)") }
+        if allergic  > 0 { parts.append("过敏 \(allergic)") }
+        if observing > 0 { parts.append("观察中 \(observing)") }
+        return parts.isEmpty ? "暂无记录" : parts.joined(separator: " · ")
+    }
+}
+
+private struct EntryCard<Icon: View>: View {
+    let title: String
+    let subtitle: String
+    let iconBg: Color
+    @ViewBuilder let icon: () -> Icon
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
             HStack(spacing: 14) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Palette.mintTint)
-                    AppIcon.Shield(size: 24, color: Palette.mint600)
+                    RoundedRectangle(cornerRadius: 14, style: .continuous).fill(iconBg)
+                    icon()
                 }
                 .frame(width: 44, height: 44)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("疫苗记录")
+                    Text(title)
                         .font(.system(size: 15, weight: .heavy))
                         .tracking(-0.15)
                         .foregroundStyle(Palette.ink)
-                    Text("查看接种计划与进度")
+                    Text(subtitle)
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(Palette.ink3)
                 }
@@ -524,6 +569,7 @@ struct GrowthView: View {
                 AppIcon.Chevron(size: 16, color: Palette.ink3)
             }
             .padding(.horizontal, 18).padding(.vertical, 14)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .background(Palette.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
             .shadowCard()
         }
@@ -650,6 +696,6 @@ struct TabTitleHeader: View {
 }
 
 #Preview("成长") {
-    GrowthView(onOpenVaccines: {})
+    GrowthView(onOpen: { _ in })
         .environment(AppStore.preview)
 }

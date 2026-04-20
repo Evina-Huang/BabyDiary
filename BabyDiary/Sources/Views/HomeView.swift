@@ -8,16 +8,28 @@ struct HomeView: View {
     var body: some View {
         VStack(spacing: 0) {
             // Greeting block
-            VStack(alignment: .leading, spacing: 2) {
-                Text(dateLine())
-                    .font(.system(size: 12, weight: .bold))
-                    .tracking(0.72)
-                    .textCase(.uppercase)
-                    .foregroundStyle(Palette.ink3)
-                Text("你好呀 👋")
-                    .font(.system(size: 24, weight: .black))
-                    .tracking(-0.72)
-                    .foregroundStyle(Palette.ink)
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(dateLine())
+                        .font(.system(size: 12, weight: .bold))
+                        .tracking(0.72)
+                        .textCase(.uppercase)
+                        .foregroundStyle(Palette.ink3)
+                    Text("你好呀 👋")
+                        .font(.system(size: 24, weight: .black))
+                        .tracking(-0.72)
+                        .foregroundStyle(Palette.ink)
+                }
+                Spacer()
+                Button { onOpen(.backup) } label: {
+                    Image(systemName: "square.and.arrow.up.on.square")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(store.theme.primary600)
+                        .frame(width: 40, height: 40)
+                        .background(store.theme.primaryTint, in: Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("数据备份")
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 20).padding(.top, 10).padding(.bottom, 2)
@@ -44,11 +56,6 @@ struct HomeView: View {
 
                 SinceLastRow().padding(.top, 10)
 
-                VaccineEntry { onOpen(.vaccine) }
-                    .padding(.top, 16)
-
-                FoodListEntry { onOpen(.foodList) }
-                    .padding(.top, 12)
             }
         }
         .background(Palette.bg)
@@ -346,87 +353,6 @@ private struct SinceLastRow: View {
     }
 }
 
-// MARK: — Bottom-of-home food list entry
-
-private struct FoodListEntry: View {
-    let onTap: () -> Void
-    @Environment(AppStore.self) private var store
-
-    var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 14) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(Palette.yellow)
-                    AppIcon.Bowl(size: 24, color: Palette.yellowInk)
-                }
-                .frame(width: 44, height: 44)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("食物清单")
-                        .font(.system(size: 15, weight: .heavy))
-                        .tracking(-0.15)
-                        .foregroundStyle(Palette.ink)
-                    Text(subtitle)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Palette.ink3)
-                }
-                Spacer(minLength: 0)
-                AppIcon.Chevron(size: 16, color: Palette.ink3)
-            }
-            .padding(.horizontal, 18).padding(.vertical, 14)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Palette.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .shadowCard()
-        }
-        .buttonStyle(PressableStyle())
-    }
-
-    private var subtitle: String {
-        let safe      = store.foods.filter { $0.status == .safe }.count
-        let allergic  = store.foods.filter { $0.status == .allergic }.count
-        let observing = store.foods.filter { $0.status == .observing }.count
-        var parts: [String] = []
-        if safe      > 0 { parts.append("已排敏 \(safe)") }
-        if allergic  > 0 { parts.append("过敏 \(allergic)") }
-        if observing > 0 { parts.append("观察中 \(observing)") }
-        return parts.isEmpty ? "暂无记录" : parts.joined(separator: " · ")
-    }
-}
-
-// MARK: — Bottom-of-home vaccine entry
-
-private struct VaccineEntry: View {
-    let onTap: () -> Void
-    var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 14) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(Palette.mintTint)
-                    AppIcon.Shield(size: 24, color: Palette.mint600)
-                }
-                .frame(width: 44, height: 44)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("疫苗接种")
-                        .font(.system(size: 15, weight: .heavy))
-                        .tracking(-0.15)
-                        .foregroundStyle(Palette.ink)
-                    Text("查看接种计划与进度")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Palette.ink3)
-                }
-                Spacer(minLength: 0)
-                AppIcon.Chevron(size: 16, color: Palette.ink3)
-            }
-            .padding(.horizontal, 18).padding(.vertical, 14)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Palette.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .shadowCard()
-        }
-        .buttonStyle(PressableStyle())
-    }
-}
-
 // MARK: — Edit baby profile sheet
 
 private struct EditBabyScreen: View {
@@ -480,6 +406,7 @@ private struct EditBabyScreen: View {
                         b.gender = gender
                         b.avatarData = avatarData
                         store.baby = b
+                        store.persist()
                         onClose()
                     }
                     .padding(.top, 6)

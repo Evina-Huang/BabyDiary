@@ -13,7 +13,7 @@ struct ContentView: View {
                 switch tab {
                 case .home:    HomeView(onOpen: { sub = $0 })
                 case .records: RecordsView()
-                case .growth:  GrowthView(onOpenVaccines: { sub = .vaccine })
+                case .growth:  GrowthView(onOpen: { sub = $0 })
                 case .stats:   StatsView()
                 }
             }
@@ -39,6 +39,7 @@ struct ContentView: View {
         case .solid:    SolidScreen(onBack:    { sub = nil })
         case .vaccine:  VaccineScreen(onBack:  { sub = nil })
         case .foodList: FoodListScreen(onBack: { sub = nil })
+        case .backup:   BackupScreen(onBack:   { sub = nil })
         }
     }
 }

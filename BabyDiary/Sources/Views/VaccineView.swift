@@ -3,6 +3,8 @@ import SwiftUI
 struct VaccineScreen: View {
     let onBack: () -> Void
     @Environment(AppStore.self) private var store
+    @State private var editing: Vaccine? = nil
+    @State private var showAddCustom = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -10,19 +12,47 @@ struct VaccineScreen: View {
             ScreenBody {
                 progressHero.padding(.top, 4)
 
-                let upcoming = store.vaccines.filter { !$0.done }
-                let completed = store.vaccines.filter { $0.done }
+                let plan = store.vaccines
+                let upcoming = plan.filter { !$0.done }
+                let completed = plan.filter { $0.done }
+                let templates = store.availableVaccineTemplates
 
-                sectionHeader(title: "待接种", countLabel: "\(upcoming.count) 项",
+                sectionHeader(title: "我的接种计划 · 待接种", countLabel: "\(upcoming.count) 项",
                               ink: Palette.pinkInk, bg: store.theme.primaryTint)
                     .padding(.top, 24)
 
-                VStack(spacing: 10) {
-                    ForEach(upcoming) { v in
-                        VaccineCard(vaccine: v) { store.toggleVaccine(v.id) }
+                if upcoming.isEmpty {
+                    Card {
+                        Text("还没有待接种的疫苗，从下方「推荐接种」中添加，或自定义新增。")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Palette.ink3)
                     }
+                    .padding(.top, 10)
+                } else {
+                    VStack(spacing: 10) {
+                        ForEach(upcoming) { v in
+                            VaccineCard(vaccine: v,
+                                        onEdit: { editing = v },
+                                        onComplete: { store.toggleVaccine(v.id) })
+                        }
+                    }
+                    .padding(.top, 10)
                 }
-                .padding(.top, 10)
+
+                addCustomButton.padding(.top, 12)
+
+                if !templates.isEmpty {
+                    sectionHeader(title: "推荐接种", countLabel: "\(templates.count) 项",
+                                  ink: store.theme.primary600, bg: store.theme.primaryTint)
+                        .padding(.top, 24)
+
+                    VStack(spacing: 10) {
+                        ForEach(templates) { t in
+                            TemplateCard(template: t) { store.addVaccineFromTemplate(t) }
+                        }
+                    }
+                    .padding(.top, 10)
+                }
 
                 if !completed.isEmpty {
                     sectionHeader(title: "已完成", countLabel: "\(completed.count) 项",
@@ -33,7 +63,7 @@ struct VaccineScreen: View {
                         VStack(spacing: 0) {
                             ForEach(Array(completed.enumerated()), id: \.element.id) { i, v in
                                 CompletedRow(vaccine: v, last: i == completed.count - 1) {
-                                    store.toggleVaccine(v.id)
+                                    editing = v
                                 }
                                 .padding(.horizontal, 16)
                             }
@@ -44,6 +74,32 @@ struct VaccineScreen: View {
             }
         }
         .background(Palette.bg)
+        .sheet(item: $editing) { v in
+            VaccineEditSheet(vaccine: v) { editing = nil }
+                .environment(store)
+                .presentationDetents([.medium, .large])
+        }
+        .sheet(isPresented: $showAddCustom) {
+            VaccineAddCustomSheet { showAddCustom = false }
+                .environment(store)
+                .presentationDetents([.medium])
+        }
+    }
+
+    private var addCustomButton: some View {
+        Button { showAddCustom = true } label: {
+            HStack(spacing: 8) {
+                AppIcon.Check(size: 14, color: store.theme.primary600)
+                Text("新增自定义疫苗")
+                    .font(.system(size: 14, weight: .heavy))
+                    .tracking(-0.14)
+                    .foregroundStyle(store.theme.primary600)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .background(store.theme.primaryTint, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        }
+        .buttonStyle(PressableStyle())
     }
 
     private var progressHero: some View {
@@ -105,13 +161,17 @@ struct VaccineScreen: View {
     }
 }
 
+// MARK: — 计划中的疫苗卡片
+
 private struct VaccineCard: View {
     let vaccine: Vaccine
-    let onToggle: () -> Void
+    let onEdit: () -> Void
+    let onComplete: () -> Void
 
     var body: some View {
-        let overdue = vaccine.status == .overdue
-        let dueNow  = vaccine.status == .due
+        let status = vaccine.status()
+        let overdue = status == .overdue
+        let dueNow  = status == .due
         let bg: Color = overdue ? Color(hex: 0xFFE8E0)
                         : dueNow ? Palette.yellow : .white
         let iconBg: Color = overdue ? .white
@@ -132,32 +192,51 @@ private struct VaccineCard: View {
                     .tracking(-0.15)
                     .foregroundStyle(Palette.ink)
                 HStack(spacing: 6) {
-                    Text("推荐 \(vaccine.age)")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(Palette.ink3)
+                    if let d = vaccine.scheduledDate {
+                        Text("计划 \(formatDate(d))")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(Palette.ink3)
+                    } else {
+                        Text(vaccine.ageLabel)
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(Palette.ink3)
+                    }
                     if overdue { tag(text: "已逾期", tint: Color(hex: 0xFF7F64)) }
                     if dueNow  { tag(text: "本月",   tint: Palette.yellowInk) }
+                    if vaccine.isCustom { tag(text: "自定义", tint: Palette.ink3) }
                 }
             }
             Spacer(minLength: 0)
 
-            Button(action: onToggle) {
-                HStack(spacing: 6) {
-                    AppIcon.Check(size: 14, color: .white)
-                    Text("完成")
-                        .font(.system(size: 13, weight: .heavy))
-                        .tracking(-0.13)
+            VStack(spacing: 6) {
+                Button(action: onComplete) {
+                    HStack(spacing: 6) {
+                        AppIcon.Check(size: 14, color: .white)
+                        Text("完成")
+                            .font(.system(size: 13, weight: .heavy))
+                            .tracking(-0.13)
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 14).padding(.vertical, 10)
+                    .background(Palette.mint, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .shadow(color: Palette.mint600.opacity(0.35), radius: 8, x: 0, y: 2)
                 }
-                .foregroundStyle(.white)
-                .padding(.horizontal, 14).padding(.vertical, 10)
-                .background(Palette.mint, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .shadow(color: Palette.mint600.opacity(0.35), radius: 8, x: 0, y: 2)
+                .buttonStyle(PressableStyle())
+
+                Button(action: onEdit) {
+                    Text("编辑")
+                        .font(.system(size: 11, weight: .heavy))
+                        .foregroundStyle(Palette.ink3)
+                        .padding(.horizontal, 10).padding(.vertical, 4)
+                        .background(Palette.bg2, in: Capsule())
+                }
+                .buttonStyle(PressableStyle())
             }
-            .buttonStyle(PressableStyle())
         }
         .padding(16)
         .background(bg, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
         .shadowCard()
+        .contentShape(Rectangle())
     }
 
     private func tag(text: String, tint: Color) -> some View {
@@ -171,13 +250,58 @@ private struct VaccineCard: View {
     }
 }
 
+// MARK: — 推荐模板卡片（尚未加入计划）
+
+private struct TemplateCard: View {
+    let template: VaccineTemplate
+    let onAdd: () -> Void
+    @Environment(AppStore.self) private var store
+
+    var body: some View {
+        HStack(spacing: 14) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Palette.bg2)
+                AppIcon.Syringe(size: 22, color: Palette.ink3)
+            }
+            .frame(width: 44, height: 44)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(template.name)
+                    .font(.system(size: 15, weight: .heavy))
+                    .tracking(-0.15)
+                    .foregroundStyle(Palette.ink)
+                Text("推荐 \(template.ageLabel) · 约 \(formatDate(store.recommendedDate(forMonths: template.ageMonths)))")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Palette.ink3)
+            }
+            Spacer(minLength: 0)
+
+            Button(action: onAdd) {
+                Text("加入计划")
+                    .font(.system(size: 13, weight: .heavy))
+                    .tracking(-0.13)
+                    .foregroundStyle(store.theme.primary600)
+                    .padding(.horizontal, 12).padding(.vertical, 9)
+                    .background(store.theme.primaryTint, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+            .buttonStyle(PressableStyle())
+        }
+        .padding(16)
+        .background(Color.white, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(Palette.line, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+        )
+    }
+}
+
 private struct CompletedRow: View {
     let vaccine: Vaccine
     let last: Bool
-    let onToggle: () -> Void
+    let onTap: () -> Void
 
     var body: some View {
-        Button(action: onToggle) {
+        Button(action: onTap) {
             VStack(spacing: 0) {
                 HStack(spacing: 14) {
                     ZStack {
@@ -193,12 +317,15 @@ private struct CompletedRow: View {
                             .foregroundStyle(Palette.ink)
                             .strikethrough(true, color: Palette.ink3)
                         if let dd = vaccine.doneDate {
-                            Text("\(vaccine.age) · 已于 \(dd) 接种")
+                            Text("\(vaccine.ageLabel) · 已于 \(formatDate(dd)) 接种")
                                 .font(.system(size: 12, weight: .semibold))
                                 .foregroundStyle(Palette.ink3)
                         }
                     }
                     Spacer(minLength: 0)
+                    Text("编辑")
+                        .font(.system(size: 11, weight: .heavy))
+                        .foregroundStyle(Palette.ink3)
                 }
                 .padding(.vertical, 12)
                 if !last {
@@ -208,6 +335,149 @@ private struct CompletedRow: View {
         }
         .buttonStyle(PressableStyle())
     }
+}
+
+// MARK: — 编辑已有疫苗
+
+private struct VaccineEditSheet: View {
+    @State var vaccine: Vaccine
+    let onClose: () -> Void
+    @Environment(AppStore.self) private var store
+    @State private var isDone: Bool
+    @State private var scheduled: Date
+    @State private var doneDate: Date
+
+    init(vaccine: Vaccine, onClose: @escaping () -> Void) {
+        self._vaccine = State(initialValue: vaccine)
+        self.onClose = onClose
+        self._isDone = State(initialValue: vaccine.done)
+        self._scheduled = State(initialValue: vaccine.scheduledDate ?? Date())
+        self._doneDate = State(initialValue: vaccine.doneDate ?? vaccine.scheduledDate ?? Date())
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("疫苗") {
+                    TextField("名称", text: $vaccine.name)
+                    HStack {
+                        Text("推荐月龄")
+                        Spacer()
+                        Text(vaccine.ageLabel).foregroundStyle(.secondary)
+                    }
+                }
+
+                Section("计划接种日期") {
+                    DatePicker("日期", selection: $scheduled, displayedComponents: .date)
+                        .environment(\.locale, Locale(identifier: "zh_CN"))
+                    Button("重置为推荐日期") {
+                        scheduled = store.recommendedDate(forMonths: vaccine.ageMonths)
+                    }
+                }
+
+                Section {
+                    Toggle("已接种", isOn: $isDone)
+                    if isDone {
+                        DatePicker("接种日期", selection: $doneDate, displayedComponents: .date)
+                            .environment(\.locale, Locale(identifier: "zh_CN"))
+                    }
+                }
+
+                Section {
+                    Button(role: .destructive) {
+                        store.removeVaccine(vaccine.id)
+                        onClose()
+                    } label: {
+                        Text(vaccine.isCustom ? "删除此疫苗" : "从我的计划中移除")
+                    }
+                }
+            }
+            .navigationTitle("编辑疫苗")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("取消", action: onClose)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("保存") {
+                        var updated = vaccine
+                        updated.scheduledDate = scheduled
+                        updated.doneDate = isDone ? doneDate : nil
+                        store.updateVaccine(updated)
+                        onClose()
+                    }
+                    .disabled(vaccine.name.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            }
+        }
+    }
+}
+
+// MARK: — 新增自定义疫苗
+
+private struct VaccineAddCustomSheet: View {
+    let onClose: () -> Void
+    @Environment(AppStore.self) private var store
+    @State private var name: String = ""
+    @State private var ageMonths: Int = 6
+    @State private var useCustomDate = false
+    @State private var scheduled: Date = Date()
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("疫苗信息") {
+                    TextField("疫苗名称", text: $name)
+                    Stepper(value: $ageMonths, in: 0...72) {
+                        HStack {
+                            Text("推荐月龄")
+                            Spacer()
+                            Text(vaccineAgeLabel(months: ageMonths)).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                Section("计划接种日期") {
+                    Toggle("自定义日期", isOn: $useCustomDate)
+                    if useCustomDate {
+                        DatePicker("日期", selection: $scheduled, displayedComponents: .date)
+                            .environment(\.locale, Locale(identifier: "zh_CN"))
+                    } else {
+                        HStack {
+                            Text("将使用推荐日期")
+                            Spacer()
+                            Text(formatDate(store.recommendedDate(forMonths: ageMonths)))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+            .navigationTitle("新增自定义疫苗")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("取消", action: onClose) }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("添加") {
+                        store.addCustomVaccine(
+                            name: name.trimmingCharacters(in: .whitespaces),
+                            ageMonths: ageMonths,
+                            scheduledDate: useCustomDate ? scheduled : nil
+                        )
+                        onClose()
+                    }
+                    .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            }
+        }
+    }
+}
+
+// MARK: — 日期格式化
+
+private func formatDate(_ d: Date) -> String {
+    let f = DateFormatter()
+    f.locale = Locale(identifier: "zh_CN")
+    f.dateFormat = "yyyy/MM/dd"
+    return f.string(from: d)
 }
 
 #Preview("疫苗") {
