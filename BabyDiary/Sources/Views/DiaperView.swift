@@ -140,7 +140,7 @@ struct DiaperScreen: View {
                                        subtitle: "跟踪换尿布的频率能帮你了解宝宝健康")
                     } else {
                         ForEach(Array(history.enumerated()), id: \.element.id) { i, e in
-                            EventRow(event: e, last: i == history.count - 1) { store.deleteEvent($0) }
+                            EventRow(event: e, last: i == history.count - 1, onDelete: { store.deleteEvent($0) })
                                 .padding(.horizontal, 16)
                         }
                     }

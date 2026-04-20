@@ -282,7 +282,7 @@ struct SolidScreen: View {
                                        subtitle: "记录第一次尝试的新食物，留住成长的小里程碑")
                     } else {
                         ForEach(Array(history.enumerated()), id: \.element.id) { i, e in
-                            EventRow(event: e, last: i == history.count - 1) { store.deleteEvent($0) }
+                            EventRow(event: e, last: i == history.count - 1, onDelete: { store.deleteEvent($0) })
                                 .padding(.horizontal, 16)
                         }
                     }

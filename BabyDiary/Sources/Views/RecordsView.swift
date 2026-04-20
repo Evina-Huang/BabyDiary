@@ -9,6 +9,7 @@ struct RecordsView: View {
     }()
     @State private var selectedDate: Date? = nil
     @State private var calendarOpen = false
+    @State private var editing: Event? = nil
 
     private var filteredSorted: [Event] {
         let base: [Event] = {
@@ -66,6 +67,21 @@ struct RecordsView: View {
             }
         }
         .background(Palette.bg)
+        .sheet(item: $editing) { ev in
+            EventEditSheet(
+                event: ev,
+                onCancel: { editing = nil },
+                onSave: { updated in
+                    store.updateEvent(updated)
+                    editing = nil
+                },
+                onDelete: { removed in
+                    store.deleteEvent(removed)
+                    editing = nil
+                }
+            )
+            .environment(store)
+        }
     }
 
     private var kickerText: String {
@@ -144,7 +160,10 @@ struct RecordsView: View {
             Card(padding: 0) {
                 VStack(spacing: 0) {
                     ForEach(Array(g.items.enumerated()), id: \.element.id) { i, e in
-                        EventRow(event: e, last: i == g.items.count - 1) { store.deleteEvent($0) }
+                        EventRow(event: e,
+                                 last: i == g.items.count - 1,
+                                 onDelete: { store.deleteEvent($0) },
+                                 onEdit: { editing = $0 })
                             .padding(.horizontal, 16)
                     }
                 }

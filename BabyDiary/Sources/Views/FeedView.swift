@@ -333,7 +333,7 @@ struct FeedScreen: View {
                                        subtitle: "小宝喝奶的每一口都会记录在这里")
                     } else {
                         ForEach(Array(history.enumerated()), id: \.element.id) { i, e in
-                            EventRow(event: e, last: i == history.count - 1) { store.deleteEvent($0) }
+                            EventRow(event: e, last: i == history.count - 1, onDelete: { store.deleteEvent($0) })
                                 .padding(.horizontal, 16)
                         }
                     }

@@ -29,6 +29,16 @@ final class AppStore {
     func addEvent(_ e: Event) { events.insert(e, at: 0) }
     func deleteEvent(_ e: Event) { events.removeAll { $0.id == e.id } }
 
+    func updateEvent(_ e: Event) {
+        guard let idx = events.firstIndex(where: { $0.id == e.id }) else { return }
+        events[idx] = e
+    }
+
+    func updateGrowth(_ g: GrowthPoint) {
+        guard let idx = growth.firstIndex(where: { $0.id == g.id }) else { return }
+        growth[idx] = g
+    }
+
     func startTimer(kind: EventKind, at date: Date = Date()) {
         activeTimer = RunningTimer(kind: kind, startedAt: date)
     }

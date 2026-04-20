@@ -209,7 +209,11 @@ private struct SleepRow: View {
             }
             .padding(.horizontal, 18).padding(.vertical, 14)
             .background(Palette.card)
-            .swipeActions(trailing: true) { onDelete(event) }
+            .contextMenu {
+                Button(role: .destructive) { onDelete(event) } label: {
+                    Label("删除", systemImage: "trash")
+                }
+            }
             if !last {
                 Rectangle().fill(Palette.line).frame(height: 1)
             }

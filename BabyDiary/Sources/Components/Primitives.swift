@@ -102,6 +102,7 @@ struct EventRow: View {
     let event: Event
     var last: Bool = false
     var onDelete: ((Event) -> Void)? = nil
+    var onEdit: ((Event) -> Void)? = nil
 
     var body: some View {
         let row = HStack(spacing: 14) {
@@ -122,62 +123,41 @@ struct EventRow: View {
                 .font(.system(size: 13, weight: .bold))
                 .monospacedDigit()
                 .foregroundStyle(Palette.ink2)
+            if onEdit != nil {
+                AppIcon.Chevron(size: 14, color: Palette.ink3)
+            }
         }
         .padding(.vertical, 12)
+        .contentShape(Rectangle())
+
+        let tappable = Group {
+            if let onEdit {
+                Button { onEdit(event) } label: { row }
+                    .buttonStyle(PressableStyle())
+            } else {
+                row
+            }
+        }
 
         VStack(spacing: 0) {
-            row
+            tappable
             if !last {
                 Rectangle().fill(Palette.line).frame(height: 1)
             }
         }
         .background(Palette.card)
-        .swipeActions(trailing: onDelete != nil, trash: { onDelete?(event) })
-    }
-}
-
-// Lightweight swipe-to-delete bridge — on iOS lists we'd use .swipeActions,
-// but inside our custom card stack we render it manually.
-private struct SwipeToDeleteModifier: ViewModifier {
-    let trailing: Bool
-    let onTrash: () -> Void
-    @State private var dx: CGFloat = 0
-    private let MAX: CGFloat = -88
-
-    func body(content: Content) -> some View {
-        ZStack(alignment: .trailing) {
-            if trailing {
-                Button(action: { withAnimation(.spring()) { onTrash(); dx = 0 } }) {
-                    Text("删除")
-                        .font(.system(size: 13, weight: .heavy))
-                        .foregroundStyle(.white)
-                        .frame(width: 80, height: 60)
-                        .background(Palette.bg)
-                }
-                .background(Color(hex: 0xFF7F64))
+        .contextMenu {
+            if let onEdit {
+                Button { onEdit(event) } label: { Label("编辑", systemImage: "pencil") }
             }
-            content
-                .offset(x: dx)
-                .gesture(
-                    DragGesture()
-                        .onChanged { g in
-                            guard trailing else { return }
-                            let next = min(0, max(MAX * 1.2, g.translation.width))
-                            dx = next
-                        }
-                        .onEnded { _ in
-                            withAnimation(.spring()) {
-                                dx = dx < MAX / 2 ? MAX : 0
-                            }
-                        }
-                )
+            if let onDelete {
+                Button(role: .destructive) {
+                    let gen = UINotificationFeedbackGenerator()
+                    gen.notificationOccurred(.success)
+                    onDelete(event)
+                } label: { Label("删除", systemImage: "trash") }
+            }
         }
-    }
-}
-
-extension View {
-    func swipeActions(trailing: Bool, trash: @escaping () -> Void) -> some View {
-        self.modifier(SwipeToDeleteModifier(trailing: trailing, onTrash: trash))
     }
 }
 

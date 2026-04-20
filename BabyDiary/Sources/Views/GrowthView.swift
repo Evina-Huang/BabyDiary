@@ -66,6 +66,7 @@ struct GrowthView: View {
     @State private var hInput: String = ""
     @State private var historyOpen = false
     @State private var historyFilter: HistoryFilter = .all
+    @State private var editingGrowth: GrowthPoint? = nil
 
     enum HistoryFilter: Hashable { case all, d30, d90, d365
         var label: String {
@@ -99,6 +100,17 @@ struct GrowthView: View {
             }
         }
         .background(Palette.bg)
+        .sheet(item: $editingGrowth) { g in
+            GrowthEditSheet(
+                point: g,
+                onCancel: { editingGrowth = nil },
+                onSave: { updated in
+                    store.updateGrowth(updated)
+                    editingGrowth = nil
+                }
+            )
+            .environment(store)
+        }
     }
 
     // MARK: — Two stat cards (weight + height)
@@ -398,9 +410,15 @@ struct GrowthView: View {
                             .padding(.vertical, 20)
                     } else {
                         ForEach(Array(visible.enumerated()), id: \.element.id) { i, g in
-                            historyRow(g, earlier: i + 1 < visible.count ? visible[i + 1] : nil,
-                                       last: i == visible.count - 1)
-                                .padding(.horizontal, 16)
+                            Button {
+                                editingGrowth = g
+                            } label: {
+                                historyRow(g, earlier: i + 1 < visible.count ? visible[i + 1] : nil,
+                                           last: i == visible.count - 1)
+                                    .padding(.horizontal, 16)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(PressableStyle())
                         }
                     }
                 }
@@ -469,6 +487,7 @@ struct GrowthView: View {
                         .foregroundStyle(Palette.ink3)
                 }
                 Spacer(minLength: 0)
+                AppIcon.Chevron(size: 14, color: Palette.ink3)
             }
             .padding(.vertical, 12)
             if !last {
