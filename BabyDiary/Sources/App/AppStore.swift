@@ -3,13 +3,17 @@ import Observation
 
 @Observable
 final class AppStore {
-    var baby = Baby(name: "小宝", ageLabel: "6 个月", birthLabel: "2025 年 10 月 18 日")
+    var baby = Baby(
+        name: "小宝",
+        birthDate: Calendar.current.date(from: DateComponents(year: 2025, month: 10, day: 18)) ?? Date(),
+        gender: .girl
+    )
     var events: [Event] = []
     var vaccines: [Vaccine] = []
     var growth: [GrowthPoint] = []
     var foods: [FoodItem] = []
     var theme: AppTheme = .blossom
-    var timerStart: Date? = nil
+    var activeTimer: RunningTimer? = nil
 
     init() { seed() }
 
@@ -24,6 +28,17 @@ final class AppStore {
 
     func addEvent(_ e: Event) { events.insert(e, at: 0) }
     func deleteEvent(_ e: Event) { events.removeAll { $0.id == e.id } }
+
+    func startTimer(kind: EventKind, at date: Date = Date()) {
+        activeTimer = RunningTimer(kind: kind, startedAt: date)
+    }
+
+    @discardableResult
+    func stopTimer() -> RunningTimer? {
+        let t = activeTimer
+        activeTimer = nil
+        return t
+    }
 
     func toggleVaccine(_ id: String) {
         guard let idx = vaccines.firstIndex(where: { $0.id == id }) else { return }
@@ -130,6 +145,13 @@ final class AppStore {
 }
 
 // Sub-screens launched from the Home screen as iOS sheets.
+// Represents an in-progress, user-initiated timer (sleep today; feed later).
+// Modeled so a future Live Activity / Widget can serialize exactly this shape.
+struct RunningTimer: Equatable, Codable {
+    let kind: EventKind
+    let startedAt: Date
+}
+
 enum SubScreen: String, Identifiable {
     case sleep, feed, diaper, solid, vaccine, foodList
     var id: String { rawValue }

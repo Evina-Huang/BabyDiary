@@ -394,21 +394,27 @@ struct CategoryStyle {
     let tint: Color
     let ink: Color
     let icon: AnyView
+    // SF Symbol fallback — used by Widget/Live Activity where Canvas icons aren't practical.
+    let sfSymbol: String
 
     static func forKind(_ kind: EventKind, iconSize: CGFloat = 28) -> CategoryStyle {
         switch kind {
         case .sleep:
             return .init(label: "睡眠", tint: Palette.lavender, ink: Palette.lavenderInk,
-                         icon: AnyView(AppIcon.Moon(size: iconSize, color: Palette.lavenderInk)))
+                         icon: AnyView(AppIcon.Moon(size: iconSize, color: Palette.lavenderInk)),
+                         sfSymbol: "moon.fill")
         case .feed:
             return .init(label: "喂奶", tint: Palette.pink, ink: Palette.pinkInk,
-                         icon: AnyView(AppIcon.Bottle(size: iconSize, color: Palette.pinkInk)))
+                         icon: AnyView(AppIcon.Bottle(size: iconSize, color: Palette.pinkInk)),
+                         sfSymbol: "drop.fill")
         case .diaper:
             return .init(label: "换尿布", tint: Palette.blue, ink: Palette.blueInk,
-                         icon: AnyView(AppIcon.Diaper(size: iconSize, color: Palette.blueInk)))
+                         icon: AnyView(AppIcon.Diaper(size: iconSize, color: Palette.blueInk)),
+                         sfSymbol: "square.stack.fill")
         case .solid:
             return .init(label: "辅食", tint: Palette.yellow, ink: Palette.yellowInk,
-                         icon: AnyView(AppIcon.Bowl(size: iconSize, color: Palette.yellowInk)))
+                         icon: AnyView(AppIcon.Bowl(size: iconSize, color: Palette.yellowInk)),
+                         sfSymbol: "fork.knife")
         }
     }
 }
