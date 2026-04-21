@@ -55,8 +55,8 @@ struct HomeView: View {
                 }
                 .padding(.top, 12)
 
-                if let timer = store.activeTimer {
-                    TimerBanner(start: timer.startedAt).padding(.top, 14)
+                if let timer = store.activeTimer, timer.isRunning {
+                    TimerBanner(timer: timer).padding(.top, 14)
                 }
 
                 SinceLastRow().padding(.top, 10)
@@ -280,10 +280,10 @@ private struct QuickTile: View {
 // MARK: — Live sleep timer banner
 
 private struct TimerBanner: View {
-    let start: Date
+    let timer: RunningTimer
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { ctx in
-            let dur = ctx.date.timeIntervalSince(start)
+            let dur = timer.elapsed(at: ctx.date)
             HStack(spacing: 12) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -343,7 +343,7 @@ private struct DailySummaryStrip: View {
             let sleepSec: TimeInterval = todays
                 .filter { $0.kind == .sleep }
                 .compactMap(\.duration)
-                .reduce(0, +) + (store.activeTimer.map { ctx.date.timeIntervalSince($0.startedAt) } ?? 0)
+                .reduce(0, +) + (store.activeTimer.map { $0.elapsed(at: ctx.date) } ?? 0)
 
             HStack(spacing: 8) {
                 SummaryCell(tint: Palette.lavender, ink: Palette.lavenderInk,
@@ -425,7 +425,7 @@ private struct SinceLastRow: View {
         let sec = Int(max(0, s))
         let h = sec / 3600
         let m = (sec % 3600) / 60
-        return h > 0 ? "\(h)h\(m)m" : "\(m)分"
+        return h > 0 ? "\(h)时\(m)分" : "\(m)分"
     }
 }
 

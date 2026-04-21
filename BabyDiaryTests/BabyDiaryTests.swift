@@ -90,6 +90,46 @@ struct BabyDiaryTests {
         #expect(doneDate <= after)
     }
 
+    @Test func pauseTimerBanksElapsedTimeAndResumeContinues() {
+        let store = AppStore()
+        let cal = Calendar.current
+        let start = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 9, minute: 0))!
+        let pausedAt = cal.date(byAdding: .minute, value: 35, to: start)!
+        let resumedAt = cal.date(byAdding: .minute, value: 50, to: start)!
+        let end = cal.date(byAdding: .minute, value: 80, to: start)!
+
+        store.startTimer(kind: .sleep, at: start)
+        store.pauseTimer(at: pausedAt)
+
+        let paused = try! #require(store.activeTimer)
+        #expect(paused.kind == .sleep)
+        #expect(paused.startedAt == start)
+        #expect(paused.resumedAt == nil)
+        #expect(paused.accumulated == 35 * 60)
+
+        store.resumeTimer(at: resumedAt)
+
+        let resumed = try! #require(store.activeTimer)
+        #expect(resumed.resumedAt == resumedAt)
+        #expect(resumed.elapsed(at: end) == 65 * 60)
+    }
+
+    @Test func sleepEventTitleUsesDurationFromManualTimes() {
+        let cal = Calendar.current
+        let start = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 10, minute: 5))!
+        let end = cal.date(byAdding: .minute, value: 52, to: start)!
+        let event = Event(
+            kind: .sleep,
+            at: start,
+            endAt: end,
+            title: "睡眠 \(formatDurShort(end.timeIntervalSince(start)))",
+            sub: "\(formatTime(start)) - \(formatTime(end))"
+        )
+
+        #expect(event.title == "睡眠 52分")
+        #expect(event.sub == "10:05 - 10:57")
+    }
+
     @Test func applyLegacySnapshotClearsTeeth() {
         let store = AppStore()
         let eruptedAt = Date()

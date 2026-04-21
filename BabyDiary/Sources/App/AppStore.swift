@@ -71,7 +71,20 @@ final class AppStore {
     }
 
     func startTimer(kind: EventKind, at date: Date = Date()) {
-        activeTimer = RunningTimer(kind: kind, startedAt: date)
+        activeTimer = RunningTimer(kind: kind, startedAt: date, accumulated: 0, resumedAt: date)
+    }
+
+    func pauseTimer(at date: Date = Date()) {
+        guard var timer = activeTimer, let resumedAt = timer.resumedAt else { return }
+        timer.accumulated += max(0, date.timeIntervalSince(resumedAt))
+        timer.resumedAt = nil
+        activeTimer = timer
+    }
+
+    func resumeTimer(at date: Date = Date()) {
+        guard var timer = activeTimer, timer.resumedAt == nil else { return }
+        timer.resumedAt = date
+        activeTimer = timer
     }
 
     @discardableResult
@@ -279,18 +292,18 @@ final class AppStore {
         }
 
         events = [
-            .init(id: "e1",  kind: .feed,   at: at(1, 15), title: "母乳 · 左侧", sub: "18 分钟"),
-            .init(id: "e2",  kind: .diaper, at: at(2, 5),  title: "湿尿布", sub: "只有尿"),
-            .init(id: "e3",  kind: .sleep,  at: at(4, 30), endAt: at(2, 45), title: "睡眠 1h 45分钟", sub: nil),
+            .init(id: "e1",  kind: .feed,   at: at(1, 15), title: "母乳 · 左侧", sub: "18分"),
+            .init(id: "e2",  kind: .diaper, at: at(2, 5),  title: "嘘嘘", sub: ""),
+            .init(id: "e3",  kind: .sleep,  at: at(4, 30), endAt: at(2, 45), title: "睡眠 1时 45分", sub: nil),
             .init(id: "e4",  kind: .solid,  at: at(5, 0),  title: "南瓜泥", sub: "50g · 第一次吃"),
             .init(id: "e5",  kind: .feed,   at: at(6, 20), title: "奶粉", sub: "120 ml"),
-            .init(id: "e6",  kind: .diaper, at: at(7, 40), title: "两者都有", sub: "湿 + 便便"),
-            .init(id: "e7",  kind: .sleep,  at: daysAgo(1, 22), endAt: daysAgo(0, 6, 30), title: "睡眠 8h 30m", sub: "22:00 — 06:30"),
-            .init(id: "e8",  kind: .feed,   at: daysAgo(1, 14), title: "母乳 · 右侧", sub: "22 分钟"),
+            .init(id: "e6",  kind: .diaper, at: at(7, 40), title: "嘘嘘+臭臭", sub: ""),
+            .init(id: "e7",  kind: .sleep,  at: daysAgo(1, 22), endAt: daysAgo(0, 6, 30), title: "睡眠 8时 30分", sub: "22:00 - 06:30"),
+            .init(id: "e8",  kind: .feed,   at: daysAgo(1, 14), title: "母乳 · 右侧", sub: "22分"),
             .init(id: "e9",  kind: .solid,  at: daysAgo(1, 12), title: "米糊", sub: "30g"),
-            .init(id: "e10", kind: .diaper, at: daysAgo(1, 9),  title: "湿尿布", sub: "只有尿"),
+            .init(id: "e10", kind: .diaper, at: daysAgo(1, 9),  title: "嘘嘘", sub: ""),
             .init(id: "e11", kind: .feed,   at: daysAgo(2, 8),  title: "奶粉", sub: "150 ml"),
-            .init(id: "e12", kind: .sleep,  at: daysAgo(2, 13), endAt: daysAgo(2, 15), title: "睡眠 2h", sub: "13:00 — 15:00"),
+            .init(id: "e12", kind: .sleep,  at: daysAgo(2, 13), endAt: daysAgo(2, 15), title: "睡眠 2时 0分", sub: "13:00 - 15:00"),
         ]
 
         let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"
@@ -354,6 +367,15 @@ final class AppStore {
 struct RunningTimer: Equatable, Codable {
     let kind: EventKind
     let startedAt: Date
+    var accumulated: TimeInterval
+    var resumedAt: Date?
+
+    var isRunning: Bool { resumedAt != nil }
+
+    func elapsed(at now: Date) -> TimeInterval {
+        let live = resumedAt.map { max(0, now.timeIntervalSince($0)) } ?? 0
+        return accumulated + live
+    }
 }
 
 enum SubScreen: String, Identifiable {
