@@ -69,6 +69,7 @@ enum GrowthSection: String, Hashable, CaseIterable {
 
 struct GrowthView: View {
     let onOpen: (SubScreen) -> Void
+    let onOpenHealth: () -> Void
     @Environment(AppStore.self) private var store
 
     @State private var section: GrowthSection = .measure
@@ -115,7 +116,7 @@ struct GrowthView: View {
                     statCards
                     chartCard.padding(.top, 14)
                     addButton.padding(.top, 14)
-                    healthEntries.padding(.top, 22)
+                    healthLink.padding(.top, 18)
                 case .teeth:
                     teethContent
                 case .milestones:
@@ -590,32 +591,22 @@ struct GrowthView: View {
         return f.string(from: d)
     }
 
-    // MARK: — 健康入口卡片组(疫苗 + 食物清单)
+    // MARK: — 跳转健康档案的小链接
 
-    private var healthEntries: some View {
-        VStack(spacing: 10) {
-            EntryCard(
-                title: "疫苗接种",
-                subtitle: vaccineSubtitle,
-                iconBg: Palette.mintTint,
-                icon: { AppIcon.Shield(size: 24, color: Palette.mint600) },
-                onTap: { onOpen(.vaccine) }
-            )
-            EntryCard(
-                title: "食物清单",
-                subtitle: foodSubtitle,
-                iconBg: Palette.yellow,
-                icon: { AppIcon.Bowl(size: 24, color: Palette.yellowInk) },
-                onTap: { onOpen(.foodList) }
-            )
+    private var healthLink: some View {
+        Button(action: onOpenHealth) {
+            HStack(spacing: 6) {
+                Text("查看完整健康档案")
+                    .font(.system(size: 13, weight: .heavy))
+                    .tracking(-0.13)
+                AppIcon.Chevron(size: 12, color: Palette.ink2)
+            }
+            .foregroundStyle(Palette.ink2)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+            .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
-    }
-
-    private var vaccineSubtitle: String {
-        let done = store.vaccines.filter(\.done).count
-        let total = store.vaccines.count
-        if total == 0 { return "添加接种计划与进度" }
-        return "已完成 \(done) / \(total)"
+        .buttonStyle(PressableStyle())
     }
 
     private var teethSubtitle: String {
@@ -778,19 +769,9 @@ struct GrowthView: View {
         }
     }
 
-    private var foodSubtitle: String {
-        let safe      = store.foods.filter { $0.status == .safe }.count
-        let allergic  = store.foods.filter { $0.status == .allergic }.count
-        let observing = store.foods.filter { $0.status == .observing }.count
-        var parts: [String] = []
-        if safe      > 0 { parts.append("已排敏 \(safe)") }
-        if allergic  > 0 { parts.append("过敏 \(allergic)") }
-        if observing > 0 { parts.append("观察中 \(observing)") }
-        return parts.isEmpty ? "暂无记录" : parts.joined(separator: " · ")
-    }
 }
 
-private struct EntryCard<Icon: View>: View {
+struct EntryCard<Icon: View>: View {
     let title: String
     let subtitle: String
     let iconBg: Color
@@ -1068,6 +1049,6 @@ struct MilestoneEmptyHint: View {
 }
 
 #Preview("成长") {
-    GrowthView(onOpen: { _ in })
+    GrowthView(onOpen: { _ in }, onOpenHealth: {})
         .environment(AppStore.preview)
 }

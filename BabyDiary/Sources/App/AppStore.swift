@@ -286,13 +286,14 @@ enum SubScreen: String, Identifiable {
 }
 
 enum MainTab: String, CaseIterable, Identifiable, Hashable {
-    case home, records, growth, stats
+    case home, records, growth, health, stats
     var id: String { rawValue }
     var label: String {
         switch self {
         case .home:    return "首页"
         case .records: return "记录"
         case .growth:  return "成长"
+        case .health:  return "健康"
         case .stats:   return "统计"
         }
     }

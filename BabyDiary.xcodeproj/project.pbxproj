@@ -17,6 +17,7 @@
 		38084E6AF5C55B0345AF5E92 /* Primitives.swift in Sources */ = {isa = PBXBuildFile; fileRef = C42524527BFAA06E62EA17DF /* Primitives.swift */; };
 		3CA11A2C3704EBDEBCAA2E75 /* FeedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFE78E7D4207C0B0F803CD81 /* FeedView.swift */; };
 		49338A5D7D855A968B61839F /* RecordsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 846242867B8E637561712FE3 /* RecordsView.swift */; };
+		53226578ED9E13EE9FC54D5F /* HealthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5B214EE78DBD388DC9E6491 /* HealthView.swift */; };
 		614260B1B6950989AEFB7AB0 /* StatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D263718D27C28E0CF528F25F /* StatsView.swift */; };
 		67035A757992B9AFE73AE03C /* VaccineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC8D0F2DAE3C93A66E2FF521 /* VaccineView.swift */; };
 		6AEECBD51C09CB2312324295 /* BabyDiaryApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D03ECC892748E58446D60717 /* BabyDiaryApp.swift */; };
@@ -67,6 +68,7 @@
 		A3792BD5CAF341914797907E /* Backup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Backup.swift; sourceTree = "<group>"; };
 		A9BA817C6B1233EF476B94E2 /* TeethScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TeethScreen.swift; sourceTree = "<group>"; };
 		AA9831391FD58F873506339A /* AppStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStore.swift; sourceTree = "<group>"; };
+		B5B214EE78DBD388DC9E6491 /* HealthView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthView.swift; sourceTree = "<group>"; };
 		BA3E4AAE44A1EB50CB7798E7 /* BabyDiaryTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = BabyDiaryTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		BC8D0F2DAE3C93A66E2FF521 /* VaccineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaccineView.swift; sourceTree = "<group>"; };
 		C2C7AC0ABADFB4E8B1D479A4 /* DiaperView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaperView.swift; sourceTree = "<group>"; };
@@ -180,6 +182,7 @@
 				5491D057510332F88BFA9834 /* FoodListView.swift */,
 				3710482D2313F83730310BD8 /* GrowthEditSheet.swift */,
 				E906265959DF67553653CC27 /* GrowthView.swift */,
+				B5B214EE78DBD388DC9E6491 /* HealthView.swift */,
 				F32A661F9551A563B09C6653 /* HomeView.swift */,
 				0D43A3CBA6BB96433C61C4C2 /* MilestoneEditSheet.swift */,
 				846242867B8E637561712FE3 /* RecordsView.swift */,
@@ -292,6 +295,7 @@
 				136A58C2188D9BF2A7317D70 /* GrowthEditSheet.swift in Sources */,
 				057C5512709EBE465CED3E96 /* GrowthPoint.swift in Sources */,
 				8425AB80FEAA16C5595DBF3A /* GrowthView.swift in Sources */,
+				53226578ED9E13EE9FC54D5F /* HealthView.swift in Sources */,
 				0B54D372872352EDD0E81C3E /* HomeView.swift in Sources */,
 				3508026DD2969F26B069677F /* Icons.swift in Sources */,
 				6C26FDF5F1C6A680DE1F6A54 /* Milestone.swift in Sources */,

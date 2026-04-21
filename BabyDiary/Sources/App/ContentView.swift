@@ -10,7 +10,8 @@ struct ContentView: View {
             switch tab {
             case .home:    HomeView(onOpen: { sub = $0 })
             case .records: RecordsView()
-            case .growth:  GrowthView(onOpen: { sub = $0 })
+            case .growth:  GrowthView(onOpen: { sub = $0 }, onOpenHealth: { tab = .health })
+            case .health:  HealthView(onOpen: { sub = $0 })
             case .stats:   StatsView()
             }
         }
@@ -102,6 +103,7 @@ struct AppTabBar: View {
             case .home:    AppIcon.Home(size: 24, color: c, fill: f)
             case .records: AppIcon.Book(size: 24, color: c, fill: f)
             case .growth:  AppIcon.Growth(size: 24, color: c, fill: f)
+            case .health:  AppIcon.Shield(size: 24, color: c, fill: f)
             case .stats:   AppIcon.Chart(size: 24, color: c)
             }
         }
