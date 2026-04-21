@@ -28,19 +28,46 @@ final class AppStore {
         return s
     }()
 
-    func addEvent(_ e: Event) { events.insert(e, at: 0); persist() }
-    func deleteEvent(_ e: Event) { events.removeAll { $0.id == e.id }; persist() }
+    func addEvent(_ e: Event) {
+        events.insert(e, at: 0)
+        persist()
+    }
+
+    func deleteEvent(_ e: Event) {
+        events.removeAll { $0.id == e.id }
+        if e.kind == .solid {
+            syncSolidFoods(named: Set(solidFoodNames(in: e)))
+        }
+        persist()
+    }
 
     func updateEvent(_ e: Event) {
         guard let idx = events.firstIndex(where: { $0.id == e.id }) else { return }
+        let original = events[idx]
         events[idx] = e
+        if original.kind == .solid || e.kind == .solid {
+            syncSolidFoods(named: Set(solidFoodNames(in: original) + solidFoodNames(in: e)))
+        }
         persist()
     }
 
     func updateGrowth(_ g: GrowthPoint) {
         guard let idx = growth.firstIndex(where: { $0.id == g.id }) else { return }
-        growth[idx] = g
+        var updated = g
+        updated.ageMonths = ageMonths(on: updated.date)
+        growth[idx] = updated
         persist()
+    }
+
+    func ageMonths(on date: Date) -> Double {
+        let cal = Calendar.current
+        let start = cal.startOfDay(for: baby.birthDate)
+        let end = cal.startOfDay(for: date)
+        guard end > start else { return 0 }
+        let comps = cal.dateComponents([.month, .day], from: start, to: end)
+        let months = Double(comps.month ?? 0)
+        let days = Double(comps.day ?? 0)
+        return max(0, months + days / 30.0)
     }
 
     func startTimer(kind: EventKind, at date: Date = Date()) {
@@ -105,7 +132,7 @@ final class AppStore {
         if vaccines[idx].done {
             vaccines[idx].doneDate = nil
         } else {
-            vaccines[idx].doneDate = vaccines[idx].scheduledDate ?? Date()
+            vaccines[idx].doneDate = Date()
         }
         persist()
     }
@@ -120,7 +147,12 @@ final class AppStore {
         }
     }
 
-    func addGrowth(_ g: GrowthPoint) { growth.append(g); persist() }
+    func addGrowth(_ g: GrowthPoint) {
+        var newPoint = g
+        newPoint.ageMonths = ageMonths(on: newPoint.date)
+        growth.append(newPoint)
+        persist()
+    }
 
     // MARK: — Milestones
 
@@ -158,6 +190,7 @@ final class AppStore {
     func recordSolidFood(_ name: String, at date: Date = .now, observationDays: Int = 3) {
         if let idx = foods.firstIndex(where: { $0.name == name }) {
             foods[idx].timesEaten += 1
+            foods[idx].firstUsedAt = min(foods[idx].firstUsedAt, date)
         } else {
             foods.append(FoodItem(
                 id: "fd" + UUID().uuidString.prefix(6).lowercased(),
@@ -188,6 +221,49 @@ final class AppStore {
     func deleteFood(_ id: String) {
         foods.removeAll { $0.id == id }
         persist()
+    }
+
+    private func solidFoodNames(in event: Event) -> [String] {
+        guard event.kind == .solid else { return [] }
+        let parts = event.title
+            .components(separatedBy: "·")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        let names = parts.isEmpty
+            ? [event.title.trimmingCharacters(in: .whitespacesAndNewlines)]
+            : parts
+        var seen: Set<String> = []
+        return names.filter { seen.insert($0).inserted }
+    }
+
+    private func syncSolidFoods(named names: Set<String>) {
+        for name in names where !name.isEmpty {
+            syncSolidFood(named: name)
+        }
+    }
+
+    private func syncSolidFood(named name: String) {
+        let matches = events.filter {
+            $0.kind == .solid && solidFoodNames(in: $0).contains(name)
+        }
+        guard let firstUsedAt = matches.map(\.at).min() else {
+            foods.removeAll { $0.name == name }
+            return
+        }
+
+        if let idx = foods.firstIndex(where: { $0.name == name }) {
+            foods[idx].firstUsedAt = firstUsedAt
+            foods[idx].timesEaten = matches.count
+        } else {
+            foods.append(FoodItem(
+                id: "fd" + UUID().uuidString.prefix(6).lowercased(),
+                name: name,
+                firstUsedAt: firstUsedAt,
+                status: .observing,
+                timesEaten: matches.count,
+                observationDays: 3
+            ))
+        }
     }
 
     private func seed() {

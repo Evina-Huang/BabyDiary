@@ -93,6 +93,7 @@ struct GrowthEditSheet: View {
         guard let w = trimmedWeight, let h = trimmedHeight, !dateInFuture else { return }
         var g = original
         g.date = date
+        g.ageMonths = store.ageMonths(on: date)
         g.weightKg = w
         g.heightCm = h
         onSave(g)

@@ -47,13 +47,15 @@ extension AppStore {
         vaccines = snap.vaccines
         growth = snap.growth
         foods = snap.foods
-        // 按位置合并,保证 20 颗位置齐全;老备份无 teeth 字段时保留当前空记录
+        // 按位置合并,保证 20 颗位置齐全;老备份无 teeth 字段时回退为空记录
         milestones = snap.milestones ?? []
         if let saved = snap.teeth {
             let byId = Dictionary(uniqueKeysWithValues: saved.map { ($0.id, $0) })
             teeth = ToothPosition.all.map { p in
                 byId[ToothRecord.id(for: p)] ?? .empty(for: p)
             }
+        } else {
+            teeth = ToothPosition.all.map(ToothRecord.empty(for:))
         }
     }
 

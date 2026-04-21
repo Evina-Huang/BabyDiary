@@ -429,10 +429,11 @@ struct GrowthView: View {
         guard w != nil || h != nil else { return }
         let useW = w ?? latest?.weightKg ?? 0
         let useH = h ?? latest?.heightCm ?? 0
+        let measuredAt = Date()
         store.addGrowth(.init(
             id: "g" + UUID().uuidString.prefix(6).lowercased(),
-            date: Date(),
-            ageMonths: 6,
+            date: measuredAt,
+            ageMonths: store.ageMonths(on: measuredAt),
             weightKg: useW,
             heightCm: useH,
             headCm: nil))

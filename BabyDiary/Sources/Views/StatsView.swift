@@ -77,8 +77,11 @@ private struct PatternChart: View {
 
     private let HOURS = 24
     private let CELL_H: CGFloat = 18
+    private let AXIS_W: CGFloat = 28
+    private let AXIS_LABEL_H: CGFloat = 16
 
     private var chartH: CGFloat { CGFloat(HOURS) * CELL_H }
+    private var tickHours: [Int] { Array(stride(from: 0, through: HOURS, by: 2)) }
 
     private var days: [Date] {
         let cal = Calendar.current
@@ -153,17 +156,18 @@ private struct PatternChart: View {
     }
 
     private var yAxis: some View {
-        VStack(alignment: .trailing, spacing: 0) {
-            ForEach(0...HOURS / 2, id: \.self) { i in
-                Text(String(format: "%02d", i * 2))
+        ZStack(alignment: .topTrailing) {
+            ForEach(tickHours, id: \.self) { hour in
+                Text(String(format: "%02d", hour))
                     .font(.system(size: 10, weight: .bold))
                     .monospacedDigit()
                     .foregroundStyle(Palette.ink3)
-                    .frame(height: i == 0 ? CELL_H : CELL_H * 2, alignment: .top)
-                    .offset(y: i == 0 ? 0 : -6)
+                    .frame(width: AXIS_W, height: AXIS_LABEL_H, alignment: .trailing)
+                    .offset(y: axisLabelOffset(forHour: hour))
             }
         }
-        .padding(.trailing, 6)
+        .frame(width: AXIS_W, height: chartH, alignment: .topTrailing)
+        .padding(.trailing, 10)
     }
 
     private func daysRow(minWidth: CGFloat?) -> some View {
@@ -191,11 +195,11 @@ private struct PatternChart: View {
                     .opacity(isToday ? 1 : 0.7)
                     .frame(height: chartH)
 
-                ForEach(0...HOURS / 2, id: \.self) { i in
+                ForEach(tickHours, id: \.self) { hour in
                     Rectangle()
                         .fill(Color.white.opacity(0.7))
                         .frame(height: 1)
-                        .offset(y: CGFloat(i) * CELL_H * 2)
+                        .offset(y: yOffset(forHour: Double(hour)))
                 }
 
                 if filter == .all || filter == .sleep {
@@ -226,7 +230,7 @@ private struct PatternChart: View {
                     .fill(Palette.lavenderInk.opacity(0.35))
                     .frame(width: geo.size.width - 4,
                            height: max(3, durHours * CELL_H))
-                    .offset(x: 2, y: topHours * CELL_H)
+                    .offset(x: 2, y: yOffset(forHour: topHours))
             }
         }
     }
@@ -235,7 +239,7 @@ private struct PatternChart: View {
         let cal = Calendar.current
         let hour = Double(cal.component(.hour, from: e.at))
         let minute = Double(cal.component(.minute, from: e.at))
-        let top = (hour + minute / 60) * CELL_H
+        let top = yOffset(forHour: hour + minute / 60)
         return GeometryReader { geo in
             Circle()
                 .fill(kindColor(e.kind))
@@ -263,6 +267,14 @@ private struct PatternChart: View {
         case .diaper: return e.kind == .diaper
         case .solid: return e.kind == .solid
         }
+    }
+
+    private func yOffset(forHour hour: Double) -> CGFloat {
+        CGFloat(hour) * CELL_H
+    }
+
+    private func axisLabelOffset(forHour hour: Int) -> CGFloat {
+        yOffset(forHour: Double(hour)) - AXIS_LABEL_H / 2
     }
 
     private func xLabel(for d: Date) -> String {
