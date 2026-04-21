@@ -56,10 +56,22 @@ private func refFor(_ m: GrowthMetric) -> [GrowthRef] {
     m == .weight ? WEIGHT_REF : HEIGHT_REF
 }
 
+enum GrowthSection: String, Hashable, CaseIterable {
+    case measure, teeth, milestones
+    var label: String {
+        switch self {
+        case .measure:    return "身高体重"
+        case .teeth:      return "出牙"
+        case .milestones: return "里程碑"
+        }
+    }
+}
+
 struct GrowthView: View {
     let onOpen: (SubScreen) -> Void
     @Environment(AppStore.self) private var store
 
+    @State private var section: GrowthSection = .measure
     @State private var metric: GrowthMetric = .weight
     @State private var adding = false
     @State private var wInput: String = ""
@@ -68,6 +80,8 @@ struct GrowthView: View {
     @State private var historySheet = false
     @State private var historyFilter: HistoryFilter = .all
     @State private var editingGrowth: GrowthPoint? = nil
+    @State private var editingMilestone: Milestone? = nil
+    @State private var addingMilestone = false
 
     enum HistoryFilter: Hashable { case all, d30, d90, d365
         var label: String {
@@ -93,10 +107,20 @@ struct GrowthView: View {
             TabTitleHeader(kicker: "\(store.baby.name) · \(store.baby.ageLabel)",
                            title: "成长")
             ScreenBody {
-                statCards
-                chartCard.padding(.top, 14)
-                addButton.padding(.top, 14)
-                healthEntries.padding(.top, 22)
+                sectionSwitcher
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.bottom, 14)
+                switch section {
+                case .measure:
+                    statCards
+                    chartCard.padding(.top, 14)
+                    addButton.padding(.top, 14)
+                    healthEntries.padding(.top, 22)
+                case .teeth:
+                    teethContent
+                case .milestones:
+                    milestonesContent
+                }
             }
         }
         .background(Palette.bg)
@@ -128,6 +152,37 @@ struct GrowthView: View {
             )
             .environment(store)
         }
+        .sheet(item: $editingMilestone) { m in
+            MilestoneEditSheet(
+                original: m,
+                onCancel: { editingMilestone = nil },
+                onSave: { updated in
+                    store.updateMilestone(updated)
+                    editingMilestone = nil
+                },
+                onDelete: { id in
+                    store.deleteMilestone(id)
+                    editingMilestone = nil
+                }
+            )
+            .environment(store)
+        }
+        .sheet(isPresented: $addingMilestone) {
+            MilestoneEditSheet(
+                original: nil,
+                onCancel: { addingMilestone = false },
+                onSave: { new in
+                    store.addMilestone(new)
+                    addingMilestone = false
+                }
+            )
+            .environment(store)
+        }
+    }
+
+    private var sectionSwitcher: some View {
+        SegPill(selection: $section,
+                options: GrowthSection.allCases.map { ($0, $0.label) })
     }
 
     // MARK: — Two stat cards (weight + height)
@@ -547,13 +602,6 @@ struct GrowthView: View {
                 onTap: { onOpen(.vaccine) }
             )
             EntryCard(
-                title: "出牙记录",
-                subtitle: teethSubtitle,
-                iconBg: Palette.blue,
-                icon: { AppIcon.Tooth(size: 24, color: Palette.blueInk) },
-                onTap: { onOpen(.teeth) }
-            )
-            EntryCard(
                 title: "食物清单",
                 subtitle: foodSubtitle,
                 iconBg: Palette.yellow,
@@ -579,6 +627,155 @@ struct GrowthView: View {
             return "已出 \(done) / 20 · 最近 \(ago)"
         }
         return "已出 \(done) / 20"
+    }
+
+    // MARK: — Teeth section
+
+    @ViewBuilder
+    private var teethContent: some View {
+        let erupted = store.teeth.compactMap { rec -> (ToothRecord, Date)? in
+            guard let d = rec.eruptedAt else { return nil }
+            return (rec, d)
+        }.sorted { $0.1 > $1.1 }
+
+        VStack(spacing: 14) {
+            Card {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text("出牙进度")
+                            .font(.system(size: 15, weight: .heavy)).tracking(-0.15)
+                        Spacer()
+                        Text("\(erupted.count) / 20")
+                            .font(.system(size: 13, weight: .heavy))
+                            .foregroundStyle(Palette.blueInk)
+                            .padding(.horizontal, 10).padding(.vertical, 4)
+                            .background(Palette.blue, in: Capsule())
+                    }
+                    Text(teethSubtitle)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Palette.ink3)
+                    Button { onOpen(.teeth) } label: {
+                        HStack(spacing: 8) {
+                            AppIcon.Tooth(size: 16, color: .white)
+                            Text("打开牙位图")
+                                .font(.system(size: 14, weight: .heavy)).tracking(-0.14)
+                                .foregroundStyle(.white)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(store.theme.primary,
+                                    in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .shadowPill(tint: store.theme.primary600)
+                    }
+                    .buttonStyle(PressableStyle())
+                }
+            }
+
+            if !erupted.isEmpty {
+                Card(padding: 0) {
+                    VStack(spacing: 0) {
+                        ForEach(Array(erupted.enumerated()), id: \.element.0.id) { i, pair in
+                            toothRow(pair.0, date: pair.1, last: i == erupted.count - 1)
+                        }
+                    }
+                }
+            } else {
+                MilestoneEmptyHint(text: "还没有记录出牙，点击上方进入牙位图开始记录。")
+            }
+        }
+    }
+
+    private func toothRow(_ rec: ToothRecord, date: Date, last: Bool) -> some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 14) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Palette.blue)
+                    AppIcon.Tooth(size: 18, color: Palette.blueInk)
+                }
+                .frame(width: 40, height: 40)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(rec.position.label)
+                        .font(.system(size: 15, weight: .heavy)).tracking(-0.15)
+                        .foregroundStyle(Palette.ink)
+                    Text(isoDate(date))
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Palette.ink3)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 16).padding(.vertical, 12)
+            if !last {
+                Rectangle().fill(Palette.line).frame(height: 1)
+            }
+        }
+    }
+
+    // MARK: — Milestones section
+
+    private var timelineItems: [TimelineItem] {
+        var items: [TimelineItem] = store.milestones.map {
+            TimelineItem(id: $0.id, date: $0.date, title: $0.title, note: $0.note,
+                         emoji: $0.emoji, photoData: $0.photoData, source: .user($0))
+        }
+        for e in store.events {
+            let haystack = e.title + " " + (e.sub ?? "")
+            guard haystack.contains("第一次") else { continue }
+            let emoji: String = {
+                switch e.kind {
+                case .solid:  return "🍽️"
+                case .feed:   return "🍼"
+                case .diaper: return "👣"
+                case .sleep:  return "💤"
+                }
+            }()
+            items.append(TimelineItem(
+                id: "ev_" + e.id, date: e.at,
+                title: e.title, note: e.sub, emoji: emoji, photoData: nil,
+                source: .event(e)
+            ))
+        }
+        return items.sorted { $0.date > $1.date }
+    }
+
+    @ViewBuilder
+    private var milestonesContent: some View {
+        let items = timelineItems
+        VStack(spacing: 14) {
+            Button { addingMilestone = true } label: {
+                HStack(spacing: 8) {
+                    AppIcon.Plus(size: 18, color: .white)
+                    Text("记录新里程碑")
+                        .font(.system(size: 15, weight: .heavy)).tracking(-0.15)
+                }
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(store.theme.primary,
+                            in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .shadowPill(tint: store.theme.primary600)
+            }
+            .buttonStyle(PressableStyle())
+
+            if items.isEmpty {
+                MilestoneEmptyHint(text: "添加第一条里程碑，记录宝宝的成长瞬间。")
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(Array(items.enumerated()), id: \.element.id) { i, it in
+                        MilestoneTimelineRow(
+                            item: it,
+                            tint: store.theme.primaryTint,
+                            ink: store.theme.primary600,
+                            isLast: i == items.count - 1,
+                            onTap: {
+                                if case .user(let m) = it.source {
+                                    editingMilestone = m
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+        }
     }
 
     private var foodSubtitle: String {
@@ -744,6 +941,129 @@ struct TabTitleHeader: View {
         .padding(.top, 62)
         .padding(.horizontal, 20)
         .padding(.bottom, 8)
+    }
+}
+
+// MARK: — Milestone timeline support
+
+struct TimelineItem: Identifiable {
+    let id: String
+    let date: Date
+    let title: String
+    let note: String?
+    let emoji: String?
+    let photoData: Data?
+    let source: Source
+    enum Source { case user(Milestone); case event(Event) }
+
+    var isFromEvent: Bool {
+        if case .event = source { return true }
+        return false
+    }
+}
+
+private struct MilestoneTimelineRow: View {
+    let item: TimelineItem
+    let tint: Color
+    let ink: Color
+    let isLast: Bool
+    let onTap: () -> Void
+
+    private var dateStr: String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "zh_CN")
+        f.dateFormat = "yyyy 年 M 月 d 日"
+        return f.string(from: item.date)
+    }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(spacing: 0) {
+                ZStack {
+                    Circle().fill(tint)
+                    Circle().strokeBorder(ink.opacity(0.3), lineWidth: 1.5)
+                    if let e = item.emoji, !e.isEmpty {
+                        Text(e).font(.system(size: 14))
+                    } else {
+                        Circle().fill(ink).frame(width: 8, height: 8)
+                    }
+                }
+                .frame(width: 32, height: 32)
+                .padding(.top, 6)
+
+                if !isLast {
+                    Rectangle().fill(Palette.line)
+                        .frame(width: 2)
+                        .frame(maxHeight: .infinity)
+                        .padding(.vertical, 2)
+                }
+            }
+            .frame(width: 32)
+
+            Button(action: onTap) {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 6) {
+                        Text(dateStr)
+                            .font(.system(size: 11, weight: .heavy))
+                            .tracking(0.66)
+                            .textCase(.uppercase)
+                            .foregroundStyle(Palette.ink3)
+                        if item.isFromEvent {
+                            Text("来自记录")
+                                .font(.system(size: 10, weight: .heavy))
+                                .tracking(-0.1)
+                                .foregroundStyle(ink)
+                                .padding(.horizontal, 8).padding(.vertical, 2)
+                                .background(tint, in: Capsule())
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(item.title)
+                            .font(.system(size: 16, weight: .heavy))
+                            .tracking(-0.16)
+                            .foregroundStyle(Palette.ink)
+                            .multilineTextAlignment(.leading)
+                        if let n = item.note, !n.isEmpty {
+                            Text(n)
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(Palette.ink2)
+                                .multilineTextAlignment(.leading)
+                        }
+                        if let data = item.photoData, let ui = UIImage(data: data) {
+                            Image(uiImage: ui)
+                                .resizable().scaledToFill()
+                                .frame(height: 180)
+                                .frame(maxWidth: .infinity)
+                                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        }
+                    }
+                    .padding(14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Palette.card,
+                                in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .shadowCard()
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(PressableStyle())
+            .disabled(item.isFromEvent)
+            .padding(.bottom, isLast ? 0 : 14)
+        }
+    }
+}
+
+struct MilestoneEmptyHint: View {
+    let text: String
+    var body: some View {
+        Text(text)
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(Palette.ink3)
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 28).padding(.horizontal, 18)
+            .background(Palette.bg2,
+                        in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 }
 

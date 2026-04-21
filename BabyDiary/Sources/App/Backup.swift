@@ -14,6 +14,7 @@ struct DataSnapshot: Codable {
     var growth: [GrowthPoint]
     var foods: [FoodItem]
     var teeth: [ToothRecord]? = nil
+    var milestones: [Milestone]? = nil
 }
 
 // MARK: — Persistence + export on AppStore
@@ -36,7 +37,8 @@ extension AppStore {
 
     func snapshot() -> DataSnapshot {
         DataSnapshot(baby: baby, events: events, vaccines: vaccines,
-                     growth: growth, foods: foods, teeth: teeth)
+                     growth: growth, foods: foods, teeth: teeth,
+                     milestones: milestones)
     }
 
     func apply(_ snap: DataSnapshot) {
@@ -46,6 +48,7 @@ extension AppStore {
         growth = snap.growth
         foods = snap.foods
         // 按位置合并,保证 20 颗位置齐全;老备份无 teeth 字段时保留当前空记录
+        milestones = snap.milestones ?? []
         if let saved = snap.teeth {
             let byId = Dictionary(uniqueKeysWithValues: saved.map { ($0.id, $0) })
             teeth = ToothPosition.all.map { p in

@@ -13,6 +13,7 @@ final class AppStore {
     var growth: [GrowthPoint] = []
     var foods: [FoodItem] = []
     var teeth: [ToothRecord] = ToothPosition.all.map(ToothRecord.empty(for:))
+    var milestones: [Milestone] = []
     var theme: AppTheme = .blossom
     var activeTimer: RunningTimer? = nil
 
@@ -121,6 +122,21 @@ final class AppStore {
 
     func addGrowth(_ g: GrowthPoint) { growth.append(g); persist() }
 
+    // MARK: — Milestones
+
+    func addMilestone(_ m: Milestone) { milestones.append(m); persist() }
+
+    func updateMilestone(_ m: Milestone) {
+        guard let idx = milestones.firstIndex(where: { $0.id == m.id }) else { return }
+        milestones[idx] = m
+        persist()
+    }
+
+    func deleteMilestone(_ id: String) {
+        milestones.removeAll { $0.id == id }
+        persist()
+    }
+
     // MARK: — Teeth
 
     func tooth(at position: ToothPosition) -> ToothRecord {
@@ -227,6 +243,21 @@ final class AppStore {
             .init(id: "fd5", name: "苹果泥", firstUsedAt: f.date(from: "2026-03-10")!, status: .safe,     timesEaten: 8,  observationDays: 3),
             .init(id: "fd6", name: "香蕉",   firstUsedAt: f.date(from: "2026-03-20")!, status: .safe,     timesEaten: 6,  observationDays: 3),
             .init(id: "fd7", name: "鸡蛋黄", firstUsedAt: f.date(from: "2026-02-10")!, status: .allergic, timesEaten: 2,  observationDays: 7),
+        ]
+
+        milestones = [
+            .init(id: "ms_smile", date: f.date(from: "2025-12-05")!,
+                  title: "第一次笑出声",
+                  note: "爸爸做鬼脸时突然咯咯笑，太可爱了。",
+                  emoji: "😊", photoData: nil),
+            .init(id: "ms_roll", date: f.date(from: "2026-02-22")!,
+                  title: "第一次翻身",
+                  note: "从仰卧翻到趴着，自己还吓了一跳。",
+                  emoji: "🌀", photoData: nil),
+            .init(id: "ms_mama", date: f.date(from: "2026-04-10")!,
+                  title: "会叫\"妈妈\"",
+                  note: nil,
+                  emoji: "💞", photoData: nil),
         ]
 
         growth = [
