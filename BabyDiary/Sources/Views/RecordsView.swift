@@ -252,8 +252,8 @@ private struct MonthCalendarExpanded: View {
 
     private var grid: some View {
         let cells = buildCells()
-        let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 7)
-        return LazyVGrid(columns: columns, spacing: 2) {
+        let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 7)
+        return LazyVGrid(columns: columns, spacing: 4) {
             ForEach(Array(cells.enumerated()), id: \.offset) { _, d in
                 dayCell(d)
             }
@@ -307,7 +307,7 @@ private struct MonthCalendarExpanded: View {
                         .frame(height: 4)
                     }
                     .frame(maxWidth: .infinity)
-                    .aspectRatio(1, contentMode: .fit)
+                    .frame(height: 40)
                     .background(
                         RoundedRectangle(cornerRadius: 10, style: .continuous)
                             .fill(
@@ -319,7 +319,7 @@ private struct MonthCalendarExpanded: View {
                 }
                 .buttonStyle(PressableStyle())
             } else {
-                Color.clear.aspectRatio(1, contentMode: .fit)
+                Color.clear.frame(height: 40)
             }
         }
     }

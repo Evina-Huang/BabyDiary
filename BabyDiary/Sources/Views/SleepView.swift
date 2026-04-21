@@ -139,7 +139,7 @@ struct SleepScreen: View {
                 VStack(spacing: 0) {
                     if history.isEmpty {
                         EmptyStateView(title: "还没有睡眠记录",
-                                       subtitle: "小宝的每一次小憩都会记录在这里")
+                                       subtitle: "\(store.baby.name)的每一次小憩都会记录在这里")
                     } else {
                         ForEach(Array(history.enumerated()), id: \.element.id) { i, e in
                             SleepRow(event: e, last: i == history.count - 1) { store.deleteEvent($0) }

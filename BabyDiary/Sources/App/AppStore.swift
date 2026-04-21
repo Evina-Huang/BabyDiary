@@ -142,6 +142,19 @@ final class AppStore {
         persist()
     }
 
+    func renameFood(_ id: String, to name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty,
+              let idx = foods.firstIndex(where: { $0.id == id }) else { return }
+        foods[idx].name = trimmed
+        persist()
+    }
+
+    func deleteFood(_ id: String) {
+        foods.removeAll { $0.id == id }
+        persist()
+    }
+
     private func seed() {
         let cal = Calendar.current
         let now = Date()

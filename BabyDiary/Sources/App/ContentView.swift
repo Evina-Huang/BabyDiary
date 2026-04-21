@@ -6,23 +6,20 @@ struct ContentView: View {
     @State private var sub: SubScreen? = nil
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            Palette.bg.ignoresSafeArea()
-
-            Group {
-                switch tab {
-                case .home:    HomeView(onOpen: { sub = $0 })
-                case .records: RecordsView()
-                case .growth:  GrowthView(onOpen: { sub = $0 })
-                case .stats:   StatsView()
-                }
+        Group {
+            switch tab {
+            case .home:    HomeView(onOpen: { sub = $0 })
+            case .records: RecordsView()
+            case .growth:  GrowthView(onOpen: { sub = $0 })
+            case .stats:   StatsView()
             }
-            .padding(.bottom, 72)      // reserve space for the floating tab bar
-
-            AppTabBar(tab: $tab)
-                .padding(.horizontal, 14)
-                .padding(.bottom, 8)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Palette.bg.ignoresSafeArea())
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            AppTabBar(tab: $tab)
+        }
+        .ignoresSafeArea(.keyboard, edges: .bottom)
         .sheet(item: $sub) { s in
             subContent(for: s)
                 .environment(store)
@@ -59,13 +56,18 @@ struct AppTabBar: View {
             }
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 8)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .stroke(Palette.line, lineWidth: 0.5)
+        .padding(.top, 8)
+        .padding(.bottom, 8)
+        .background(
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .ignoresSafeArea(edges: .bottom)
         )
-        .shadowSurface()
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(Palette.line)
+                .frame(height: 0.5)
+        }
     }
 
     private struct TabButton: View {

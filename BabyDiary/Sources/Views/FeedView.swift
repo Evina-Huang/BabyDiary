@@ -15,6 +15,12 @@ struct FeedScreen: View {
     @State private var mode: Mode = .breast
     @State private var saved = false
 
+    // Breast sub-mode (timer vs manual)
+    @State private var bSub: FormulaSub = .timer
+    @State private var bManualMinL: Int = 10
+    @State private var bManualMinR: Int = 0
+    @State private var bManualTime: Date = .now
+
     // Breast timer state
     @State private var bPhase: Phase = .idle
     @State private var bActive: Side = .L
@@ -87,6 +93,40 @@ struct FeedScreen: View {
         let total = liveL + liveR
 
         VStack(spacing: 14) {
+            SegPill(selection: $bSub, options: [(.timer, "计时"), (.manual, "手动输入")])
+                .disabled(bPhase != .idle)
+
+            if bSub == .manual {
+                breastManualForm
+            } else {
+                breastTimerBlock(liveL: liveL, liveR: liveR, total: total)
+            }
+        }
+        .padding(.top, 22)
+    }
+
+    private var breastManualForm: some View {
+        VStack(spacing: 14) {
+            VStack(alignment: .leading, spacing: 10) {
+                FieldLabel(text: "左侧(分钟)")
+                StepperInput(value: $bManualMinL, step: 1, min: 0, max: 120, suffix: "分")
+            }
+            VStack(alignment: .leading, spacing: 10) {
+                FieldLabel(text: "右侧(分钟)")
+                StepperInput(value: $bManualMinR, step: 1, min: 0, max: 120, suffix: "分")
+            }
+            InlineWheelTimePicker(time: $bManualTime, theme: store.theme)
+            CTAButton(title: saved ? "✓ 已保存" : "保存记录",
+                      variant: saved ? .secondary : .primary,
+                      theme: store.theme,
+                      action: saveBreastManual)
+                .padding(.top, 4)
+        }
+    }
+
+    @ViewBuilder
+    private func breastTimerBlock(liveL: TimeInterval, liveR: TimeInterval, total: TimeInterval) -> some View {
+        VStack(spacing: 14) {
             if lastFeed != nil, bPhase == .idle {
                 Text("💡 上次从\(bActive == .R ? "右" : "左")边结束")
                     .font(.system(size: 12, weight: .bold))
@@ -132,7 +172,6 @@ struct FeedScreen: View {
                     .frame(maxWidth: .infinity)
             }
         }
-        .padding(.top, 22)
     }
 
     private struct SideButton: View {
@@ -277,7 +316,7 @@ struct FeedScreen: View {
                     Button {
                         ml = v
                     } label: {
-                        Text("\(v) ml")
+                        Text("\(v)ml")
                             .font(.system(size: 13, weight: .bold))
                             .foregroundStyle(ml == v ? .white : Palette.ink2)
                             .padding(.horizontal, 14).padding(.vertical, 8)
@@ -291,25 +330,7 @@ struct FeedScreen: View {
     }
 
     private var manualTimePicker: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            FieldLabel(text: "时间")
-            HStack(spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous).fill(.white)
-                    AppIcon.Clock(size: 20, color: store.theme.primary600)
-                }
-                .frame(width: 36, height: 36)
-                Text(formatTime(time))
-                    .font(.system(size: 16, weight: .heavy))
-                    .tracking(-0.16)
-                Spacer(minLength: 0)
-                DatePicker("", selection: $time, displayedComponents: .hourAndMinute)
-                    .labelsHidden()
-                    .tint(store.theme.primary600)
-            }
-            .padding(.horizontal, 16).padding(.vertical, 14)
-            .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        }
+        InlineWheelTimePicker(time: $time, theme: store.theme)
     }
 
     // MARK: — History
@@ -330,7 +351,7 @@ struct FeedScreen: View {
                 VStack(spacing: 0) {
                     if history.isEmpty {
                         EmptyStateView(title: "还没有喂奶记录",
-                                       subtitle: "小宝喝奶的每一口都会记录在这里")
+                                       subtitle: "\(store.baby.name)喝奶的每一口都会记录在这里")
                     } else {
                         ForEach(Array(history.enumerated()), id: \.element.id) { i, e in
                             EventRow(event: e, last: i == history.count - 1, onDelete: { store.deleteEvent($0) })
@@ -395,6 +416,23 @@ struct FeedScreen: View {
         resetBreast(); flash()
     }
 
+    private func saveBreastManual() {
+        let l = bManualMinL, r = bManualMinR
+        guard l + r > 0 else { return }
+        let tot = l + r
+        let title: String; let sub: String
+        if l > 0 && r > 0 {
+            title = "母乳 · 双侧"; sub = "左 \(l)分 · 右 \(r)分 · 共 \(tot)分"
+        } else if l > 0 {
+            title = "母乳 · 左侧"; sub = "\(tot) 分钟"
+        } else {
+            title = "母乳 · 右侧"; sub = "\(tot) 分钟"
+        }
+        store.addEvent(.init(kind: .feed, at: bManualTime, endAt: bManualTime, title: title, sub: sub))
+        bManualMinL = 10; bManualMinR = 0; bManualTime = Date()
+        flash()
+    }
+
     private func startFormula() {
         let now = Date()
         fSessionStart = now; fSessionEnd = nil
@@ -416,11 +454,11 @@ struct FeedScreen: View {
         guard fPhase == .stopped, let s = fSessionStart, let e = fSessionEnd else { return }
         store.addEvent(.init(kind: .feed, at: e,
                              title: "奶粉",
-                             sub: "\(ml) ml · \(hhmm(s))–\(hhmm(e))"))
+                             sub: "\(ml)ml · \(hhmm(s))–\(hhmm(e))"))
         resetFormula(); flash()
     }
     private func saveFormulaManual() {
-        store.addEvent(.init(kind: .feed, at: time, title: "奶粉", sub: "\(ml) ml"))
+        store.addEvent(.init(kind: .feed, at: time, title: "奶粉", sub: "\(ml)ml"))
         time = Date(); flash()
     }
 

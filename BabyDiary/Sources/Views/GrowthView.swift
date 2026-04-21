@@ -211,7 +211,7 @@ struct GrowthView: View {
 
     private var legend: some View {
         HStack(spacing: 14) {
-            legendItem(Rectangle().fill(metric.accentInk).frame(width: 14, height: 3), label: "小宝")
+            legendItem(Rectangle().fill(metric.accentInk).frame(width: 14, height: 3), label: store.baby.name)
             legendItem(Rectangle().fill(metric.accentTint.opacity(0.55))
                         .frame(width: 14, height: 8)
                         .clipShape(RoundedRectangle(cornerRadius: 3)),

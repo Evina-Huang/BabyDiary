@@ -341,9 +341,10 @@ struct EventEditSheet: View {
             FieldLabel(text: label)
             DatePicker("", selection: binding, displayedComponents: [.date, .hourAndMinute])
                 .labelsHidden()
+                .datePickerStyle(.wheel)
                 .tint(store.theme.primary600)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 14).padding(.vertical, 10)
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 8).padding(.vertical, 4)
                 .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                 .environment(\.locale, Locale(identifier: "zh_CN"))
         }

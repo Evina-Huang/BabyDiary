@@ -3,6 +3,7 @@ import SwiftUI
 struct FoodListScreen: View {
     let onBack: () -> Void
     @Environment(AppStore.self) private var store
+    @State private var editing: FoodItem? = nil
 
     var body: some View {
         VStack(spacing: 0) {
@@ -23,7 +24,8 @@ struct FoodListScreen: View {
                             title: "观察中",
                             dotColor: Palette.yellowInk,
                             tint: Palette.yellow,
-                            foods: observing
+                            foods: observing,
+                            onEdit: { editing = $0 }
                         )
                         .padding(.top, 8)
                     }
@@ -32,7 +34,8 @@ struct FoodListScreen: View {
                             title: "安全",
                             dotColor: Palette.mint600,
                             tint: Palette.mintTint,
-                            foods: safe
+                            foods: safe,
+                            onEdit: { editing = $0 }
                         )
                         .padding(.top, 18)
                     }
@@ -41,7 +44,8 @@ struct FoodListScreen: View {
                             title: "过敏",
                             dotColor: Color(hex: 0xD44E3A),
                             tint: Color(hex: 0xFFDDD8),
-                            foods: allergic
+                            foods: allergic,
+                            onEdit: { editing = $0 }
                         )
                         .padding(.top, 18)
                     }
@@ -49,6 +53,11 @@ struct FoodListScreen: View {
             }
         }
         .background(Palette.bg)
+        .sheet(item: $editing) { food in
+            FoodEditSheet(food: food, onClose: { editing = nil })
+                .environment(store)
+                .presentationDetents([.medium])
+        }
     }
 }
 
@@ -59,6 +68,7 @@ private struct FoodSection: View {
     let dotColor: Color
     let tint: Color
     let foods: [FoodItem]
+    let onEdit: (FoodItem) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -79,7 +89,7 @@ private struct FoodSection: View {
             Card(padding: 0) {
                 VStack(spacing: 0) {
                     ForEach(Array(foods.enumerated()), id: \.element.id) { i, food in
-                        FoodRow(food: food, tint: tint, dotColor: dotColor, last: i == foods.count - 1)
+                        FoodRow(food: food, tint: tint, dotColor: dotColor, last: i == foods.count - 1, onEdit: { onEdit(food) })
                             .padding(.horizontal, 16)
                     }
                 }
@@ -95,9 +105,17 @@ private struct FoodRow: View {
     let tint: Color
     let dotColor: Color
     let last: Bool
+    let onEdit: () -> Void
     @Environment(AppStore.self) private var store
 
     var body: some View {
+        Button(action: onEdit) {
+            rowContent
+        }
+        .buttonStyle(PressableStyle())
+    }
+
+    private var rowContent: some View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
                 Circle()
@@ -165,6 +183,137 @@ private struct FoodRow: View {
         let base = "\(mm)月\(dd)日初次 · 共 \(food.timesEaten) 次"
         if let notes = food.notes, !notes.isEmpty { return "\(base) · \(notes)" }
         return base
+    }
+}
+
+// MARK: — Edit sheet
+
+private struct FoodEditSheet: View {
+    let food: FoodItem
+    let onClose: () -> Void
+    @Environment(AppStore.self) private var store
+    @State private var name: String = ""
+    @State private var status: FoodStatus = .observing
+    @State private var showDeleteConfirm = false
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ScreenHeader(title: "编辑食物", onBack: onClose)
+            ScreenBody {
+                VStack(spacing: 18) {
+                    FormField(label: "名称") {
+                        TextField("食物名称", text: $name)
+                    }
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        FieldLabel(text: "状态")
+                        SegPill(selection: $status, options: [
+                            (.observing, "观察中"),
+                            (.safe, "安全"),
+                            (.allergic, "过敏"),
+                        ])
+                    }
+
+                    CTAButton(title: "保存", theme: store.theme) {
+                        store.renameFood(food.id, to: name)
+                        store.updateFoodStatus(food.id, status)
+                        onClose()
+                    }
+                    .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
+
+                    Button { showDeleteConfirm = true } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "trash")
+                                .font(.system(size: 13, weight: .bold))
+                            Text("删除此食物")
+                                .font(.system(size: 14, weight: .heavy))
+                                .tracking(-0.14)
+                        }
+                        .foregroundStyle(Color(hex: 0xD44E3A))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(Color(hex: 0xFFDDD8), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    }
+                    .buttonStyle(PressableStyle())
+                }
+                .padding(.top, 6)
+            }
+        }
+        .background(Palette.bg)
+        .onAppear {
+            name = food.name
+            status = food.status
+        }
+        .overlay {
+            if showDeleteConfirm {
+                CustomConfirmDialog(
+                    title: "确定删除「\(food.name)」?",
+                    message: "删除后食物记录将不可恢复。",
+                    confirmLabel: "删除",
+                    onConfirm: {
+                        store.deleteFood(food.id)
+                        onClose()
+                    },
+                    onCancel: { showDeleteConfirm = false }
+                )
+            }
+        }
+    }
+}
+
+private struct CustomConfirmDialog: View {
+    let title: String
+    let message: String
+    let confirmLabel: String
+    let onConfirm: () -> Void
+    let onCancel: () -> Void
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.28)
+                .ignoresSafeArea()
+                .onTapGesture(perform: onCancel)
+
+            VStack(spacing: 14) {
+                Text(title)
+                    .font(.system(size: 17, weight: .heavy))
+                    .tracking(-0.17)
+                    .foregroundStyle(Palette.ink)
+                    .multilineTextAlignment(.center)
+                Text(message)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Palette.ink3)
+                    .multilineTextAlignment(.center)
+
+                HStack(spacing: 10) {
+                    Button(action: onCancel) {
+                        Text("取消")
+                            .font(.system(size: 15, weight: .heavy))
+                            .foregroundStyle(Palette.ink2)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    }
+                    .buttonStyle(PressableStyle())
+
+                    Button(action: onConfirm) {
+                        Text(confirmLabel)
+                            .font(.system(size: 15, weight: .heavy))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(Color(hex: 0xD44E3A), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    }
+                    .buttonStyle(PressableStyle())
+                }
+                .padding(.top, 4)
+            }
+            .padding(20)
+            .background(Palette.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .shadowCard()
+            .padding(.horizontal, 40)
+        }
+        .transition(.opacity)
     }
 }
 

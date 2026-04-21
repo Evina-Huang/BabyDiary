@@ -401,6 +401,27 @@ func formatDurShort(_ seconds: TimeInterval) -> String {
     return "\(m)分钟"
 }
 
+struct InlineWheelTimePicker: View {
+    @Binding var time: Date
+    let theme: AppTheme
+    var components: DatePickerComponents = .hourAndMinute
+    var label: String = "时间"
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            FieldLabel(text: label)
+            DatePicker("", selection: $time, displayedComponents: components)
+                .labelsHidden()
+                .datePickerStyle(.wheel)
+                .tint(theme.primary600)
+                .environment(\.locale, Locale(identifier: "zh_CN"))
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 8).padding(.vertical, 4)
+                .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
+    }
+}
+
 func formatDateLabel(_ d: Date) -> String {
     let cal = Calendar.current
     if cal.isDateInToday(d)     { return "今天" }

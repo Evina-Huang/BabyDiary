@@ -52,7 +52,11 @@ struct DiaperScreen: View {
                 ZStack {
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
                         .fill(on ? Color.white.opacity(0.6) : Color.white)
-                    Text(o.emoji).font(.system(size: 22))
+                    Text(o.emoji)
+                        .font(.system(size: o.k == .both ? 18 : 22))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.5)
+                        .padding(.horizontal, 4)
                 }
                 .frame(width: 48, height: 48)
 
@@ -82,25 +86,7 @@ struct DiaperScreen: View {
     }
 
     private var timePicker: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            FieldLabel(text: "时间")
-            HStack(spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous).fill(.white)
-                    AppIcon.Clock(size: 20, color: store.theme.primary600)
-                }
-                .frame(width: 36, height: 36)
-                Text(formatTime(time))
-                    .font(.system(size: 16, weight: .heavy))
-                    .tracking(-0.16)
-                Spacer(minLength: 0)
-                DatePicker("", selection: $time, displayedComponents: .hourAndMinute)
-                    .labelsHidden()
-                    .tint(store.theme.primary600)
-            }
-            .padding(.horizontal, 16).padding(.vertical, 14)
-            .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        }
+        InlineWheelTimePicker(time: $time, theme: store.theme)
     }
 
     private var saveButton: some View {

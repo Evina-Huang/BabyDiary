@@ -15,10 +15,17 @@ struct HomeView: View {
                         .tracking(0.72)
                         .textCase(.uppercase)
                         .foregroundStyle(Palette.ink3)
-                    Text("你好呀 👋")
+                    let g = greeting(for: store.baby)
+                    Text(g.text)
                         .font(.system(size: 24, weight: .black))
                         .tracking(-0.72)
                         .foregroundStyle(Palette.ink)
+                    if let sub = g.sub {
+                        Text(sub)
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(g.isSpecial ? store.theme.primary600 : Palette.ink3)
+                            .padding(.top, 2)
+                    }
                 }
                 Spacer()
                 Button { onOpen(.backup) } label: {
@@ -54,6 +61,9 @@ struct HomeView: View {
 
                 DailySummaryStrip().padding(.top, 14)
 
+                VaccineReminderBanner(onOpen: { onOpen(.vaccine) })
+                    .padding(.top, 14)
+
                 SinceLastRow().padding(.top, 10)
 
             }
@@ -67,6 +77,72 @@ struct HomeView: View {
         f.dateFormat = "M月d日 EEEE"
         return f.string(from: Date())
     }
+}
+
+// MARK: — Greeting: daily random phrase + milestone celebration
+
+private struct Greeting {
+    let text: String
+    let sub: String?
+    let isSpecial: Bool
+}
+
+private let dailyPhrases: [String] = [
+    "今天也是被爱着的一天 🤍",
+    "做父母是一场温柔的修行 🌱",
+    "再累的夜,都会等到天亮 ☀️",
+    "小小的抱抱,大大的力量 🫶",
+    "你已经做得很好啦 ✨",
+    "慢慢来,没关系 🍃",
+    "每一次喂奶都是心跳的对话 🫧",
+    "别忘了也爱自己一下 🌷",
+    "今天的笑声要记得存好 🎀",
+    "成长是一场看不见的烟花 🎆",
+    "软软的小手,抓住了整个世界 🌏",
+    "今天的云也像棉花糖 ☁️",
+    "安心呼吸,一切都在变好 🌼",
+    "陪伴,是最长情的告白 💌",
+    "你是他最喜欢的人 💕",
+]
+
+private func greeting(for baby: Baby) -> Greeting {
+    let cal = Calendar.current
+    let today = cal.startOfDay(for: Date())
+    let birth = cal.startOfDay(for: baby.birthDate)
+    let days = max(0, cal.dateComponents([.day], from: birth, to: today).day ?? 0)
+
+    // Special day: 100-day, 200-day, 365-day, exact monthly anniversary
+    if days > 0, days % 100 == 0 {
+        return Greeting(text: "\(baby.name)来到这个世界的第 \(days) 天 🎉",
+                        sub: "每一个 100 天,都是了不起的里程碑",
+                        isSpecial: true)
+    }
+    if days == 365 {
+        return Greeting(text: "\(baby.name)一岁啦 🎂", sub: "生日快乐,第一个小生日", isSpecial: true)
+    }
+    let comps = cal.dateComponents([.year, .month, .day], from: birth, to: today)
+    if comps.day == 0 {
+        let months = (comps.year ?? 0) * 12 + (comps.month ?? 0)
+        if months > 0 {
+            if months == 12 {
+                return Greeting(text: "满一岁了 🎂", sub: "\(baby.name)整整一岁啦", isSpecial: true)
+            }
+            return Greeting(text: "\(baby.name)满 \(months) 个月啦 🎊",
+                            sub: "一个月又一个月的奇迹",
+                            isSpecial: true)
+        }
+    }
+    // Birthday anniversary (after first year)
+    let b = cal.dateComponents([.month, .day], from: birth)
+    let t = cal.dateComponents([.month, .day], from: today)
+    if let y = comps.year, y >= 1, b.month == t.month, b.day == t.day {
+        return Greeting(text: "\(baby.name) \(y) 岁啦 🎂", sub: "生日快乐呀", isSpecial: true)
+    }
+
+    // Regular day: daily random, seeded stably by day
+    let seed = cal.ordinality(of: .day, in: .era, for: today) ?? days
+    let phrase = dailyPhrases[abs(seed) % dailyPhrases.count]
+    return Greeting(text: phrase, sub: nil, isSpecial: false)
 }
 
 // MARK: — Baby badge header card
@@ -350,6 +426,82 @@ private struct SinceLastRow: View {
         let h = sec / 3600
         let m = (sec % 3600) / 60
         return h > 0 ? "\(h)h\(m)m" : "\(m)分"
+    }
+}
+
+// MARK: — Vaccine reminder banner
+
+private struct VaccineReminderBanner: View {
+    @Environment(AppStore.self) private var store
+    let onOpen: () -> Void
+
+    var body: some View {
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: Date())
+        let pending = store.vaccines.filter { !$0.done }
+        let urgent = pending.filter { v in
+            guard let d = v.scheduledDate else { return false }
+            let days = cal.dateComponents([.day], from: today, to: cal.startOfDay(for: d)).day ?? 0
+            return days <= 15   // overdue (negative) or within half a month
+        }
+        let next = urgent.sorted {
+            ($0.scheduledDate ?? .distantFuture) < ($1.scheduledDate ?? .distantFuture)
+        }.first
+
+        if let v = next {
+            let isOverdue = v.status() == .overdue
+            let tint: Color = isOverdue ? Color(hex: 0xFFE8E0) : Palette.yellow
+            let ink: Color = isOverdue ? Color(hex: 0xD44E3A) : Palette.yellowInk
+            let kicker: String = isOverdue ? "已逾期" : "即将接种"
+
+            Button(action: onOpen) {
+                HStack(spacing: 12) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(Color.white.opacity(0.6))
+                        AppIcon.Syringe(size: 22, color: ink)
+                    }
+                    .frame(width: 42, height: 42)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("疫苗提醒 · \(kicker)")
+                            .font(.system(size: 11, weight: .heavy))
+                            .tracking(0.66)
+                            .textCase(.uppercase)
+                            .foregroundStyle(ink)
+                        Text(v.name)
+                            .font(.system(size: 15, weight: .heavy))
+                            .tracking(-0.15)
+                            .foregroundStyle(Palette.ink)
+                        Text(reminderDetail(for: v))
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Palette.ink3)
+                    }
+                    Spacer(minLength: 0)
+                    AppIcon.Chevron(size: 16, color: Palette.ink3)
+                }
+                .padding(.horizontal, 14).padding(.vertical, 12)
+                .background(tint, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            }
+            .buttonStyle(PressableStyle())
+        }
+    }
+
+    private func reminderDetail(for v: Vaccine) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "zh_CN")
+        f.dateFormat = "M月d日"
+        if let d = v.scheduledDate {
+            let days = Calendar.current.dateComponents(
+                [.day],
+                from: Calendar.current.startOfDay(for: Date()),
+                to: Calendar.current.startOfDay(for: d)
+            ).day ?? 0
+            if days < 0 { return "\(v.ageLabel) · 计划 \(f.string(from: d))(已过 \(-days) 天)" }
+            if days == 0 { return "\(v.ageLabel) · 就是今天" }
+            return "\(v.ageLabel) · 还有 \(days) 天(\(f.string(from: d)))"
+        }
+        return v.ageLabel
     }
 }
 
