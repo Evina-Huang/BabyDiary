@@ -23,6 +23,7 @@
 		6AEECBD51C09CB2312324295 /* BabyDiaryApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D03ECC892748E58446D60717 /* BabyDiaryApp.swift */; };
 		6C26FDF5F1C6A680DE1F6A54 /* Milestone.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8361B81937103CAB6ED865C7 /* Milestone.swift */; };
 		72768378CE6D0262BB6CF9F5 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65AC155878DF39E04CA789EA /* ContentView.swift */; };
+		84197A7FE9DC14CB3DD0AB47 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 72D7D108F4BB04D6737EF131 /* Assets.xcassets */; };
 		8425AB80FEAA16C5595DBF3A /* GrowthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E906265959DF67553653CC27 /* GrowthView.swift */; };
 		84CAC6C4C0C65888C4F9E770 /* TeethScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9BA817C6B1233EF476B94E2 /* TeethScreen.swift */; };
 		8761C4018D55BF3AD2A03BAB /* FoodListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5491D057510332F88BFA9834 /* FoodListView.swift */; };
@@ -61,6 +62,7 @@
 		65AC155878DF39E04CA789EA /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		6D500E176081E9F39321BC6F /* Icons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Icons.swift; sourceTree = "<group>"; };
 		6F76EAD923BE8FA56D20274E /* GrowthPoint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GrowthPoint.swift; sourceTree = "<group>"; };
+		72D7D108F4BB04D6737EF131 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		75A3C34D1CA00285FB7EA36C /* BabyDiary.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = BabyDiary.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		8361B81937103CAB6ED865C7 /* Milestone.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Milestone.swift; sourceTree = "<group>"; };
 		846242867B8E637561712FE3 /* RecordsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordsView.swift; sourceTree = "<group>"; };
@@ -126,6 +128,7 @@
 		A314F73EDC210E0ECB183A54 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				72D7D108F4BB04D6737EF131 /* Assets.xcassets */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -203,6 +206,7 @@
 			buildConfigurationList = D581B9285B4AEF45A683C15B /* Build configuration list for PBXNativeTarget "BabyDiary" */;
 			buildPhases = (
 				C9A85C57BBDD0F5F1BE27B25 /* Sources */,
+				1DAF6BAB08E5CA30E1B5C3EF /* Resources */,
 			);
 			buildRules = (
 			);
@@ -267,6 +271,17 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		1DAF6BAB08E5CA30E1B5C3EF /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				84197A7FE9DC14CB3DD0AB47 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		46926E7ED48D800DAE86BBD7 /* Sources */ = {
