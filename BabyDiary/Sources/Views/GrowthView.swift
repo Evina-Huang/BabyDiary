@@ -65,6 +65,7 @@ struct GrowthView: View {
     @State private var wInput: String = ""
     @State private var hInput: String = ""
     @State private var historyOpen = false
+    @State private var historySheet = false
     @State private var historyFilter: HistoryFilter = .all
     @State private var editingGrowth: GrowthPoint? = nil
 
@@ -95,11 +96,27 @@ struct GrowthView: View {
                 statCards
                 chartCard.padding(.top, 14)
                 addButton.padding(.top, 14)
-                historyBlock.padding(.top, 22)
                 healthEntries.padding(.top, 22)
             }
         }
         .background(Palette.bg)
+        .sheet(isPresented: $historySheet) {
+            NavigationStack {
+                ScrollView {
+                    historyBlock.padding(.horizontal, 20).padding(.top, 12).padding(.bottom, 32)
+                }
+                .background(Palette.bg)
+                .navigationTitle("测量历史")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("完成") { historySheet = false }
+                    }
+                }
+            }
+            .environment(store)
+            .onAppear { historyOpen = true }
+        }
         .sheet(item: $editingGrowth) { g in
             GrowthEditSheet(
                 point: g,
@@ -190,6 +207,20 @@ struct GrowthView: View {
                             .background(metric.accentTint, in: Capsule())
                     }
                 }
+
+                Button { historySheet = true } label: {
+                    HStack(spacing: 4) {
+                        Text("历史记录 · \(store.growth.count) 条")
+                            .font(.system(size: 12, weight: .heavy))
+                            .tracking(-0.12)
+                        AppIcon.Chevron(size: 11, color: Palette.ink2)
+                    }
+                    .foregroundStyle(Palette.ink2)
+                    .padding(.horizontal, 10).padding(.vertical, 5)
+                    .background(Palette.bg2, in: Capsule())
+                }
+                .buttonStyle(PressableStyle())
+                .frame(maxWidth: .infinity, alignment: .trailing)
 
                 GrowthChartView(metric: metric, entries: sorted)
                     .frame(height: 200)
@@ -358,7 +389,7 @@ struct GrowthView: View {
     private var historyBlock: some View {
         let all = Array(sorted.reversed())
         let visible: [GrowthPoint] = {
-            if !historyOpen { return Array(all.prefix(5)) }
+            if !historyOpen { return [] }
             switch historyFilter {
             case .all: return all
             case .d30, .d90, .d365:
@@ -400,33 +431,35 @@ struct GrowthView: View {
                 }
             }
 
-            Card(padding: 0) {
-                VStack(spacing: 0) {
-                    if visible.isEmpty {
-                        Text("这段时间没有记录")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(Palette.ink3)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 20)
-                    } else {
-                        ForEach(Array(visible.enumerated()), id: \.element.id) { i, g in
-                            Button {
-                                editingGrowth = g
-                            } label: {
-                                historyRow(g, earlier: i + 1 < visible.count ? visible[i + 1] : nil,
-                                           last: i == visible.count - 1)
-                                    .padding(.horizontal, 16)
-                                    .contentShape(Rectangle())
+            if historyOpen {
+                Card(padding: 0) {
+                    VStack(spacing: 0) {
+                        if visible.isEmpty {
+                            Text("这段时间没有记录")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(Palette.ink3)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 20)
+                        } else {
+                            ForEach(Array(visible.enumerated()), id: \.element.id) { i, g in
+                                Button {
+                                    editingGrowth = g
+                                } label: {
+                                    historyRow(g, earlier: i + 1 < visible.count ? visible[i + 1] : nil,
+                                               last: i == visible.count - 1)
+                                        .padding(.horizontal, 16)
+                                        .contentShape(Rectangle())
+                                }
+                                .buttonStyle(PressableStyle())
                             }
-                            .buttonStyle(PressableStyle())
                         }
                     }
                 }
             }
 
-            if !historyOpen, all.count > 5 {
+            if !historyOpen {
                 Button { withAnimation(.spring()) { historyOpen = true } } label: {
-                    Text("显示全部 \(all.count) 条记录")
+                    Text(all.isEmpty ? "暂无记录" : "展开 \(all.count) 条记录")
                         .font(.system(size: 13, weight: .heavy))
                         .tracking(-0.13)
                         .foregroundStyle(Palette.ink2)
@@ -435,6 +468,7 @@ struct GrowthView: View {
                         .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                 }
                 .buttonStyle(PressableStyle())
+                .disabled(all.isEmpty)
             }
             if historyOpen {
                 Button {
@@ -513,6 +547,13 @@ struct GrowthView: View {
                 onTap: { onOpen(.vaccine) }
             )
             EntryCard(
+                title: "出牙记录",
+                subtitle: teethSubtitle,
+                iconBg: Palette.blue,
+                icon: { AppIcon.Tooth(size: 24, color: Palette.blueInk) },
+                onTap: { onOpen(.teeth) }
+            )
+            EntryCard(
                 title: "食物清单",
                 subtitle: foodSubtitle,
                 iconBg: Palette.yellow,
@@ -527,6 +568,17 @@ struct GrowthView: View {
         let total = store.vaccines.count
         if total == 0 { return "添加接种计划与进度" }
         return "已完成 \(done) / \(total)"
+    }
+
+    private var teethSubtitle: String {
+        let done = store.teeth.filter { $0.eruptedAt != nil }.count
+        if done == 0 { return "点击牙位图记录第一颗牙" }
+        if let latest = store.teeth.compactMap(\.eruptedAt).max() {
+            let days = Calendar.current.dateComponents([.day], from: latest, to: Date()).day ?? 0
+            let ago = days <= 0 ? "今天" : "\(days) 天前"
+            return "已出 \(done) / 20 · 最近 \(ago)"
+        }
+        return "已出 \(done) / 20"
     }
 
     private var foodSubtitle: String {

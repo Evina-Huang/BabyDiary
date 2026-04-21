@@ -388,6 +388,54 @@ enum AppIcon {
     }
 }
 
+extension AppIcon {
+    struct Tooth: View {
+        var size: CGFloat = 24
+        var color: Color
+        var fill: Color = .clear
+        var body: some View {
+            Canvas { ctx, _ in
+                let t = CGAffineTransform(scaleX: size/24, y: size/24)
+                var p = Path()
+                // 冠部圆润、底部分叉(两根牙根)
+                p.move(to: .init(x: 7, y: 3.5))
+                p.addCurve(to: .init(x: 17, y: 3.5),
+                           control1: .init(x: 9, y: 1.8),
+                           control2: .init(x: 15, y: 1.8))
+                p.addCurve(to: .init(x: 19, y: 10),
+                           control1: .init(x: 19.5, y: 5),
+                           control2: .init(x: 19.5, y: 7.5))
+                p.addCurve(to: .init(x: 15.5, y: 15),
+                           control1: .init(x: 18.5, y: 12.5),
+                           control2: .init(x: 16.5, y: 13))
+                p.addCurve(to: .init(x: 14, y: 21),
+                           control1: .init(x: 15, y: 17.5),
+                           control2: .init(x: 15, y: 20))
+                p.addCurve(to: .init(x: 12, y: 17.5),
+                           control1: .init(x: 13, y: 21.5),
+                           control2: .init(x: 12.3, y: 19))
+                p.addCurve(to: .init(x: 10, y: 21),
+                           control1: .init(x: 11.7, y: 19),
+                           control2: .init(x: 11, y: 21.5))
+                p.addCurve(to: .init(x: 8.5, y: 15),
+                           control1: .init(x: 9, y: 20),
+                           control2: .init(x: 9, y: 17.5))
+                p.addCurve(to: .init(x: 5, y: 10),
+                           control1: .init(x: 7.5, y: 13),
+                           control2: .init(x: 5.5, y: 12.5))
+                p.addCurve(to: .init(x: 7, y: 3.5),
+                           control1: .init(x: 4.5, y: 7.5),
+                           control2: .init(x: 4.5, y: 5))
+                p.closeSubpath()
+                ctx.fill(p.applying(t), with: .color(fill))
+                ctx.stroke(p.applying(t), with: .color(color),
+                           style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+            }
+            .frame(width: size, height: size)
+        }
+    }
+}
+
 // Map event kind → (tint, ink, icon) for CategoryIcon / SinceLastBanner / EventRow.
 struct CategoryStyle {
     let label: String

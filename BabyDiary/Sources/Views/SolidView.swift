@@ -298,7 +298,7 @@ struct SolidScreen: View {
             store.recordSolidFood(foodName, at: time, observationDays: observationDaysMap[foodName] ?? 3)
         }
         withAnimation { saved = true }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
             withAnimation { saved = false }
         }
         selectedNames = []; observationDaysMap = [:]; customInput = ""; amount = ""; notes = ""

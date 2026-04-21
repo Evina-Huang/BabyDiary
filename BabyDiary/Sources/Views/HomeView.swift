@@ -17,8 +17,8 @@ struct HomeView: View {
                         .foregroundStyle(Palette.ink3)
                     let g = greeting(for: store.baby)
                     Text(g.text)
-                        .font(.system(size: 24, weight: .black))
-                        .tracking(-0.72)
+                        .font(.system(size: 18, weight: .heavy))
+                        .tracking(-0.36)
                         .foregroundStyle(Palette.ink)
                     if let sub = g.sub {
                         Text(sub)
@@ -59,12 +59,12 @@ struct HomeView: View {
                     TimerBanner(start: timer.startedAt).padding(.top, 14)
                 }
 
-                DailySummaryStrip().padding(.top, 14)
+                SinceLastRow().padding(.top, 10)
+
+                DailySummaryStrip().padding(.top, 4)
 
                 VaccineReminderBanner(onOpen: { onOpen(.vaccine) })
                     .padding(.top, 14)
-
-                SinceLastRow().padding(.top, 10)
 
             }
         }

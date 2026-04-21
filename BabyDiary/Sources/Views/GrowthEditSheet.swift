@@ -50,10 +50,11 @@ struct GrowthEditSheet: View {
                                        in: ...Date().addingTimeInterval(24 * 3600),
                                        displayedComponents: .date)
                                 .labelsHidden()
+                                .datePickerStyle(.compact)
                                 .tint(store.theme.primary600)
                                 .environment(\.locale, Locale(identifier: "zh_CN"))
-                                .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(.horizontal, 14).padding(.vertical, 10)
+                                .frame(maxWidth: .infinity, alignment: .leading)
                                 .background(Palette.bg2,
                                             in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                         }

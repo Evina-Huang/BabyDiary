@@ -12,6 +12,7 @@ final class AppStore {
     var vaccines: [Vaccine] = []
     var growth: [GrowthPoint] = []
     var foods: [FoodItem] = []
+    var teeth: [ToothRecord] = ToothPosition.all.map(ToothRecord.empty(for:))
     var theme: AppTheme = .blossom
     var activeTimer: RunningTimer? = nil
 
@@ -119,6 +120,24 @@ final class AppStore {
     }
 
     func addGrowth(_ g: GrowthPoint) { growth.append(g); persist() }
+
+    // MARK: — Teeth
+
+    func tooth(at position: ToothPosition) -> ToothRecord {
+        if let found = teeth.first(where: { $0.position == position }) { return found }
+        return .empty(for: position)
+    }
+
+    func setTooth(_ position: ToothPosition, eruptedAt: Date?, note: String? = nil) {
+        let id = ToothRecord.id(for: position)
+        if let idx = teeth.firstIndex(where: { $0.id == id }) {
+            teeth[idx].eruptedAt = eruptedAt
+            teeth[idx].note = note
+        } else {
+            teeth.append(.init(id: id, position: position, eruptedAt: eruptedAt, note: note))
+        }
+        persist()
+    }
 
     func recordSolidFood(_ name: String, at date: Date = .now, observationDays: Int = 3) {
         if let idx = foods.firstIndex(where: { $0.name == name }) {
@@ -231,7 +250,7 @@ struct RunningTimer: Equatable, Codable {
 }
 
 enum SubScreen: String, Identifiable {
-    case sleep, feed, diaper, solid, vaccine, foodList, backup
+    case sleep, feed, diaper, solid, vaccine, foodList, teeth, backup
     var id: String { rawValue }
 }
 

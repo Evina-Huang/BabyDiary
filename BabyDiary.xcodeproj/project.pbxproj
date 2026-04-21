@@ -21,6 +21,7 @@
 		6AEECBD51C09CB2312324295 /* BabyDiaryApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D03ECC892748E58446D60717 /* BabyDiaryApp.swift */; };
 		72768378CE6D0262BB6CF9F5 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65AC155878DF39E04CA789EA /* ContentView.swift */; };
 		8425AB80FEAA16C5595DBF3A /* GrowthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E906265959DF67553653CC27 /* GrowthView.swift */; };
+		84CAC6C4C0C65888C4F9E770 /* TeethScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9BA817C6B1233EF476B94E2 /* TeethScreen.swift */; };
 		8761C4018D55BF3AD2A03BAB /* FoodListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5491D057510332F88BFA9834 /* FoodListView.swift */; };
 		972A70388DA4655BA6F1198D /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5BA15EF9E3E52299271C1A3 /* Theme.swift */; };
 		A15C5809230D08E7735D9957 /* Vaccine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0707DB66BE6B3F5B718679C3 /* Vaccine.swift */; };
@@ -28,6 +29,7 @@
 		B8645C91E2EE03B9EA940B5A /* Backup.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3792BD5CAF341914797907E /* Backup.swift */; };
 		BCEC5DB360E3B0F899717BB2 /* DiaperView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2C7AC0ABADFB4E8B1D479A4 /* DiaperView.swift */; };
 		BE937337B54F44B51D0E139F /* BackupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEEA5B6B67F89989A1EB85EF /* BackupView.swift */; };
+		C7A8C9434D4FEF2395E4EF49 /* Tooth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 207C1F685155DB510F75BDDD /* Tooth.swift */; };
 		C8ABA57A566961EC9833ABF7 /* FoodItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0181DA81854724D428DE31A5 /* FoodItem.swift */; };
 		C9EE5DEC31801EB78F0521B2 /* AppStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA9831391FD58F873506339A /* AppStore.swift */; };
 		DC77C5471B6A77860BA20FA9 /* Event.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2183741F6B070696BCE37F88 /* Event.swift */; };
@@ -48,6 +50,7 @@
 		0181DA81854724D428DE31A5 /* FoodItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoodItem.swift; sourceTree = "<group>"; };
 		0707DB66BE6B3F5B718679C3 /* Vaccine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Vaccine.swift; sourceTree = "<group>"; };
 		11499DE74B462B78A849A44F /* BabyDiaryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BabyDiaryTests.swift; sourceTree = "<group>"; };
+		207C1F685155DB510F75BDDD /* Tooth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tooth.swift; sourceTree = "<group>"; };
 		2183741F6B070696BCE37F88 /* Event.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Event.swift; sourceTree = "<group>"; };
 		3710482D2313F83730310BD8 /* GrowthEditSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GrowthEditSheet.swift; sourceTree = "<group>"; };
 		5491D057510332F88BFA9834 /* FoodListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoodListView.swift; sourceTree = "<group>"; };
@@ -58,6 +61,7 @@
 		846242867B8E637561712FE3 /* RecordsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordsView.swift; sourceTree = "<group>"; };
 		95D1A27D017DACA51051A40E /* EventEditSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventEditSheet.swift; sourceTree = "<group>"; };
 		A3792BD5CAF341914797907E /* Backup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Backup.swift; sourceTree = "<group>"; };
+		A9BA817C6B1233EF476B94E2 /* TeethScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TeethScreen.swift; sourceTree = "<group>"; };
 		AA9831391FD58F873506339A /* AppStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStore.swift; sourceTree = "<group>"; };
 		BA3E4AAE44A1EB50CB7798E7 /* BabyDiaryTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = BabyDiaryTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		BC8D0F2DAE3C93A66E2FF521 /* VaccineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaccineView.swift; sourceTree = "<group>"; };
@@ -137,6 +141,7 @@
 				2183741F6B070696BCE37F88 /* Event.swift */,
 				0181DA81854724D428DE31A5 /* FoodItem.swift */,
 				6F76EAD923BE8FA56D20274E /* GrowthPoint.swift */,
+				207C1F685155DB510F75BDDD /* Tooth.swift */,
 				0707DB66BE6B3F5B718679C3 /* Vaccine.swift */,
 			);
 			path = Models;
@@ -175,6 +180,7 @@
 				C61F3580FA78D7EEF0F4C739 /* SleepView.swift */,
 				F2E3BE778F004091A6BFD447 /* SolidView.swift */,
 				D263718D27C28E0CF528F25F /* StatsView.swift */,
+				A9BA817C6B1233EF476B94E2 /* TeethScreen.swift */,
 				BC8D0F2DAE3C93A66E2FF521 /* VaccineView.swift */,
 			);
 			path = Views;
@@ -287,7 +293,9 @@
 				06B4E6F4B3F1348B99D0E3BF /* SleepView.swift in Sources */,
 				104C48F6EB4128DF961E251B /* SolidView.swift in Sources */,
 				614260B1B6950989AEFB7AB0 /* StatsView.swift in Sources */,
+				84CAC6C4C0C65888C4F9E770 /* TeethScreen.swift in Sources */,
 				972A70388DA4655BA6F1198D /* Theme.swift in Sources */,
+				C7A8C9434D4FEF2395E4EF49 /* Tooth.swift in Sources */,
 				A15C5809230D08E7735D9957 /* Vaccine.swift in Sources */,
 				67035A757992B9AFE73AE03C /* VaccineView.swift in Sources */,
 			);
@@ -364,6 +372,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -380,6 +389,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
