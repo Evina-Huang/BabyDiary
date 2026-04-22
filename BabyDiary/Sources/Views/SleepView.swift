@@ -18,15 +18,10 @@ struct SleepScreen: View {
         }
         return max(0, draftEnd.timeIntervalSince(draftStart))
     }
-    private var timeValidationMessage: String? {
-        if draftEnd <= draftStart { return "结束时间需晚于开始时间" }
-        return nil
-    }
-    private var canSaveDraft: Bool { timeValidationMessage == nil }
 
     var body: some View {
         VStack(spacing: 0) {
-            ScreenHeader(title: "睡眠记录", onBack: onBack)
+            ScreenHeader(title: "睡眠记录", onBack: handleBack)
             ScreenBody {
                 TimelineView(.periodic(from: .now, by: 1)) { ctx in
                     content(now: ctx.date)
@@ -36,6 +31,7 @@ struct SleepScreen: View {
         .background(Palette.bg)
         .onAppear(perform: syncDraftFromTimer)
         .onChange(of: store.activeTimer) { _, _ in syncDraftFromTimer() }
+        .onDisappear(perform: discardDraftSleep)
         .sheet(item: $activePicker) { picker in
             SleepPickerSheet(picker: picker,
                              time: binding(for: picker),
@@ -109,11 +105,10 @@ struct SleepScreen: View {
                             isRunning ? pauseSleep(at: now) : resumeSleep(at: now)
                         }
                         CTAButton(title: saved ? "✓ 已保存" : "保存记录",
-                                  variant: canSaveDraft ? (saved ? .secondary : .primary) : .ghost,
+                                  variant: saved ? .secondary : .primary,
                                   theme: store.theme) {
                             saveSleep(now: now)
                         }
-                        .disabled(!canSaveDraft)
                     }
                     .padding(.top, 22)
                 } else {
@@ -132,15 +127,9 @@ struct SleepScreen: View {
     private func editorCard() -> some View {
         return Card {
             VStack(alignment: .leading, spacing: 14) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text("手动调整时间")
-                        .font(.system(size: 15, weight: .heavy))
-                        .tracking(-0.15)
-                    Spacer()
-                    Text(isRunning ? "先暂停再修改结束时间" : "可修改开始和结束时间")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(Palette.ink3)
-                }
+                Text("手动调整时间")
+                    .font(.system(size: 15, weight: .heavy))
+                    .tracking(-0.15)
 
                 CompactDateTimeField(time: $draftStart,
                                      theme: store.theme,
@@ -164,47 +153,8 @@ struct SleepScreen: View {
                     .disabled(isRunning)
                     .opacity(isRunning ? 0.65 : 1)
                     .onChange(of: draftEnd) { _, _ in saved = false }
-
-                if canSaveDraft {
-                    HStack(spacing: 10) {
-                        summaryPill(title: "睡了", value: formatDurShort(displayDuration))
-                        summaryPill(title: "开始", value: formatTime(draftStart))
-                        summaryPill(title: "结束", value: formatTime(effectiveEnd))
-                    }
-                } else {
-                    invalidTimeBanner
-                }
             }
         }
-    }
-
-    private var invalidTimeBanner: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "exclamationmark.circle.fill")
-                .font(.system(size: 14, weight: .bold))
-            Text(timeValidationMessage ?? "")
-                .font(.system(size: 13, weight: .bold))
-        }
-        .foregroundStyle(Color(hex: 0xFF7F64))
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 12)
-        .background(Color(hex: 0xFF7F64).opacity(0.1),
-                    in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-    }
-
-    private func summaryPill(title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            MicroLabel(text: title)
-            Text(value)
-                .font(.system(size: 14, weight: .heavy))
-                .monospacedDigit()
-                .foregroundStyle(Palette.ink)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     private var lastNightCard: some View {
@@ -304,7 +254,7 @@ struct SleepScreen: View {
             store.pauseTimer(at: now)
             draftEnd = now
         }
-        guard canSaveDraft else { return }
+        draftEnd = max(draftEnd, draftStart)
 
         let dur = draftEnd.timeIntervalSince(draftStart)
         store.addEvent(.init(
@@ -319,13 +269,25 @@ struct SleepScreen: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { saved = false }
     }
 
+    private func handleBack() {
+        discardDraftSleep()
+        onBack()
+    }
+
+    private func discardDraftSleep() {
+        if store.activeTimer != nil {
+            store.stopTimer()
+        }
+        draftStart = .now
+        draftEnd = .now
+        saved = false
+        activePicker = nil
+    }
+
     private func statusText() -> String {
         guard let timer else { return "轻触下方按钮记录睡眠开始时间" }
         if timer.isRunning {
             return "开始于 \(formatTime(draftStart))，需要结束时先暂停或直接保存"
-        }
-        if let message = timeValidationMessage {
-            return message
         }
         return "已暂停在 \(formatTime(draftEnd))，可手动调整醒来时间后保存"
     }
@@ -335,7 +297,10 @@ struct SleepScreen: View {
         case .startDate, .startTime:
             return $draftStart
         case .endDate, .endTime:
-            return $draftEnd
+            return Binding(
+                get: { draftEnd },
+                set: { draftEnd = max($0, draftStart) }
+            )
         }
     }
 
@@ -468,23 +433,22 @@ private struct SleepPickerSheet: View {
                                 .datePickerStyle(.graphical)
                         }
                     } else {
-                        DatePicker("", selection: $time, displayedComponents: .hourAndMinute)
-                            .datePickerStyle(.wheel)
-                            .frame(height: 180)
-                            .clipped()
-                            .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                        if let minimumDate {
+                            DatePicker("", selection: $time, in: minimumDate...Date().addingTimeInterval(365 * 24 * 3600), displayedComponents: .hourAndMinute)
+                                .datePickerStyle(.wheel)
+                                .frame(height: 180)
+                                .clipped()
+                                .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                        } else {
+                            DatePicker("", selection: $time, displayedComponents: .hourAndMinute)
+                                .datePickerStyle(.wheel)
+                                .frame(height: 180)
+                                .clipped()
+                                .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                        }
                     }
                 }
 
-                Button(action: { dismiss() }) {
-                    Text("完成")
-                        .font(.system(size: 16, weight: .heavy))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(theme.primary, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                }
-                .buttonStyle(PressableStyle())
             }
             .labelsHidden()
             .tint(theme.primary600)
@@ -493,6 +457,12 @@ private struct SleepPickerSheet: View {
             .background(Palette.bg)
             .navigationTitle(picker.title)
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("完成") { dismiss() }
+                        .font(.system(size: 15, weight: .heavy))
+                }
+            }
         }
         .presentationDetents(picker.isDate ? [.medium] : [.height(320)])
     }

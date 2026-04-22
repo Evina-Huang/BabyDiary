@@ -17,9 +17,9 @@ struct DiaperScreen: View {
     }
 
     private let options: [Option] = [
-        .init(k: .wet,   label: "湿尿布",   sub: "只有尿",    emoji: "💧",   tint: Palette.blue,     ink: Palette.blueInk),
-        .init(k: .dirty, label: "臭臭",     sub: "便便",      emoji: "💩",   tint: Palette.yellow,   ink: Palette.yellowInk),
-        .init(k: .both,  label: "两者都有", sub: "湿 + 便便", emoji: "💧💩", tint: Palette.mintTint, ink: Palette.mint600),
+        .init(k: .wet,   label: "嘘嘘",       sub: "",             emoji: "💧",   tint: Palette.blue,     ink: Palette.blueInk),
+        .init(k: .dirty, label: "臭臭",       sub: "",             emoji: "💩",   tint: Palette.yellow,   ink: Palette.yellowInk),
+        .init(k: .both,  label: "嘘嘘+臭臭", sub: "",             emoji: "💧💩", tint: Palette.mintTint, ink: Palette.mint600),
     ]
 
     @State private var type: DType? = nil
@@ -65,9 +65,11 @@ struct DiaperScreen: View {
                         .font(.system(size: 16, weight: .heavy))
                         .tracking(-0.16)
                         .foregroundStyle(on ? o.ink : Palette.ink)
-                    Text(o.sub)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(on ? o.ink.opacity(0.8) : Palette.ink3)
+                    if !o.sub.isEmpty {
+                        Text(o.sub)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(on ? o.ink.opacity(0.8) : Palette.ink3)
+                    }
                 }
                 Spacer(minLength: 0)
                 Circle()

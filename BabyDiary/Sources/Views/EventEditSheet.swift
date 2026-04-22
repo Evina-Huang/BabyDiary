@@ -6,6 +6,11 @@ import SwiftUI
 // and sub strings are always rebuilt from the structured inputs — never
 // free-text-edited — to match the new-record experience.
 struct EventEditSheet: View {
+    private enum ExpandedTimeField {
+        case start
+        case end
+    }
+
     let original: Event
     let onCancel: () -> Void
     let onSave: (Event) -> Void
@@ -17,14 +22,15 @@ struct EventEditSheet: View {
     @State private var at: Date
     @State private var showConfirm = false
     @State private var showDeleteConfirm = false
+    @State private var expandedTimeField: ExpandedTimeField?
 
     // Sleep
     @State private var endAt: Date
 
     // Diaper
     enum DType: String, Hashable, CaseIterable { case wet, dirty, both
-        var label: String { self == .wet ? "湿尿布" : self == .dirty ? "臭臭" : "两者都有" }
-        var sub: String { self == .wet ? "只有尿" : self == .dirty ? "便便" : "湿 + 便便" }
+        var label: String { self == .wet ? "嘘嘘" : self == .dirty ? "臭臭" : "嘘嘘+臭臭" }
+        var sub: String { "" }
         var emoji: String { self == .wet ? "💧" : self == .dirty ? "💩" : "💧💩" }
     }
     @State private var dType: DType = .wet
@@ -66,7 +72,9 @@ struct EventEditSheet: View {
         // Parse existing data per kind
         switch event.kind {
         case .diaper:
-            if event.title.contains("湿") && !event.title.contains("便") { _dType = .init(initialValue: .wet) }
+            if event.title.contains("嘘嘘") || (event.title.contains("湿") && !event.title.contains("便")) {
+                _dType = .init(initialValue: event.title.contains("臭") ? .both : .wet)
+            }
             else if event.title.contains("臭") || event.title == "便便" || event.title.contains("便") && !event.title.contains("两") { _dType = .init(initialValue: .dirty) }
             else { _dType = .init(initialValue: .both) }
         case .feed:
@@ -137,13 +145,16 @@ struct EventEditSheet: View {
                     VStack(alignment: .leading, spacing: 18) {
                         kindForm
                         timeField(label: original.kind == .sleep ? "开始时间" : "时间",
-                                  binding: $at)
+                                  binding: $at,
+                                  field: .start)
                         if original.kind == .sleep {
-                            timeField(label: "结束时间", binding: $endAt)
+                            timeField(label: "结束时间",
+                                      binding: $endAt,
+                                      field: .end)
                             if endAt <= at {
                                 hintText("结束时间需晚于开始时间", warn: true)
                             } else {
-                                hintText("持续 \(formatDur(endAt.timeIntervalSince(at)))")
+                                durationSummary
                             }
                         }
                     }
@@ -336,17 +347,165 @@ struct EventEditSheet: View {
 
     // MARK: — Shared fragments
 
-    private func timeField(label: String, binding: Binding<Date>) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+    private func timeField(label: String,
+                           binding: Binding<Date>,
+                           field: ExpandedTimeField) -> some View {
+        let isExpanded = expandedTimeField == field
+        let accent = timeFieldAccent(for: field)
+
+        return VStack(alignment: .leading, spacing: 8) {
             FieldLabel(text: label)
-            DatePicker("", selection: binding, displayedComponents: [.date, .hourAndMinute])
-                .labelsHidden()
-                .datePickerStyle(.wheel)
-                .tint(store.theme.primary600)
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, 8).padding(.vertical, 4)
-                .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .environment(\.locale, Locale(identifier: "zh_CN"))
+            VStack(alignment: .leading, spacing: 12) {
+                Button {
+                    withAnimation(.spring(response: 0.26, dampingFraction: 0.92)) {
+                        expandedTimeField = isExpanded ? nil : field
+                    }
+                } label: {
+                    HStack(alignment: .center, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                Text(hhmm(binding.wrappedValue))
+                                    .font(.system(size: 28, weight: .black))
+                                    .tracking(-0.72)
+                                    .monospacedDigit()
+                                    .foregroundStyle(Palette.ink)
+                                Text(formatDateLabel(binding.wrappedValue))
+                                    .font(.system(size: 14, weight: .heavy))
+                                    .foregroundStyle(accent.ink)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 6)
+                                    .background(accent.badge, in: Capsule())
+                            }
+                            Text(timeDetail(binding.wrappedValue))
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(Palette.ink3)
+                        }
+                        Spacer(minLength: 0)
+                        Text(isExpanded ? "收起" : "调整")
+                            .font(.system(size: 12, weight: .heavy))
+                            .foregroundStyle(isExpanded ? accent.ink : Palette.ink2)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 7)
+                            .background(isExpanded ? accent.badge : Color.white.opacity(0.72),
+                                        in: Capsule())
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(PressableStyle())
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 14)
+                .padding(.top, 14)
+                .padding(.bottom, isExpanded ? 10 : 14)
+                .background(
+                    LinearGradient(colors: [
+                        isExpanded ? accent.surfaceStrong : accent.surfaceSoft,
+                        Color.white.opacity(isExpanded ? 0.92 : 0.7)
+                    ], startPoint: .topLeading, endPoint: .bottomTrailing),
+                    in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(isExpanded ? accent.borderStrong : accent.borderSoft, lineWidth: 1)
+                }
+                .shadowSurface()
+
+                if isExpanded {
+                    DatePicker("", selection: binding, displayedComponents: [.date, .hourAndMinute])
+                        .labelsHidden()
+                        .datePickerStyle(.wheel)
+                        .tint(store.theme.primary600)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 178)
+                        .clipped()
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .offset(y: -3)
+                        .background(accent.wheel,
+                                    in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .environment(\.locale, Locale(identifier: "zh_CN"))
+                        .transition(
+                            .asymmetric(
+                                insertion: .offset(y: -14)
+                                    .combined(with: .scale(scale: 0.985, anchor: .top))
+                                    .combined(with: .opacity),
+                                removal: .offset(y: -8)
+                                    .combined(with: .scale(scale: 0.995, anchor: .top))
+                                    .combined(with: .opacity)
+                            )
+                        )
+                }
+            }
+            .animation(.spring(response: 0.28, dampingFraction: 0.9), value: isExpanded)
+        }
+    }
+
+    private func timeFieldAccent(for field: ExpandedTimeField) -> (surfaceSoft: Color,
+                                                                   surfaceStrong: Color,
+                                                                   badge: Color,
+                                                                   wheel: Color,
+                                                                   ink: Color,
+                                                                   borderSoft: Color,
+                                                                   borderStrong: Color) {
+        switch field {
+        case .start:
+            return (
+                Color(hex: 0xFFF4EE),
+                Color(hex: 0xFFE8DD).opacity(0.96),
+                Color(hex: 0xFFF7F0),
+                Color(hex: 0xFFFDFC).opacity(0.9),
+                Color(hex: 0xA46D5A),
+                Color.white.opacity(0.45),
+                Color(hex: 0xE6CABC)
+            )
+        case .end:
+            return (
+                Color(hex: 0xEEF6F2),
+                Color(hex: 0xDFF0E9).opacity(0.98),
+                Color(hex: 0xF3FBF7),
+                Color(hex: 0xF8FDFC).opacity(0.92),
+                Color(hex: 0x5F8C79),
+                Color.white.opacity(0.45),
+                Color(hex: 0xC9E2D7)
+            )
+        }
+    }
+
+    private func timeDetail(_ date: Date) -> String {
+        let calendar = Calendar.current
+        if calendar.isDateInToday(date) {
+            return weekdayText(date)
+        }
+        if calendar.isDateInYesterday(date) {
+            return weekdayText(date)
+        }
+        if calendar.isDate(date, equalTo: Date(), toGranularity: .year) {
+            return weekdayText(date)
+        }
+        return yearDateText(date)
+    }
+
+    private var durationSummary: some View {
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 3) {
+                MicroLabel(text: "睡眠时长")
+                Text(formatDur(endAt.timeIntervalSince(at)))
+                    .font(.system(size: 18, weight: .black))
+                    .tracking(-0.36)
+                    .foregroundStyle(Palette.ink)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(
+            LinearGradient(colors: [store.theme.primaryTint, Color.white],
+                           startPoint: .topLeading,
+                           endPoint: .bottomTrailing),
+            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color.white.opacity(0.6), lineWidth: 1)
         }
     }
 
@@ -400,7 +559,7 @@ struct EventEditSheet: View {
                 e.title = "母乳 · \(breastSide.label)"
                 switch breastSide {
                 case .left, .right:
-                    e.sub = "\(breastMinutes) 分钟"
+                    e.sub = "\(breastMinutes)分"
                 case .both:
                     let total = leftMinutes + rightMinutes
                     let first = firstSide == .left
@@ -421,7 +580,7 @@ struct EventEditSheet: View {
             e.endAt = endAt
             let dur = endAt.timeIntervalSince(at)
             e.title = "睡眠 \(formatDurShort(dur))"
-            e.sub = "\(hhmm(at)) — \(hhmm(endAt))"
+            e.sub = "\(hhmm(at)) - \(hhmm(endAt))"
         }
         onSave(e)
     }
@@ -429,4 +588,18 @@ struct EventEditSheet: View {
 
 private func hhmm(_ d: Date) -> String {
     let f = DateFormatter(); f.dateFormat = "HH:mm"; return f.string(from: d)
+}
+
+private func weekdayText(_ d: Date) -> String {
+    let f = DateFormatter()
+    f.locale = Locale(identifier: "zh_CN")
+    f.dateFormat = "EEEE"
+    return f.string(from: d)
+}
+
+private func yearDateText(_ d: Date) -> String {
+    let f = DateFormatter()
+    f.locale = Locale(identifier: "zh_CN")
+    f.dateFormat = "yyyy年M月d日"
+    return f.string(from: d)
 }

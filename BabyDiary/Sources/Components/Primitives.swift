@@ -195,7 +195,7 @@ struct SinceLastBanner: View {
                         .tracking(0.6)
                         .textCase(.uppercase)
                         .foregroundStyle(style.ink.opacity(0.75))
-                    Text(h > 0 ? "\(h)小时\(m)分" : "\(m) 分钟")
+                    Text(h > 0 ? "\(h)时\(m)分" : "\(m)分")
                         .font(.system(size: 16, weight: .black))
                         .tracking(-0.32)
                         .monospacedDigit()
@@ -379,9 +379,7 @@ func formatTime(_ d: Date) -> String {
     let cal = Calendar.current
     let h = cal.component(.hour, from: d)
     let m = cal.component(.minute, from: d)
-    let ap = h < 12 ? "上午" : "下午"
-    let hh = h % 12 == 0 ? 12 : h % 12
-    return String(format: "%@ %d:%02d", ap, hh, m)
+    return String(format: "%02d:%02d", h, m)
 }
 
 func formatDur(_ seconds: TimeInterval) -> String {
@@ -397,8 +395,8 @@ func formatDurShort(_ seconds: TimeInterval) -> String {
     let sec = Int(seconds)
     let h = sec / 3600
     let m = (sec % 3600) / 60
-    if h > 0 { return "\(h)h \(m)m" }
-    return "\(m)分钟"
+    if h > 0 { return "\(h)时 \(m)分" }
+    return "\(m)分"
 }
 
 struct InlineWheelTimePicker: View {

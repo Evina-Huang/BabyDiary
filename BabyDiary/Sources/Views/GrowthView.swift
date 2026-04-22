@@ -249,7 +249,7 @@ struct GrowthView: View {
                         Text("生长曲线 · \(metric.label)")
                             .font(.system(size: 15, weight: .heavy))
                             .tracking(-0.15)
-                        Text("0 — 12 月龄 · WHO 参考范围")
+                        Text("0 - 12 月龄 · WHO 参考范围")
                             .font(.system(size: 12, weight: .semibold))
                             .foregroundStyle(Palette.ink3)
                     }
@@ -920,9 +920,9 @@ struct TabTitleHeader: View {
                 .foregroundStyle(Palette.ink)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.top, 62)
+        .padding(.top, 10)
         .padding(.horizontal, 20)
-        .padding(.bottom, 8)
+        .padding(.bottom, 2)
     }
 }
 

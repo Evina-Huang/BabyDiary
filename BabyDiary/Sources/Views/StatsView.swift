@@ -114,9 +114,6 @@ private struct PatternChart: View {
                 Text("时间规律")
                     .font(.system(size: 15, weight: .heavy))
                     .tracking(-0.15)
-                Text("一眼看出宝宝每天的节奏")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Palette.ink3)
             }
             Spacer(minLength: 0)
         }

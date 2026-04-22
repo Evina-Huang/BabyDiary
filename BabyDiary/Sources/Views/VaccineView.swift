@@ -4,7 +4,9 @@ struct VaccineScreen: View {
     let onBack: () -> Void
     @Environment(AppStore.self) private var store
     @State private var editing: Vaccine? = nil
+    @State private var editingCompleted: Vaccine? = nil
     @State private var showAddCustom = false
+    @State private var showRecommended = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -42,16 +44,17 @@ struct VaccineScreen: View {
                 addCustomButton.padding(.top, 12)
 
                 if !templates.isEmpty {
-                    sectionHeader(title: "推荐接种", countLabel: "\(templates.count) 项",
-                                  ink: store.theme.primary600, bg: store.theme.primaryTint)
+                    recommendedHeader(count: templates.count)
                         .padding(.top, 24)
 
-                    VStack(spacing: 10) {
-                        ForEach(templates) { t in
-                            TemplateCard(template: t) { store.addVaccineFromTemplate(t) }
+                    if showRecommended {
+                        VStack(spacing: 10) {
+                            ForEach(templates) { t in
+                                TemplateCard(template: t) { store.addVaccineFromTemplate(t) }
+                            }
                         }
+                        .padding(.top, 10)
                     }
-                    .padding(.top, 10)
                 }
 
                 if !completed.isEmpty {
@@ -63,7 +66,7 @@ struct VaccineScreen: View {
                         VStack(spacing: 0) {
                             ForEach(Array(completed.enumerated()), id: \.element.id) { i, v in
                                 CompletedRow(vaccine: v, last: i == completed.count - 1) {
-                                    editing = v
+                                    editingCompleted = v
                                 }
                                 .padding(.horizontal, 16)
                             }
@@ -83,6 +86,14 @@ struct VaccineScreen: View {
             VaccineAddCustomSheet { showAddCustom = false }
                 .environment(store)
                 .presentationDetents([.medium])
+        }
+        .overlay {
+            if let vaccine = editingCompleted {
+                CompletedVaccineEditor(vaccine: vaccine) {
+                    editingCompleted = nil
+                }
+                .environment(store)
+            }
         }
     }
 
@@ -158,6 +169,39 @@ struct VaccineScreen: View {
                 .background(bg, in: Capsule())
             Spacer()
         }
+    }
+
+    private func recommendedHeader(count: Int) -> some View {
+        Button {
+            withAnimation(.easeOut(duration: 0.18)) {
+                showRecommended.toggle()
+            }
+        } label: {
+            HStack(alignment: .center, spacing: 10) {
+                Text("推荐接种")
+                    .font(.system(size: 15, weight: .heavy))
+                    .tracking(-0.15)
+                    .foregroundStyle(Palette.ink)
+                Text("\(count) 项")
+                    .font(.system(size: 11, weight: .heavy))
+                    .foregroundStyle(store.theme.primary600)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 2)
+                    .background(store.theme.primaryTint, in: Capsule())
+                Spacer()
+                Text(showRecommended ? "收起" : "展开")
+                    .font(.system(size: 12, weight: .heavy))
+                    .foregroundStyle(store.theme.primary600)
+                Image(systemName: showRecommended ? "chevron.up" : "chevron.down")
+                    .font(.system(size: 11, weight: .black))
+                    .foregroundStyle(store.theme.primary600)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .background(Color.white, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .shadowCard()
+        }
+        .buttonStyle(PressableStyle())
     }
 }
 
@@ -315,7 +359,6 @@ private struct CompletedRow: View {
                             .font(.system(size: 15, weight: .heavy))
                             .tracking(-0.15)
                             .foregroundStyle(Palette.ink)
-                            .strikethrough(true, color: Palette.ink3)
                         if let dd = vaccine.doneDate {
                             Text("\(vaccine.ageLabel) · 已于 \(formatDate(dd)) 接种")
                                 .font(.system(size: 12, weight: .semibold))
@@ -334,6 +377,170 @@ private struct CompletedRow: View {
             }
         }
         .buttonStyle(PressableStyle())
+    }
+}
+
+private struct CompletedVaccineEditor: View {
+    let vaccine: Vaccine
+    let onClose: () -> Void
+    @Environment(AppStore.self) private var store
+    @State private var name: String
+    @State private var doneDate: Date
+    @State private var showDeleteConfirm = false
+
+    init(vaccine: Vaccine, onClose: @escaping () -> Void) {
+        self.vaccine = vaccine
+        self.onClose = onClose
+        self._name = State(initialValue: vaccine.name)
+        self._doneDate = State(initialValue: vaccine.doneDate ?? vaccine.scheduledDate ?? Date())
+    }
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.28)
+                .ignoresSafeArea()
+                .onTapGesture(perform: onClose)
+
+            VStack(spacing: 0) {
+                ScreenHeader(title: "编辑已接种记录", onBack: onClose)
+                    .padding(.top, 8)
+
+                ScreenBody {
+                    VStack(spacing: 18) {
+                        Card {
+                            VStack(alignment: .leading, spacing: 16) {
+                                FormField(label: "名称") {
+                                    TextField("疫苗名称", text: $name)
+                                }
+
+                                VStack(alignment: .leading, spacing: 8) {
+                                    FieldLabel(text: "推荐月龄")
+                                    Text(vaccine.ageLabel)
+                                        .font(.system(size: 16, weight: .semibold))
+                                        .foregroundStyle(Palette.ink)
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 14)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                                }
+
+                                VStack(alignment: .leading, spacing: 8) {
+                                    FieldLabel(text: "接种日期")
+                                    DatePicker("", selection: $doneDate, displayedComponents: .date)
+                                        .labelsHidden()
+                                        .environment(\.locale, Locale(identifier: "zh_CN"))
+                                        .datePickerStyle(.graphical)
+                                        .padding(10)
+                                        .frame(maxWidth: .infinity)
+                                        .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                                }
+                            }
+                        }
+
+                        CTAButton(title: "保存", theme: store.theme) {
+                            var updated = vaccine
+                            updated.name = name.trimmingCharacters(in: .whitespaces)
+                            updated.doneDate = doneDate
+                            store.updateVaccine(updated)
+                            onClose()
+                        }
+                        .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
+
+                        Button { showDeleteConfirm = true } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "trash")
+                                    .font(.system(size: 13, weight: .bold))
+                                Text(vaccine.isCustom ? "删除此疫苗" : "从我的计划中移除")
+                                    .font(.system(size: 14, weight: .heavy))
+                                    .tracking(-0.14)
+                            }
+                            .foregroundStyle(Color(hex: 0xD44E3A))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(Color(hex: 0xFFDDD8), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                        }
+                        .buttonStyle(PressableStyle())
+                    }
+                    .padding(.top, 6)
+                }
+            }
+            .frame(maxWidth: 560)
+            .background(Palette.bg)
+            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .shadowSurface()
+            .padding(.horizontal, 16)
+            .padding(.vertical, 28)
+
+            if showDeleteConfirm {
+                VaccineConfirmDialog(
+                    title: "确定删除「\(vaccine.name)」?",
+                    message: "删除后这条疫苗记录将不可恢复。",
+                    confirmLabel: "删除",
+                    onConfirm: {
+                        store.removeVaccine(vaccine.id)
+                        onClose()
+                    },
+                    onCancel: { showDeleteConfirm = false }
+                )
+            }
+        }
+        .transition(.opacity)
+    }
+}
+
+private struct VaccineConfirmDialog: View {
+    let title: String
+    let message: String
+    let confirmLabel: String
+    let onConfirm: () -> Void
+    let onCancel: () -> Void
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.28)
+                .ignoresSafeArea()
+                .onTapGesture(perform: onCancel)
+
+            VStack(spacing: 14) {
+                Text(title)
+                    .font(.system(size: 17, weight: .heavy))
+                    .tracking(-0.17)
+                    .foregroundStyle(Palette.ink)
+                    .multilineTextAlignment(.center)
+                Text(message)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Palette.ink3)
+                    .multilineTextAlignment(.center)
+
+                HStack(spacing: 10) {
+                    Button(action: onCancel) {
+                        Text("取消")
+                            .font(.system(size: 15, weight: .heavy))
+                            .foregroundStyle(Palette.ink2)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    }
+                    .buttonStyle(PressableStyle())
+
+                    Button(action: onConfirm) {
+                        Text(confirmLabel)
+                            .font(.system(size: 15, weight: .heavy))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(Color(hex: 0xD44E3A), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    }
+                    .buttonStyle(PressableStyle())
+                }
+                .padding(.top, 4)
+            }
+            .padding(20)
+            .background(Palette.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .shadowCard()
+            .padding(.horizontal, 40)
+        }
+        .transition(.opacity)
     }
 }
 
