@@ -16,6 +16,7 @@ final class AppStore {
     var milestones: [Milestone] = []
     var theme: AppTheme = .blossom
     var activeTimer: RunningTimer? = nil
+    var feedDraft: FeedDraft? = nil
 
     init() { seed() }
 
@@ -28,23 +29,63 @@ final class AppStore {
         return s
     }()
 
-    func addEvent(_ e: Event) { events.insert(e, at: 0); persist() }
-    func deleteEvent(_ e: Event) { events.removeAll { $0.id == e.id }; persist() }
+    func addEvent(_ e: Event) {
+        events.insert(e, at: 0)
+        persist()
+    }
+
+    func deleteEvent(_ e: Event) {
+        events.removeAll { $0.id == e.id }
+        if e.kind == .solid {
+            syncSolidFoods(named: Set(solidFoodNames(in: e)))
+        }
+        persist()
+    }
 
     func updateEvent(_ e: Event) {
         guard let idx = events.firstIndex(where: { $0.id == e.id }) else { return }
+        let original = events[idx]
         events[idx] = e
+        if original.kind == .solid || e.kind == .solid {
+            syncSolidFoods(named: Set(solidFoodNames(in: original) + solidFoodNames(in: e)))
+        }
         persist()
     }
 
     func updateGrowth(_ g: GrowthPoint) {
         guard let idx = growth.firstIndex(where: { $0.id == g.id }) else { return }
-        growth[idx] = g
+        var updated = g
+        updated.ageMonths = ageMonths(on: updated.date)
+        growth[idx] = updated
         persist()
     }
 
+    func ageMonths(on date: Date) -> Double {
+        let cal = Calendar.current
+        let start = cal.startOfDay(for: baby.birthDate)
+        let end = cal.startOfDay(for: date)
+        guard end > start else { return 0 }
+        let comps = cal.dateComponents([.month, .day], from: start, to: end)
+        let months = Double(comps.month ?? 0)
+        let days = Double(comps.day ?? 0)
+        return max(0, months + days / 30.0)
+    }
+
     func startTimer(kind: EventKind, at date: Date = Date()) {
-        activeTimer = RunningTimer(kind: kind, startedAt: date)
+        activeTimer = RunningTimer(kind: kind, startedAt: date, accumulated: 0, resumedAt: date)
+    }
+
+    func pauseTimer(at date: Date = Date()) {
+        guard var timer = activeTimer, let resumedAt = timer.resumedAt else { return }
+        timer.accumulated += max(0, date.timeIntervalSince(resumedAt))
+        timer.resumedAt = nil
+        activeTimer = timer
+    }
+
+    func resumeTimer(at date: Date = Date()) {
+        guard var timer = activeTimer, timer.resumedAt == nil else { return }
+        timer.resumedAt = date
+        activeTimer = timer
     }
 
     @discardableResult
@@ -105,7 +146,7 @@ final class AppStore {
         if vaccines[idx].done {
             vaccines[idx].doneDate = nil
         } else {
-            vaccines[idx].doneDate = vaccines[idx].scheduledDate ?? Date()
+            vaccines[idx].doneDate = Date()
         }
         persist()
     }
@@ -120,7 +161,12 @@ final class AppStore {
         }
     }
 
-    func addGrowth(_ g: GrowthPoint) { growth.append(g); persist() }
+    func addGrowth(_ g: GrowthPoint) {
+        var newPoint = g
+        newPoint.ageMonths = ageMonths(on: newPoint.date)
+        growth.append(newPoint)
+        persist()
+    }
 
     // MARK: — Milestones
 
@@ -158,6 +204,7 @@ final class AppStore {
     func recordSolidFood(_ name: String, at date: Date = .now, observationDays: Int = 3) {
         if let idx = foods.firstIndex(where: { $0.name == name }) {
             foods[idx].timesEaten += 1
+            foods[idx].firstUsedAt = min(foods[idx].firstUsedAt, date)
         } else {
             foods.append(FoodItem(
                 id: "fd" + UUID().uuidString.prefix(6).lowercased(),
@@ -190,6 +237,49 @@ final class AppStore {
         persist()
     }
 
+    private func solidFoodNames(in event: Event) -> [String] {
+        guard event.kind == .solid else { return [] }
+        let parts = event.title
+            .components(separatedBy: "·")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        let names = parts.isEmpty
+            ? [event.title.trimmingCharacters(in: .whitespacesAndNewlines)]
+            : parts
+        var seen: Set<String> = []
+        return names.filter { seen.insert($0).inserted }
+    }
+
+    private func syncSolidFoods(named names: Set<String>) {
+        for name in names where !name.isEmpty {
+            syncSolidFood(named: name)
+        }
+    }
+
+    private func syncSolidFood(named name: String) {
+        let matches = events.filter {
+            $0.kind == .solid && solidFoodNames(in: $0).contains(name)
+        }
+        guard let firstUsedAt = matches.map(\.at).min() else {
+            foods.removeAll { $0.name == name }
+            return
+        }
+
+        if let idx = foods.firstIndex(where: { $0.name == name }) {
+            foods[idx].firstUsedAt = firstUsedAt
+            foods[idx].timesEaten = matches.count
+        } else {
+            foods.append(FoodItem(
+                id: "fd" + UUID().uuidString.prefix(6).lowercased(),
+                name: name,
+                firstUsedAt: firstUsedAt,
+                status: .observing,
+                timesEaten: matches.count,
+                observationDays: 3
+            ))
+        }
+    }
+
     private func seed() {
         let cal = Calendar.current
         let now = Date()
@@ -203,18 +293,18 @@ final class AppStore {
         }
 
         events = [
-            .init(id: "e1",  kind: .feed,   at: at(1, 15), title: "母乳 · 左侧", sub: "18 分钟"),
-            .init(id: "e2",  kind: .diaper, at: at(2, 5),  title: "湿尿布", sub: "只有尿"),
-            .init(id: "e3",  kind: .sleep,  at: at(4, 30), endAt: at(2, 45), title: "睡眠 1h 45分钟", sub: nil),
+            .init(id: "e1",  kind: .feed,   at: at(1, 15), title: "母乳 · 左侧", sub: "18分"),
+            .init(id: "e2",  kind: .diaper, at: at(2, 5),  title: "嘘嘘", sub: ""),
+            .init(id: "e3",  kind: .sleep,  at: at(4, 30), endAt: at(2, 45), title: "睡眠 1时 45分", sub: nil),
             .init(id: "e4",  kind: .solid,  at: at(5, 0),  title: "南瓜泥", sub: "50g · 第一次吃"),
             .init(id: "e5",  kind: .feed,   at: at(6, 20), title: "奶粉", sub: "120 ml"),
-            .init(id: "e6",  kind: .diaper, at: at(7, 40), title: "两者都有", sub: "湿 + 便便"),
-            .init(id: "e7",  kind: .sleep,  at: daysAgo(1, 22), endAt: daysAgo(0, 6, 30), title: "睡眠 8h 30m", sub: "22:00 — 06:30"),
-            .init(id: "e8",  kind: .feed,   at: daysAgo(1, 14), title: "母乳 · 右侧", sub: "22 分钟"),
+            .init(id: "e6",  kind: .diaper, at: at(7, 40), title: "嘘嘘+臭臭", sub: ""),
+            .init(id: "e7",  kind: .sleep,  at: daysAgo(1, 22), endAt: daysAgo(0, 6, 30), title: "睡眠 8时 30分", sub: "22:00 - 06:30"),
+            .init(id: "e8",  kind: .feed,   at: daysAgo(1, 14), title: "母乳 · 右侧", sub: "22分"),
             .init(id: "e9",  kind: .solid,  at: daysAgo(1, 12), title: "米糊", sub: "30g"),
-            .init(id: "e10", kind: .diaper, at: daysAgo(1, 9),  title: "湿尿布", sub: "只有尿"),
+            .init(id: "e10", kind: .diaper, at: daysAgo(1, 9),  title: "嘘嘘", sub: ""),
             .init(id: "e11", kind: .feed,   at: daysAgo(2, 8),  title: "奶粉", sub: "150 ml"),
-            .init(id: "e12", kind: .sleep,  at: daysAgo(2, 13), endAt: daysAgo(2, 15), title: "睡眠 2h", sub: "13:00 — 15:00"),
+            .init(id: "e12", kind: .sleep,  at: daysAgo(2, 13), endAt: daysAgo(2, 15), title: "睡眠 2时 0分", sub: "13:00 - 15:00"),
         ]
 
         let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"
@@ -278,6 +368,60 @@ final class AppStore {
 struct RunningTimer: Equatable, Codable {
     let kind: EventKind
     let startedAt: Date
+    var accumulated: TimeInterval
+    var resumedAt: Date?
+
+    var isRunning: Bool { resumedAt != nil }
+
+    func elapsed(at now: Date) -> TimeInterval {
+        let live = resumedAt.map { max(0, now.timeIntervalSince($0)) } ?? 0
+        return accumulated + live
+    }
+}
+
+struct FeedDraft: Equatable, Codable {
+    var mode: FeedDraftMode = .breast
+
+    var breastSubMode: FeedDraftSubMode = .timer
+    var breastManualLeftMinutes: Int = 10
+    var breastManualRightMinutes: Int = 0
+    var breastManualTime: Date = .now
+    var breastPhase: FeedDraftPhase = .idle
+    var breastActiveSide: FeedDraftSide = .left
+    var breastLeftDuration: TimeInterval = 0
+    var breastRightDuration: TimeInterval = 0
+    var breastSegmentStart: Date? = nil
+    var breastSessionStart: Date? = nil
+    var breastSessionEnd: Date? = nil
+
+    var formulaSubMode: FeedDraftSubMode = .timer
+    var formulaPhase: FeedDraftPhase = .idle
+    var formulaDuration: TimeInterval = 0
+    var formulaSegmentStart: Date? = nil
+    var formulaSessionStart: Date? = nil
+    var formulaSessionEnd: Date? = nil
+    var formulaMilliliters: Int = 120
+    var formulaTime: Date = .now
+
+    var hasActiveState: Bool {
+        breastPhase != .idle || formulaPhase != .idle
+    }
+}
+
+enum FeedDraftMode: String, Equatable, Codable {
+    case breast, formula
+}
+
+enum FeedDraftSubMode: String, Equatable, Codable {
+    case timer, manual
+}
+
+enum FeedDraftPhase: String, Equatable, Codable {
+    case idle, running, paused, stopped
+}
+
+enum FeedDraftSide: String, Equatable, Codable {
+    case left, right
 }
 
 enum SubScreen: String, Identifiable {

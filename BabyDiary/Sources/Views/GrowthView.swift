@@ -249,7 +249,7 @@ struct GrowthView: View {
                         Text("生长曲线 · \(metric.label)")
                             .font(.system(size: 15, weight: .heavy))
                             .tracking(-0.15)
-                        Text("0 — 12 月龄 · WHO 参考范围")
+                        Text("0 - 12 月龄 · WHO 参考范围")
                             .font(.system(size: 12, weight: .semibold))
                             .foregroundStyle(Palette.ink3)
                     }
@@ -429,10 +429,11 @@ struct GrowthView: View {
         guard w != nil || h != nil else { return }
         let useW = w ?? latest?.weightKg ?? 0
         let useH = h ?? latest?.heightCm ?? 0
+        let measuredAt = Date()
         store.addGrowth(.init(
             id: "g" + UUID().uuidString.prefix(6).lowercased(),
-            date: Date(),
-            ageMonths: 6,
+            date: measuredAt,
+            ageMonths: store.ageMonths(on: measuredAt),
             weightKg: useW,
             heightCm: useH,
             headCm: nil))
@@ -919,9 +920,9 @@ struct TabTitleHeader: View {
                 .foregroundStyle(Palette.ink)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.top, 62)
+        .padding(.top, 10)
         .padding(.horizontal, 20)
-        .padding(.bottom, 8)
+        .padding(.bottom, 2)
     }
 }
 

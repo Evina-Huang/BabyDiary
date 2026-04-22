@@ -28,6 +28,7 @@ struct FeedScreen: View {
     @State private var bRightMs: TimeInterval = 0
     @State private var bSegStart: Date? = nil
     @State private var bSessionStart: Date? = nil
+    @State private var bSessionEnd: Date? = nil
 
     // Formula state
     @State private var fSub: FormulaSub = .timer
@@ -50,11 +51,12 @@ struct FeedScreen: View {
         }
         .background(Palette.bg)
         .onAppear {
-            if let last = lastFeed {
-                mode = last.title.contains("奶粉") ? .formula : .breast
-                bActive = last.title.contains("右") ? .R : .L
-            }
+            restoreDraft()
         }
+        .onChange(of: currentDraft) { _, _ in
+            syncDraftToStore()
+        }
+        .onDisappear(perform: syncDraftToStore)
     }
 
     private var lastFeed: Event? {
@@ -155,16 +157,9 @@ struct FeedScreen: View {
             }
 
             if bPhase != .idle {
-                HStack(spacing: 10) {
-                    CTAButton(title: bPhase == .running ? "⏸ 暂停" : "▶ 继续",
-                              variant: .ghost, theme: store.theme) {
-                        bPhase == .running ? pauseBreast() : resumeBreast()
-                    }
-                    CTAButton(title: saved ? "✓ 已保存" : "完成,保存",
-                              variant: saved ? .secondary : .primary, theme: store.theme,
-                              action: saveBreast)
-                        .layoutPriority(2)
-                }
+                CTAButton(title: saved ? "✓ 已保存" : "完成,保存",
+                          variant: saved ? .secondary : .primary, theme: store.theme,
+                          action: saveBreast)
                 Button("清空重来") { resetBreast() }
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(Palette.ink3)
@@ -253,7 +248,7 @@ struct FeedScreen: View {
                                 .textCase(.uppercase)
                                 .foregroundStyle(Palette.pinkInk)
                         } else if fPhase == .stopped, let s = fSessionStart, let e = fSessionEnd {
-                            Text("\(hhmm(s)) – \(hhmm(e))")
+                            Text("\(hhmm(s)) - \(hhmm(e))")
                                 .font(.system(size: 13, weight: .heavy))
                                 .monospacedDigit()
                                 .foregroundStyle(Palette.pinkInk.opacity(0.75))
@@ -287,22 +282,27 @@ struct FeedScreen: View {
         case .running:
             HStack(spacing: 10) {
                 CTAButton(title: "⏸ 暂停", variant: .ghost, theme: store.theme, action: pauseFormula)
-                CTAButton(title: "✓ 停止", theme: store.theme, action: stopFormula).layoutPriority(2)
+                    .frame(maxWidth: .infinity)
+                CTAButton(title: "✓ 停止", theme: store.theme, action: stopFormula)
+                    .frame(maxWidth: .infinity)
             }
         case .paused:
             HStack(spacing: 10) {
                 CTAButton(title: "▶ 继续", variant: .ghost, theme: store.theme, action: resumeFormula)
-                CTAButton(title: "✓ 停止", theme: store.theme, action: stopFormula).layoutPriority(2)
+                    .frame(maxWidth: .infinity)
+                CTAButton(title: "✓ 停止", theme: store.theme, action: stopFormula)
+                    .frame(maxWidth: .infinity)
             }
         case .stopped:
             mlInput
             HStack(spacing: 10) {
                 CTAButton(title: "重来", variant: .ghost, theme: store.theme, action: resetFormula)
+                    .frame(maxWidth: .infinity)
                 CTAButton(title: saved ? "✓ 已保存" : "保存记录",
                           variant: saved ? .secondary : .primary,
                           theme: store.theme,
                           action: saveFormulaTimer)
-                    .layoutPriority(2)
+                    .frame(maxWidth: .infinity)
             }
         }
     }
@@ -316,7 +316,7 @@ struct FeedScreen: View {
                     Button {
                         ml = v
                     } label: {
-                        Text("\(v)ml")
+                        Text("\(v) ml")
                             .font(.system(size: 13, weight: .bold))
                             .foregroundStyle(ml == v ? .white : Palette.ink2)
                             .padding(.horizontal, 14).padding(.vertical, 8)
@@ -375,32 +375,48 @@ struct FeedScreen: View {
         let now = Date()
         switch bPhase {
         case .idle:
-            bActive = side; bSegStart = now; bSessionStart = now; bPhase = .running
+            bActive = side; bSegStart = now; bSessionStart = now; bSessionEnd = nil; bPhase = .running
         case .running:
-            if side != bActive { _ = bankBreast(); bActive = side; bSegStart = now }
+            if side == bActive {
+                pauseBreast(at: now)
+            } else {
+                _ = bankBreast(at: now)
+                bActive = side
+                bSegStart = now
+            }
         case .paused:
-            bActive = side; bSegStart = now; bPhase = .running
+            bActive = side; bSegStart = now; bSessionEnd = nil; bPhase = .running
         case .stopped: break
         }
     }
 
     @discardableResult
-    private func bankBreast() -> (TimeInterval, TimeInterval) {
+    private func bankBreast(at now: Date = Date()) -> (TimeInterval, TimeInterval) {
         guard bPhase == .running, let start = bSegStart else { return (bLeftMs, bRightMs) }
-        let add = Date().timeIntervalSince(start)
+        let add = now.timeIntervalSince(start)
         if bActive == .L { bLeftMs += add } else { bRightMs += add }
         return (bLeftMs, bRightMs)
     }
 
-    private func pauseBreast() { _ = bankBreast(); bSegStart = nil; bPhase = .paused }
-    private func resumeBreast() { bSegStart = Date(); bPhase = .running }
+    private func pauseBreast(at now: Date = Date()) {
+        _ = bankBreast(at: now)
+        bSegStart = nil
+        bSessionEnd = now
+        bPhase = .paused
+    }
+    private func resumeBreast() {
+        bSegStart = Date()
+        bSessionEnd = nil
+        bPhase = .running
+    }
     private func resetBreast() {
-        bPhase = .idle; bLeftMs = 0; bRightMs = 0; bSegStart = nil; bSessionStart = nil
+        bPhase = .idle; bLeftMs = 0; bRightMs = 0; bSegStart = nil; bSessionStart = nil; bSessionEnd = nil
     }
     private func saveBreast() {
-        let (l, r) = bankBreast()
-        guard l + r >= 1 else { return }
         let now = Date()
+        let (l, r) = bankBreast(at: now)
+        let end = bPhase == .running ? now : (bSessionEnd ?? now)
+        guard l + r >= 1, let start = bSessionStart else { return }
         let lMin = max(1, Int((l / 60).rounded()))
         let rMin = max(1, Int((r / 60).rounded()))
         let tot = max(1, Int(((l + r) / 60).rounded()))
@@ -408,11 +424,11 @@ struct FeedScreen: View {
         if l > 0 && r > 0 {
             title = "母乳 · 双侧"; sub = "左 \(lMin)分 · 右 \(rMin)分 · 共 \(tot)分"
         } else if l > 0 {
-            title = "母乳 · 左侧"; sub = "\(tot) 分钟"
+            title = "母乳 · 左侧"; sub = "\(tot)分"
         } else {
-            title = "母乳 · 右侧"; sub = "\(tot) 分钟"
+            title = "母乳 · 右侧"; sub = "\(tot)分"
         }
-        store.addEvent(.init(kind: .feed, at: now, endAt: now, title: title, sub: sub))
+        store.addEvent(.init(kind: .feed, at: start, endAt: end, title: title, sub: sub))
         resetBreast(); flash()
     }
 
@@ -424,9 +440,9 @@ struct FeedScreen: View {
         if l > 0 && r > 0 {
             title = "母乳 · 双侧"; sub = "左 \(l)分 · 右 \(r)分 · 共 \(tot)分"
         } else if l > 0 {
-            title = "母乳 · 左侧"; sub = "\(tot) 分钟"
+            title = "母乳 · 左侧"; sub = "\(tot)分"
         } else {
-            title = "母乳 · 右侧"; sub = "\(tot) 分钟"
+            title = "母乳 · 右侧"; sub = "\(tot)分"
         }
         store.addEvent(.init(kind: .feed, at: bManualTime, endAt: bManualTime, title: title, sub: sub))
         bManualMinL = 10; bManualMinR = 0; bManualTime = Date()
@@ -439,9 +455,9 @@ struct FeedScreen: View {
         fSegStart = now; fDurMs = 0; fPhase = .running
     }
     @discardableResult
-    private func bankFormula() -> TimeInterval {
+    private func bankFormula(at now: Date = Date()) -> TimeInterval {
         guard fPhase == .running, let start = fSegStart else { return fDurMs }
-        fDurMs += Date().timeIntervalSince(start)
+        fDurMs += now.timeIntervalSince(start)
         return fDurMs
     }
     private func pauseFormula() { _ = bankFormula(); fSegStart = nil; fPhase = .paused }
@@ -454,17 +470,96 @@ struct FeedScreen: View {
         guard fPhase == .stopped, let s = fSessionStart, let e = fSessionEnd else { return }
         store.addEvent(.init(kind: .feed, at: e,
                              title: "奶粉",
-                             sub: "\(ml)ml · \(hhmm(s))–\(hhmm(e))"))
+                             sub: "\(ml) ml · \(hhmm(s)) - \(hhmm(e))"))
         resetFormula(); flash()
     }
     private func saveFormulaManual() {
-        store.addEvent(.init(kind: .feed, at: time, title: "奶粉", sub: "\(ml)ml"))
+        store.addEvent(.init(kind: .feed, at: time, title: "奶粉", sub: "\(ml) ml"))
         time = Date(); flash()
     }
 
     private func flash() {
         saved = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { saved = false }
+    }
+
+    private var currentDraft: FeedDraft {
+        FeedDraft(
+            mode: mode == .breast ? .breast : .formula,
+            breastSubMode: bSub == .timer ? .timer : .manual,
+            breastManualLeftMinutes: bManualMinL,
+            breastManualRightMinutes: bManualMinR,
+            breastManualTime: bManualTime,
+            breastPhase: draftPhase(from: bPhase),
+            breastActiveSide: bActive == .L ? .left : .right,
+            breastLeftDuration: bLeftMs,
+            breastRightDuration: bRightMs,
+            breastSegmentStart: bSegStart,
+            breastSessionStart: bSessionStart,
+            breastSessionEnd: bSessionEnd,
+            formulaSubMode: fSub == .timer ? .timer : .manual,
+            formulaPhase: draftPhase(from: fPhase),
+            formulaDuration: fDurMs,
+            formulaSegmentStart: fSegStart,
+            formulaSessionStart: fSessionStart,
+            formulaSessionEnd: fSessionEnd,
+            formulaMilliliters: ml,
+            formulaTime: time
+        )
+    }
+
+    private func restoreDraft() {
+        if let draft = store.feedDraft, draft.hasActiveState {
+            mode = draft.mode == .breast ? .breast : .formula
+            bSub = draft.breastSubMode == .timer ? .timer : .manual
+            bManualMinL = draft.breastManualLeftMinutes
+            bManualMinR = draft.breastManualRightMinutes
+            bManualTime = draft.breastManualTime
+            bPhase = phase(from: draft.breastPhase)
+            bActive = draft.breastActiveSide == .left ? .L : .R
+            bLeftMs = draft.breastLeftDuration
+            bRightMs = draft.breastRightDuration
+            bSegStart = draft.breastSegmentStart
+            bSessionStart = draft.breastSessionStart
+            bSessionEnd = draft.breastSessionEnd
+
+            fSub = draft.formulaSubMode == .timer ? .timer : .manual
+            fPhase = phase(from: draft.formulaPhase)
+            fDurMs = draft.formulaDuration
+            fSegStart = draft.formulaSegmentStart
+            fSessionStart = draft.formulaSessionStart
+            fSessionEnd = draft.formulaSessionEnd
+            ml = draft.formulaMilliliters
+            time = draft.formulaTime
+            return
+        }
+
+        if let last = lastFeed {
+            mode = last.title.contains("奶粉") ? .formula : .breast
+            bActive = last.title.contains("右") ? .R : .L
+        }
+    }
+
+    private func syncDraftToStore() {
+        store.feedDraft = currentDraft.hasActiveState ? currentDraft : nil
+    }
+
+    private func draftPhase(from phase: Phase) -> FeedDraftPhase {
+        switch phase {
+        case .idle: return .idle
+        case .running: return .running
+        case .paused: return .paused
+        case .stopped: return .stopped
+        }
+    }
+
+    private func phase(from phase: FeedDraftPhase) -> Phase {
+        switch phase {
+        case .idle: return .idle
+        case .running: return .running
+        case .paused: return .paused
+        case .stopped: return .stopped
+        }
     }
 }
 

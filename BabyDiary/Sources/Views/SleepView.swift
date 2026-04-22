@@ -4,9 +4,24 @@ struct SleepScreen: View {
     let onBack: () -> Void
     @Environment(AppStore.self) private var store
 
+    @State private var draftStart: Date = .now
+    @State private var draftEnd: Date = .now
+    @State private var saved = false
+    @State private var activePicker: SleepPicker?
+
+    private var timer: RunningTimer? { store.activeTimer }
+    private var isRunning: Bool { timer?.isRunning ?? false }
+    private var effectiveEnd: Date { isRunning ? .now : draftEnd }
+    private var displayDuration: TimeInterval {
+        if isRunning, let timer {
+            return max(0, timer.elapsed(at: .now) + timer.startedAt.timeIntervalSince(draftStart))
+        }
+        return max(0, draftEnd.timeIntervalSince(draftStart))
+    }
+
     var body: some View {
         VStack(spacing: 0) {
-            ScreenHeader(title: "睡眠记录", onBack: onBack)
+            ScreenHeader(title: "睡眠记录", onBack: handleBack)
             ScreenBody {
                 TimelineView(.periodic(from: .now, by: 1)) { ctx in
                     content(now: ctx.date)
@@ -14,27 +29,40 @@ struct SleepScreen: View {
             }
         }
         .background(Palette.bg)
+        .onAppear(perform: syncDraftFromTimer)
+        .onChange(of: store.activeTimer) { _, _ in syncDraftFromTimer() }
+        .onDisappear(perform: handleScreenDisappear)
+        .sheet(item: $activePicker) { picker in
+            SleepPickerSheet(picker: picker,
+                             time: binding(for: picker),
+                             theme: store.theme,
+                             minimumDate: picker.isEnd ? draftStart : nil)
+        }
     }
 
     @ViewBuilder
     private func content(now: Date) -> some View {
-        let timer = store.activeTimer
-        let running = timer != nil
-        let dur: TimeInterval = timer.map { now.timeIntervalSince($0.startedAt) } ?? 0
-        heroCard(startedAt: timer?.startedAt, dur: dur)
+        heroCard(now: now)
+        if timer != nil {
+            editorCard()
+                .padding(.top, 14)
+        }
         lastNightCard
         historySection.padding(.top, 26)
     }
 
-    private func heroCard(startedAt: Date?, dur: TimeInterval) -> some View {
-        let running = startedAt != nil
-        let gradient: LinearGradient = running
+    private func heroCard(now: Date) -> some View {
+        let paused = timer != nil && !isRunning
+        let gradient: LinearGradient = paused
+            ? LinearGradient(colors: [Color(hex: 0xEDE7F8), Color(hex: 0xF8F3FC)],
+                             startPoint: .topLeading, endPoint: .bottomTrailing)
+            : isRunning
             ? LinearGradient(colors: [Color(hex: 0xE4D8F5), Color(hex: 0xF3EBFB)],
                              startPoint: .topLeading, endPoint: .bottomTrailing)
             : LinearGradient(colors: [Color(hex: 0xFFE8E0), Color(hex: 0xFFF3EC)],
                              startPoint: .topLeading, endPoint: .bottomTrailing)
-        let accent = running ? Palette.lavenderInk : store.theme.primary600
-        let moonColor = running ? Palette.lavenderInk : store.theme.primary
+        let accent = paused ? Palette.ink2 : isRunning ? Palette.lavenderInk : store.theme.primary600
+        let moonColor = paused ? Palette.ink2 : isRunning ? Palette.lavenderInk : store.theme.primary
 
         return ZStack(alignment: .topLeading) {
             RoundedRectangle(cornerRadius: 28, style: .continuous).fill(gradient)
@@ -44,11 +72,11 @@ struct SleepScreen: View {
 
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 8) {
-                    if running {
+                    if isRunning {
                         Circle().fill(Palette.lavenderInk).frame(width: 8, height: 8)
                             .modifier(PulseOpacity())
                     }
-                    Text(running ? "正在睡觉" : "准备开始")
+                    Text(isRunning ? "正在睡觉" : paused ? "已暂停" : "准备开始")
                         .font(.system(size: 12, weight: .heavy))
                         .tracking(0.72)
                         .textCase(.uppercase)
@@ -57,37 +85,76 @@ struct SleepScreen: View {
                 .padding(.horizontal, 12).padding(.vertical, 6)
                 .background(Color.white.opacity(0.6), in: Capsule())
 
-                Text(running ? formatDur(dur) : "00分 00秒")
+                Text(timer == nil ? "00分 00秒" : formatDur(displayDuration))
                     .font(.system(size: 56, weight: .black))
                     .tracking(-1.68)
                     .monospacedDigit()
-                    .foregroundStyle(running ? Palette.lavenderInk : Palette.ink)
+                    .foregroundStyle(isRunning ? Palette.lavenderInk : Palette.ink)
                     .padding(.top, 16)
 
-                Text(startedAt.map { "开始于 \(formatTime($0))" } ?? "轻触下方按钮记录睡眠开始时间")
+                Text(statusText())
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Palette.ink2)
                     .padding(.top, 10)
 
-                Button(action: toggle) {
-                    Text(running ? "🌞 宝宝醒了" : "😴 开始睡觉")
-                        .font(.system(size: 18, weight: .heavy))
-                        .tracking(-0.18)
-                        .foregroundStyle(running ? Palette.lavenderInk : .white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 20)
-                        .background(running ? Color.white : store.theme.primary,
-                                    in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-                        .shadow(color: running ? .black.opacity(0.08) : store.theme.primary600.opacity(0.35),
-                                radius: 14, x: 0, y: 4)
+                if timer != nil {
+                    HStack(spacing: 10) {
+                        CTAButton(title: isRunning ? "⏸ 暂停" : "▶ 继续",
+                                  variant: .ghost,
+                                  theme: store.theme) {
+                            isRunning ? pauseSleep(at: now) : resumeSleep(at: now)
+                        }
+                        CTAButton(title: saved ? "✓ 已保存" : "保存记录",
+                                  variant: saved ? .secondary : .primary,
+                                  theme: store.theme) {
+                            saveSleep(now: now)
+                        }
+                    }
+                    .padding(.top, 22)
+                } else {
+                    CTAButton(title: "😴 开始睡觉", theme: store.theme) {
+                        startSleep(at: now)
+                    }
+                    .padding(.top, 22)
                 }
-                .buttonStyle(PressableStyle())
-                .padding(.top, 22)
             }
             .padding(.horizontal, 22).padding(.vertical, 28)
         }
         .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
         .shadowSurface()
+    }
+
+    private func editorCard() -> some View {
+        return Card {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("手动调整时间")
+                    .font(.system(size: 15, weight: .heavy))
+                    .tracking(-0.15)
+
+                CompactDateTimeField(time: $draftStart,
+                                     theme: store.theme,
+                                     label: "开始时间",
+                                     onPickDate: { activePicker = .startDate },
+                                     onPickTime: { activePicker = .startTime })
+                    .onChange(of: draftStart) { _, newValue in
+                        if isRunning {
+                            saved = false
+                        } else {
+                            draftEnd = max(draftEnd, newValue)
+                            saved = false
+                        }
+                    }
+
+                CompactDateTimeField(time: $draftEnd,
+                                     theme: store.theme,
+                                     label: "结束时间",
+                                     onPickDate: { activePicker = .endDate },
+                                     onPickTime: { activePicker = .endTime })
+                    .disabled(isRunning)
+                    .opacity(isRunning ? 0.65 : 1)
+                    .onChange(of: draftEnd) { _, _ in saved = false }
+            }
+        }
     }
 
     private var lastNightCard: some View {
@@ -150,18 +217,99 @@ struct SleepScreen: View {
         }
     }
 
-    private func toggle() {
-        if let timer = store.activeTimer {
-            let end = Date()
-            let dur = end.timeIntervalSince(timer.startedAt)
-            store.addEvent(.init(
-                kind: timer.kind, at: timer.startedAt, endAt: end,
-                title: "睡眠 \(formatDurShort(dur))",
-                sub: "\(formatTime(timer.startedAt)) — \(formatTime(end))"
-            ))
+    private func syncDraftFromTimer() {
+        guard let timer = store.activeTimer else {
+            draftStart = .now
+            draftEnd = .now
+            return
+        }
+        draftStart = timer.startedAt
+        draftEnd = timer.startedAt.addingTimeInterval(timer.accumulated)
+    }
+
+    private func startSleep(at now: Date) {
+        saved = false
+        draftStart = now
+        draftEnd = now
+        store.startTimer(kind: .sleep, at: now)
+    }
+
+    private func pauseSleep(at now: Date) {
+        store.pauseTimer(at: now)
+        draftEnd = now
+        saved = false
+    }
+
+    private func resumeSleep(at now: Date) {
+        if draftEnd > now {
+            draftEnd = now
+        }
+        store.resumeTimer(at: now)
+        saved = false
+    }
+
+    private func saveSleep(now: Date) {
+        guard let timer = store.activeTimer else { return }
+        if timer.isRunning {
+            store.pauseTimer(at: now)
+            draftEnd = now
+        }
+        draftEnd = max(draftEnd, draftStart)
+
+        let dur = draftEnd.timeIntervalSince(draftStart)
+        store.addEvent(.init(
+            kind: .sleep,
+            at: draftStart,
+            endAt: draftEnd,
+            title: "睡眠 \(formatDurShort(dur))",
+            sub: "\(formatTime(draftStart)) - \(formatTime(draftEnd))"
+        ))
+        store.stopTimer()
+        saved = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { saved = false }
+    }
+
+    private func handleBack() {
+        activePicker = nil
+        onBack()
+    }
+
+    private func handleScreenDisappear() {
+        guard activePicker == nil else { return }
+        if store.activeTimer == nil {
+            draftStart = .now
+            draftEnd = .now
+            saved = false
+        }
+    }
+
+    private func discardDraftSleep() {
+        if store.activeTimer != nil {
             store.stopTimer()
-        } else {
-            store.startTimer(kind: .sleep)
+        }
+        draftStart = .now
+        draftEnd = .now
+        saved = false
+        activePicker = nil
+    }
+
+    private func statusText() -> String {
+        guard let timer else { return "轻触下方按钮记录睡眠开始时间" }
+        if timer.isRunning {
+            return "开始于 \(formatTime(draftStart))，需要结束时先暂停或直接保存"
+        }
+        return "已暂停在 \(formatTime(draftEnd))，可手动调整醒来时间后保存"
+    }
+
+    private func binding(for picker: SleepPicker) -> Binding<Date> {
+        switch picker {
+        case .startDate, .startTime:
+            return $draftStart
+        case .endDate, .endTime:
+            return Binding(
+                get: { draftEnd },
+                set: { draftEnd = max($0, draftStart) }
+            )
         }
     }
 
@@ -178,7 +326,174 @@ struct SleepScreen: View {
     }
 }
 
-// Sleep row uses a duration-centric layout (history list).
+private struct CompactDateTimeField: View {
+    @Binding var time: Date
+    let theme: AppTheme
+    let label: String
+    let onPickDate: () -> Void
+    let onPickTime: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            FieldLabel(text: label)
+            HStack(spacing: 10) {
+                pickerButton(title: sleepDateText(time), style: .date, action: onPickDate)
+                pickerButton(title: formatTime(time), style: .time, action: onPickTime)
+            }
+        }
+    }
+
+    private func pickerButton(title: String, style: PickerButtonStyle, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: style.fontSize, weight: .heavy))
+                .monospacedDigit()
+                .foregroundStyle(Palette.ink)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .lineLimit(1)
+                .minimumScaleFactor(style.minimumScale)
+                .padding(.horizontal, 14)
+                .padding(.vertical, style.verticalPadding)
+                .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
+        .buttonStyle(PressableStyle())
+    }
+
+    private enum PickerButtonStyle {
+        case date, time
+
+        var fontSize: CGFloat {
+            switch self {
+            case .date: return 15
+            case .time: return 18
+            }
+        }
+
+        var minimumScale: CGFloat {
+            switch self {
+            case .date: return 0.78
+            case .time: return 1
+            }
+        }
+
+        var verticalPadding: CGFloat {
+            switch self {
+            case .date: return 15
+            case .time: return 14
+            }
+        }
+    }
+}
+
+private enum SleepPicker: String, Identifiable {
+    case startDate, startTime, endDate, endTime
+    var id: String { rawValue }
+    var isDate: Bool { self == .startDate || self == .endDate }
+    var isEnd: Bool { self == .endDate || self == .endTime }
+    var title: String {
+        switch self {
+        case .startDate: return "选择开始日期"
+        case .startTime: return "选择开始时间"
+        case .endDate: return "选择结束日期"
+        case .endTime: return "选择结束时间"
+        }
+    }
+}
+
+private struct SleepPickerSheet: View {
+    let picker: SleepPicker
+    @Binding var time: Date
+    let theme: AppTheme
+    var minimumDate: Date?
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 18) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(picker.label)
+                        .font(.system(size: 12, weight: .bold))
+                        .tracking(0.72)
+                        .textCase(.uppercase)
+                        .foregroundStyle(Palette.ink3)
+                    Text(picker.isDate ? sleepDateText(time) : formatTime(time))
+                        .font(.system(size: 28, weight: .black))
+                        .tracking(-0.56)
+                        .monospacedDigit()
+                        .foregroundStyle(Palette.ink)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(18)
+                .background(
+                    LinearGradient(colors: [theme.primaryTint, Color.white.opacity(0.92)],
+                                   startPoint: .topLeading,
+                                   endPoint: .bottomTrailing),
+                    in: RoundedRectangle(cornerRadius: 22, style: .continuous)
+                )
+                .shadowCard()
+
+                Card(padding: 14, cornerRadius: 22) {
+                    if picker.isDate {
+                        if let minimumDate {
+                            DatePicker("", selection: $time, in: minimumDate...Date().addingTimeInterval(365 * 24 * 3600), displayedComponents: .date)
+                                .datePickerStyle(.graphical)
+                        } else {
+                            DatePicker("", selection: $time, displayedComponents: .date)
+                                .datePickerStyle(.graphical)
+                        }
+                    } else {
+                        if let minimumDate {
+                            DatePicker("", selection: $time, in: minimumDate...Date().addingTimeInterval(365 * 24 * 3600), displayedComponents: .hourAndMinute)
+                                .datePickerStyle(.wheel)
+                                .frame(height: 180)
+                                .clipped()
+                                .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                        } else {
+                            DatePicker("", selection: $time, displayedComponents: .hourAndMinute)
+                                .datePickerStyle(.wheel)
+                                .frame(height: 180)
+                                .clipped()
+                                .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                        }
+                    }
+                }
+
+            }
+            .labelsHidden()
+            .tint(theme.primary600)
+            .environment(\.locale, Locale(identifier: "zh_CN"))
+            .padding(20)
+            .background(Palette.bg)
+            .navigationTitle(picker.title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("完成") { dismiss() }
+                        .font(.system(size: 15, weight: .heavy))
+                }
+            }
+        }
+        .presentationDetents(picker.isDate ? [.medium] : [.height(320)])
+    }
+}
+
+private func sleepDateText(_ date: Date) -> String {
+    let f = DateFormatter()
+    f.locale = Locale(identifier: "zh_CN")
+    f.calendar = Calendar(identifier: .gregorian)
+    f.dateFormat = "yyyy/MM/dd"
+    return f.string(from: date)
+}
+
+private extension SleepPicker {
+    var label: String {
+        switch self {
+        case .startDate, .startTime: return "开始时间"
+        case .endDate, .endTime: return "结束时间"
+        }
+    }
+}
+
 private struct SleepRow: View {
     let event: Event
     let last: Bool
@@ -194,7 +509,7 @@ private struct SleepRow: View {
                         .tracking(-0.15)
                         .foregroundStyle(Palette.ink)
                     if let endAt = event.endAt {
-                        Text("\(formatTime(event.at)) — \(formatTime(endAt))")
+                        Text("\(formatTime(event.at)) - \(formatTime(endAt))")
                             .font(.system(size: 12, weight: .semibold))
                             .monospacedDigit()
                             .foregroundStyle(Palette.ink3)
@@ -221,7 +536,6 @@ private struct SleepRow: View {
     }
 }
 
-// Pulse modifier — matches the CSS .pulse-dot keyframes.
 private struct PulseOpacity: ViewModifier {
     @State private var on = false
     func body(content: Content) -> some View {

@@ -477,7 +477,7 @@ private struct ToothEditSheet: View {
             }
             .padding(.horizontal, 20).padding(.top, 18).padding(.bottom, 10)
 
-            Text("典型月龄 \(position.kind.typicalMonths.lowerBound)–\(position.kind.typicalMonths.upperBound) 月")
+            Text("典型月龄 \(position.kind.typicalMonths.lowerBound)-\(position.kind.typicalMonths.upperBound) 月")
                 .font(.system(size: 12, weight: .bold))
                 .tracking(0.6).textCase(.uppercase)
                 .foregroundStyle(Palette.ink3)

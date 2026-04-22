@@ -46,18 +46,14 @@ struct HomeView: View {
                     .padding(.top, 10)
 
                 // 2×2 quick-add grid
-                let cols = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
-                LazyVGrid(columns: cols, spacing: 12) {
+                let cols = [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)]
+                LazyVGrid(columns: cols, spacing: 16) {
                     QuickTile(kind: .sleep,  onTap: { onOpen(.sleep) })
                     QuickTile(kind: .feed,   onTap: { onOpen(.feed) })
                     QuickTile(kind: .diaper, onTap: { onOpen(.diaper) })
                     QuickTile(kind: .solid,  onTap: { onOpen(.solid) })
                 }
                 .padding(.top, 12)
-
-                if let timer = store.activeTimer {
-                    TimerBanner(start: timer.startedAt).padding(.top, 14)
-                }
 
                 SinceLastRow().padding(.top, 10)
 
@@ -280,37 +276,43 @@ private struct QuickTile: View {
 // MARK: — Live sleep timer banner
 
 private struct TimerBanner: View {
-    let start: Date
+    let timer: RunningTimer
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { ctx in
-            let dur = ctx.date.timeIntervalSince(start)
+            let running = timer.isRunning
+            let dur = running ? timer.elapsed(at: ctx.date) : timer.accumulated
+            let tint = running ? Palette.lavender : Color(hex: 0xEDE7F8)
+            let ink = running ? Palette.lavenderInk : Palette.ink2
+
             HStack(spacing: 12) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
                         .fill(Color.white.opacity(0.6))
-                    AppIcon.Moon(size: 26, color: Palette.lavenderInk)
+                    AppIcon.Moon(size: 26, color: ink)
                 }
                 .frame(width: 42, height: 42)
 
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 8) {
-                        PulseDot(color: Palette.lavenderInk)
-                        Text("正在睡觉")
+                        if running {
+                            PulseDot(color: ink)
+                        }
+                        Text(running ? "正在睡觉" : "已暂停")
                             .font(.system(size: 12, weight: .heavy))
                             .tracking(0.72)
                             .textCase(.uppercase)
-                            .foregroundStyle(Palette.lavenderInk)
+                            .foregroundStyle(ink)
                     }
                     Text(formatDur(dur))
                         .font(.system(size: 22, weight: .black))
                         .tracking(-0.44)
                         .monospacedDigit()
-                        .foregroundStyle(Palette.lavenderInk)
+                        .foregroundStyle(ink)
                 }
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, 16).padding(.vertical, 14)
-            .background(Palette.lavender, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .background(tint, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
         }
     }
 }
@@ -343,7 +345,7 @@ private struct DailySummaryStrip: View {
             let sleepSec: TimeInterval = todays
                 .filter { $0.kind == .sleep }
                 .compactMap(\.duration)
-                .reduce(0, +) + (store.activeTimer.map { ctx.date.timeIntervalSince($0.startedAt) } ?? 0)
+                .reduce(0, +) + (store.activeTimer.map { $0.elapsed(at: ctx.date) } ?? 0)
 
             HStack(spacing: 8) {
                 SummaryCell(tint: Palette.lavender, ink: Palette.lavenderInk,
@@ -388,31 +390,51 @@ private struct SinceLastRow: View {
             let now = ctx.date
             let lastFeed   = store.events.filter { $0.kind == .feed   }.max(by: { $0.at < $1.at })
             let lastDiaper = store.events.filter { $0.kind == .diaper }.max(by: { $0.at < $1.at })
-            let lastSleepEnd = store.activeTimer == nil
-                ? store.events.filter { $0.kind == .sleep && $0.endAt != nil }.max(by: { ($0.endAt ?? .distantPast) < ($1.endAt ?? .distantPast) })
-                : nil
+            let lastSleepEnd = store.events
+                .filter { $0.kind == .sleep && $0.endAt != nil }
+                .max(by: { ($0.endAt ?? .distantPast) < ($1.endAt ?? .distantPast) })
+            let sleepItem: (String, String, Color)? = {
+                if let timer = store.activeTimer, timer.kind == .sleep {
+                    return ("睡眠", timer.isRunning ? "进行中" : "已暂停", Palette.lavenderInk)
+                }
+                if let event = lastSleepEnd {
+                    return ("睡眠", fmt(now.timeIntervalSince(event.endAt ?? now)), Palette.lavenderInk)
+                }
+                return nil
+            }()
 
             let items: [(String, String, Color)] = [
                 lastFeed.map   { ("喂奶", fmt(now.timeIntervalSince($0.at)), Palette.pinkInk) },
-                lastSleepEnd.map { ("睡眠", fmt(now.timeIntervalSince($0.endAt ?? now)), Palette.lavenderInk) },
+                sleepItem,
                 lastDiaper.map { ("尿布", fmt(now.timeIntervalSince($0.at)), Palette.blueInk) },
             ].compactMap { $0 }
 
             if !items.isEmpty {
-                HStack(spacing: 10) {
+                HStack(alignment: .center, spacing: 10) {
                     Text("距上次")
                         .font(.system(size: 10, weight: .heavy))
                         .tracking(0.6)
                         .textCase(.uppercase)
-                    ForEach(Array(items.enumerated()), id: \.offset) { (i, it) in
-                        HStack(spacing: 4) {
-                            Text(it.0).font(.system(size: 11, weight: .heavy)).foregroundStyle(it.2)
-                            Text(it.1).font(.system(size: 11, weight: .bold)).monospacedDigit()
-                            if i < items.count - 1 {
-                                Text("·").opacity(0.4).padding(.leading, 6)
+                    HStack(spacing: 8) {
+                        ForEach(Array(items.enumerated()), id: \.offset) { _, it in
+                            HStack(spacing: 4) {
+                                Text(it.0)
+                                    .font(.system(size: 11, weight: .heavy))
+                                    .foregroundStyle(it.2)
+                                Text(it.1)
+                                    .font(.system(size: 11, weight: .bold))
+                                    .monospacedDigit()
+                                    .foregroundStyle(Palette.ink2)
                             }
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(Color.white.opacity(0.72),
+                                        in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                         }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .foregroundStyle(Palette.ink3)
                 .padding(.horizontal, 14).padding(.vertical, 8)
@@ -425,7 +447,7 @@ private struct SinceLastRow: View {
         let sec = Int(max(0, s))
         let h = sec / 3600
         let m = (sec % 3600) / 60
-        return h > 0 ? "\(h)h\(m)m" : "\(m)分"
+        return h > 0 ? "\(h)时\(m)分" : "\(m)分"
     }
 }
 
