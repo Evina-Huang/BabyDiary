@@ -31,7 +31,7 @@ struct SleepScreen: View {
         .background(Palette.bg)
         .onAppear(perform: syncDraftFromTimer)
         .onChange(of: store.activeTimer) { _, _ in syncDraftFromTimer() }
-        .onDisappear(perform: discardDraftSleep)
+        .onDisappear(perform: handleScreenDisappear)
         .sheet(item: $activePicker) { picker in
             SleepPickerSheet(picker: picker,
                              time: binding(for: picker),
@@ -270,8 +270,17 @@ struct SleepScreen: View {
     }
 
     private func handleBack() {
-        discardDraftSleep()
+        activePicker = nil
         onBack()
+    }
+
+    private func handleScreenDisappear() {
+        guard activePicker == nil else { return }
+        if store.activeTimer == nil {
+            draftStart = .now
+            draftEnd = .now
+            saved = false
+        }
     }
 
     private func discardDraftSleep() {
