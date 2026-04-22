@@ -157,17 +157,9 @@ struct FeedScreen: View {
             }
 
             if bPhase != .idle {
-                HStack(spacing: 10) {
-                    CTAButton(title: bPhase == .running ? "⏸ 暂停" : "▶ 继续",
-                              variant: .ghost, theme: store.theme) {
-                        bPhase == .running ? pauseBreast() : resumeBreast()
-                    }
-                    .frame(maxWidth: .infinity)
-                    CTAButton(title: saved ? "✓ 已保存" : "完成,保存",
-                              variant: saved ? .secondary : .primary, theme: store.theme,
-                              action: saveBreast)
-                        .frame(maxWidth: .infinity)
-                }
+                CTAButton(title: saved ? "✓ 已保存" : "完成,保存",
+                          variant: saved ? .secondary : .primary, theme: store.theme,
+                          action: saveBreast)
                 Button("清空重来") { resetBreast() }
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(Palette.ink3)
@@ -385,7 +377,13 @@ struct FeedScreen: View {
         case .idle:
             bActive = side; bSegStart = now; bSessionStart = now; bSessionEnd = nil; bPhase = .running
         case .running:
-            if side != bActive { _ = bankBreast(at: now); bActive = side; bSegStart = now }
+            if side == bActive {
+                pauseBreast(at: now)
+            } else {
+                _ = bankBreast(at: now)
+                bActive = side
+                bSegStart = now
+            }
         case .paused:
             bActive = side; bSegStart = now; bSessionEnd = nil; bPhase = .running
         case .stopped: break
@@ -400,8 +398,7 @@ struct FeedScreen: View {
         return (bLeftMs, bRightMs)
     }
 
-    private func pauseBreast() {
-        let now = Date()
+    private func pauseBreast(at now: Date = Date()) {
         _ = bankBreast(at: now)
         bSegStart = nil
         bSessionEnd = now
