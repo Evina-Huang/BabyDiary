@@ -16,6 +16,7 @@ final class AppStore {
     var milestones: [Milestone] = []
     var theme: AppTheme = .blossom
     var activeTimer: RunningTimer? = nil
+    var feedDraft: FeedDraft? = nil
 
     init() { seed() }
 
@@ -376,6 +377,51 @@ struct RunningTimer: Equatable, Codable {
         let live = resumedAt.map { max(0, now.timeIntervalSince($0)) } ?? 0
         return accumulated + live
     }
+}
+
+struct FeedDraft: Equatable, Codable {
+    var mode: FeedDraftMode = .breast
+
+    var breastSubMode: FeedDraftSubMode = .timer
+    var breastManualLeftMinutes: Int = 10
+    var breastManualRightMinutes: Int = 0
+    var breastManualTime: Date = .now
+    var breastPhase: FeedDraftPhase = .idle
+    var breastActiveSide: FeedDraftSide = .left
+    var breastLeftDuration: TimeInterval = 0
+    var breastRightDuration: TimeInterval = 0
+    var breastSegmentStart: Date? = nil
+    var breastSessionStart: Date? = nil
+    var breastSessionEnd: Date? = nil
+
+    var formulaSubMode: FeedDraftSubMode = .timer
+    var formulaPhase: FeedDraftPhase = .idle
+    var formulaDuration: TimeInterval = 0
+    var formulaSegmentStart: Date? = nil
+    var formulaSessionStart: Date? = nil
+    var formulaSessionEnd: Date? = nil
+    var formulaMilliliters: Int = 120
+    var formulaTime: Date = .now
+
+    var hasActiveState: Bool {
+        breastPhase != .idle || formulaPhase != .idle
+    }
+}
+
+enum FeedDraftMode: String, Equatable, Codable {
+    case breast, formula
+}
+
+enum FeedDraftSubMode: String, Equatable, Codable {
+    case timer, manual
+}
+
+enum FeedDraftPhase: String, Equatable, Codable {
+    case idle, running, paused, stopped
+}
+
+enum FeedDraftSide: String, Equatable, Codable {
+    case left, right
 }
 
 enum SubScreen: String, Identifiable {
