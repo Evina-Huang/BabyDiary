@@ -162,10 +162,11 @@ struct FeedScreen: View {
                               variant: .ghost, theme: store.theme) {
                         bPhase == .running ? pauseBreast() : resumeBreast()
                     }
+                    .frame(maxWidth: .infinity)
                     CTAButton(title: saved ? "✓ 已保存" : "完成,保存",
                               variant: saved ? .secondary : .primary, theme: store.theme,
                               action: saveBreast)
-                        .layoutPriority(2)
+                        .frame(maxWidth: .infinity)
                 }
                 Button("清空重来") { resetBreast() }
                     .font(.system(size: 13, weight: .bold))
@@ -289,22 +290,27 @@ struct FeedScreen: View {
         case .running:
             HStack(spacing: 10) {
                 CTAButton(title: "⏸ 暂停", variant: .ghost, theme: store.theme, action: pauseFormula)
-                CTAButton(title: "✓ 停止", theme: store.theme, action: stopFormula).layoutPriority(2)
+                    .frame(maxWidth: .infinity)
+                CTAButton(title: "✓ 停止", theme: store.theme, action: stopFormula)
+                    .frame(maxWidth: .infinity)
             }
         case .paused:
             HStack(spacing: 10) {
                 CTAButton(title: "▶ 继续", variant: .ghost, theme: store.theme, action: resumeFormula)
-                CTAButton(title: "✓ 停止", theme: store.theme, action: stopFormula).layoutPriority(2)
+                    .frame(maxWidth: .infinity)
+                CTAButton(title: "✓ 停止", theme: store.theme, action: stopFormula)
+                    .frame(maxWidth: .infinity)
             }
         case .stopped:
             mlInput
             HStack(spacing: 10) {
                 CTAButton(title: "重来", variant: .ghost, theme: store.theme, action: resetFormula)
+                    .frame(maxWidth: .infinity)
                 CTAButton(title: saved ? "✓ 已保存" : "保存记录",
                           variant: saved ? .secondary : .primary,
                           theme: store.theme,
                           action: saveFormulaTimer)
-                    .layoutPriority(2)
+                    .frame(maxWidth: .infinity)
             }
         }
     }
