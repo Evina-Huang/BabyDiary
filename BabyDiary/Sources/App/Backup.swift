@@ -6,25 +6,92 @@ import UniformTypeIdentifiers
 // MARK: — Snapshot
 
 struct DataSnapshot: Codable {
-    var version: Int = 1
+    var version: Int = 3
     var exportedAt: Date = Date()
     var baby: Baby
     var events: [Event]
     var vaccines: [Vaccine]
     var growth: [GrowthPoint]
     var foods: [FoodItem]
+    var medications: [MedicationRecord]? = nil
     var teeth: [ToothRecord]? = nil
     var milestones: [Milestone]? = nil
+    var activeTimer: RunningTimer? = nil
+    var feedDraft: FeedDraft? = nil
+
+    init(
+        version: Int = 3,
+        exportedAt: Date = Date(),
+        baby: Baby,
+        events: [Event],
+        vaccines: [Vaccine],
+        growth: [GrowthPoint],
+        foods: [FoodItem],
+        medications: [MedicationRecord]? = nil,
+        teeth: [ToothRecord]? = nil,
+        milestones: [Milestone]? = nil,
+        activeTimer: RunningTimer? = nil,
+        feedDraft: FeedDraft? = nil
+    ) {
+        self.version = version
+        self.exportedAt = exportedAt
+        self.baby = baby
+        self.events = events
+        self.vaccines = vaccines
+        self.growth = growth
+        self.foods = foods
+        self.medications = medications
+        self.teeth = teeth
+        self.milestones = milestones
+        self.activeTimer = activeTimer
+        self.feedDraft = feedDraft
+    }
+
+    init(
+        version: Int = 3,
+        exportedAt: Date = Date(),
+        baby: Baby,
+        events: [Event],
+        vaccines: [Vaccine],
+        growth: [GrowthPoint],
+        foods: [FoodItem],
+        teeth: [ToothRecord]? = nil,
+        milestones: [Milestone]? = nil
+    ) {
+        self.init(
+            version: version,
+            exportedAt: exportedAt,
+            baby: baby,
+            events: events,
+            vaccines: vaccines,
+            growth: growth,
+            foods: foods,
+            medications: nil,
+            teeth: teeth,
+            milestones: milestones,
+            activeTimer: nil,
+            feedDraft: nil
+        )
+    }
 }
 
 // MARK: — Persistence + export on AppStore
 
 extension AppStore {
     private static let storeFileName = "BabyDiary.json"
+    private static let recoveryFileName = "BabyDiary.previous.json"
 
-    private static var storeURL: URL {
-        let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        return dir.appendingPathComponent(storeFileName)
+    static var persistenceDirectoryURL: URL = FileManager.default.urls(
+        for: .documentDirectory,
+        in: .userDomainMask
+    )[0]
+
+    static var storeURL: URL {
+        persistenceDirectoryURL.appendingPathComponent(storeFileName)
+    }
+
+    static var recoveryURL: URL {
+        persistenceDirectoryURL.appendingPathComponent(recoveryFileName)
     }
 
     /// Returns a store populated from disk if a backup exists,
@@ -37,8 +104,10 @@ extension AppStore {
 
     func snapshot() -> DataSnapshot {
         DataSnapshot(baby: baby, events: events, vaccines: vaccines,
-                     growth: growth, foods: foods, teeth: teeth,
-                     milestones: milestones)
+                     growth: growth, foods: foods, medications: medications,
+                     teeth: teeth,
+                     milestones: milestones, activeTimer: activeTimer,
+                     feedDraft: feedDraft)
     }
 
     func apply(_ snap: DataSnapshot) {
@@ -47,6 +116,7 @@ extension AppStore {
         vaccines = snap.vaccines
         growth = snap.growth
         foods = snap.foods
+        medications = snap.medications ?? []
         // 按位置合并,保证 20 颗位置齐全;老备份无 teeth 字段时回退为空记录
         milestones = snap.milestones ?? []
         if let saved = snap.teeth {
@@ -57,23 +127,39 @@ extension AppStore {
         } else {
             teeth = ToothPosition.all.map(ToothRecord.empty(for:))
         }
+        activeTimer = snap.activeTimer
+        feedDraft = snap.feedDraft
     }
 
     @discardableResult
     func loadFromDisk() -> Bool {
-        guard let data = try? Data(contentsOf: Self.storeURL) else { return false }
-        let dec = JSONDecoder(); dec.dateDecodingStrategy = .iso8601
-        guard let snap = try? dec.decode(DataSnapshot.self, from: data) else { return false }
+        if let snap = Self.loadSnapshot(at: Self.storeURL) {
+            apply(snap)
+            return true
+        }
+        guard let snap = Self.loadSnapshot(at: Self.recoveryURL) else { return false }
         apply(snap)
+        persist(makeRecoveryCopy: false)
         return true
     }
 
-    func persist() {
+    func persist(makeRecoveryCopy: Bool = true) {
         let enc = JSONEncoder()
         enc.dateEncodingStrategy = .iso8601
         enc.outputFormatting = [.prettyPrinted, .sortedKeys]
         guard let data = try? enc.encode(snapshot()) else { return }
+        let fileManager = FileManager.default
+        if makeRecoveryCopy, fileManager.fileExists(atPath: Self.storeURL.path) {
+            try? fileManager.removeItem(at: Self.recoveryURL)
+            try? fileManager.copyItem(at: Self.storeURL, to: Self.recoveryURL)
+        }
         try? data.write(to: Self.storeURL, options: .atomic)
+    }
+
+    func lastSavedAt() -> Date? {
+        guard FileManager.default.fileExists(atPath: Self.storeURL.path) else { return nil }
+        let values = try? Self.storeURL.resourceValues(forKeys: [.contentModificationDateKey])
+        return values?.contentModificationDate
     }
 
     // MARK: — Exports
@@ -95,8 +181,7 @@ extension AppStore {
         let scoped = url.startAccessingSecurityScopedResource()
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
         let data = try Data(contentsOf: url)
-        let dec = JSONDecoder(); dec.dateDecodingStrategy = .iso8601
-        let snap = try dec.decode(DataSnapshot.self, from: data)
+        let snap = try Self.decodeSnapshot(from: data)
         apply(snap)
         persist()
     }
@@ -113,6 +198,17 @@ extension AppStore {
         let f = DateFormatter()
         f.dateFormat = "yyyy-MM-dd"
         return f.string(from: Date())
+    }
+
+    static func decodeSnapshot(from data: Data) throws -> DataSnapshot {
+        let dec = JSONDecoder()
+        dec.dateDecodingStrategy = .iso8601
+        return try dec.decode(DataSnapshot.self, from: data)
+    }
+
+    private static func loadSnapshot(at url: URL) -> DataSnapshot? {
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        return try? decodeSnapshot(from: data)
     }
 }
 
@@ -140,6 +236,7 @@ enum PDFBuilder {
             drawCover(&cursor, snap: snap)
             drawGrowth(&cursor, snap: snap)
             drawVaccines(&cursor, snap: snap)
+            drawMedications(&cursor, snap: snap)
             drawFoods(&cursor, snap: snap)
             drawEvents(&cursor, snap: snap)
         }
@@ -165,6 +262,8 @@ enum PDFBuilder {
         c.kv("疫苗计划", "\(snap.vaccines.count) 项 · 已完成 \(snap.vaccines.filter { $0.done }.count)")
         c.kv("成长曲线", "\(snap.growth.count) 个测量点")
         c.kv("辅食记录", "\(snap.foods.count) 种食物")
+        let meds = snap.medications ?? []
+        c.kv("用药记录", "\(meds.count) 条 · 疑似过敏 \(meds.filter { $0.reaction == .allergic }.count)")
         c.gap(10)
     }
 
@@ -193,6 +292,31 @@ enum PDFBuilder {
         }
         c.table(headers: ["疫苗", "适龄", "计划日期", "接种日期", "状态"],
                 widths: [160, 70, 85, 85, 70], rows: rows)
+        c.gap(12)
+    }
+
+    private static func drawMedications(_ c: inout Cursor, snap: DataSnapshot) {
+        c.sectionTitle("用药记录")
+        let meds = snap.medications ?? []
+        guard !meds.isEmpty else { c.text("（暂无数据）", size: 11, color: .gray); c.gap(12); return }
+        let rows = meds.sorted { $0.takenAt > $1.takenAt }.map { m -> [String] in
+            let reaction: String = {
+                var label = m.reaction.label
+                if let note = m.reactionNote, !note.isEmpty {
+                    label += " · \(note)"
+                }
+                return label
+            }()
+            return [
+                "\(shortDate(m.takenAt)) \(hm(m.takenAt))",
+                m.name,
+                m.dose.isEmpty ? "-" : m.dose,
+                m.reason.isEmpty ? "-" : m.reason,
+                reaction
+            ]
+        }
+        c.table(headers: ["时间", "药名", "剂量", "用途", "过敏反应"],
+                widths: [110, 115, 70, 95, 130], rows: rows)
         c.gap(12)
     }
 

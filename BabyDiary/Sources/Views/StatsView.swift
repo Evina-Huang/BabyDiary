@@ -12,9 +12,10 @@ struct StatsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            TabTitleHeader(kicker: "最近 \(range.rawValue) 天", title: "统计")
             ScreenBody {
-                rangeSeg.padding(.bottom, 14)
+                rangeSeg
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.bottom, 14)
                 PatternChart(events: store.events, range: range.rawValue)
             }
         }
@@ -22,28 +23,8 @@ struct StatsView: View {
     }
 
     private var rangeSeg: some View {
-        HStack(spacing: 6) {
-            ForEach(Range.allCases, id: \.self) { r in
-                Button { withAnimation(.easeOut(duration: 0.16)) { range = r } } label: {
-                    Text(r.label)
-                        .font(.system(size: 14, weight: .heavy))
-                        .tracking(-0.14)
-                        .foregroundStyle(range == r ? store.theme.primary600 : Palette.ink2)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background {
-                            if range == r {
-                                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                    .fill(Color.white)
-                                    .shadow(color: .black.opacity(0.06), radius: 3, x: 0, y: 1)
-                            }
-                        }
-                }
-                .buttonStyle(PressableStyle())
-            }
-        }
-        .padding(5)
-        .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        SegPill(selection: $range,
+                options: Range.allCases.map { ($0, $0.label) })
     }
 }
 

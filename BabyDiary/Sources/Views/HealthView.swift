@@ -10,8 +10,6 @@ struct HealthView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            TabTitleHeader(kicker: "\(store.baby.name) · \(store.baby.ageLabel)",
-                           title: "健康")
             ScreenBody {
                 latestMeasureCard
                 VStack(spacing: 10) {
@@ -21,6 +19,13 @@ struct HealthView: View {
                         iconBg: Palette.mintTint,
                         icon: { AppIcon.Shield(size: 24, color: Palette.mint600) },
                         onTap: { onOpen(.vaccine) }
+                    )
+                    EntryCard(
+                        title: "用药记录",
+                        subtitle: medicationSubtitle,
+                        iconBg: Palette.blue,
+                        icon: { AppIcon.Pill(size: 24, color: Palette.blueInk) },
+                        onTap: { onOpen(.medication) }
                     )
                     EntryCard(
                         title: "食物与过敏",
@@ -101,6 +106,14 @@ struct HealthView: View {
         if allergic  > 0 { parts.append("过敏 \(allergic)") }
         if observing > 0 { parts.append("观察中 \(observing)") }
         return parts.isEmpty ? "暂无记录" : parts.joined(separator: " · ")
+    }
+
+    private var medicationSubtitle: String {
+        let total = store.medications.count
+        let allergic = store.medications.filter { $0.reaction == .allergic }.count
+        guard total > 0 else { return "记录药名、剂量与过敏反应" }
+        if allergic > 0 { return "\(total) 条记录 · 疑似过敏 \(allergic)" }
+        return "\(total) 条记录 · 暂无药物过敏"
     }
 
     private func isoDate(_ d: Date) -> String {

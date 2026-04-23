@@ -114,8 +114,6 @@ struct GrowthView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            TabTitleHeader(kicker: "\(store.baby.name) · \(store.baby.ageLabel)",
-                           title: "成长")
             ScreenBody {
                 sectionSwitcher
                     .frame(maxWidth: .infinity, alignment: .center)

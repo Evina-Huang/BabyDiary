@@ -18,10 +18,13 @@ struct BackupScreen: View {
                 summaryCard
                     .padding(.top, 10)
 
+                autosaveCard
+                    .padding(.top, 12)
+
                 Card(padding: 18) {
                     VStack(alignment: .leading, spacing: 14) {
                         sectionLabel("导出 / 备份")
-                        Text("建议每天导出一次，保存到「文件」App、iCloud Drive 或通过 AirDrop 发到其他设备。")
+                        Text("自动保存用于日常使用，导出用于换机、重装前或额外留底。建议在大版本更新前导出一次。")
                             .font(.system(size: 12))
                             .foregroundStyle(Palette.ink2)
 
@@ -86,7 +89,7 @@ struct BackupScreen: View {
                 if let url = confirmImport { performImport(url) }
             }
         } message: {
-            Text("当前所有日常记录、成长、疫苗和辅食数据将被备份文件中的内容覆盖。")
+            Text("当前所有日常记录、成长、疫苗、用药和辅食数据将被备份文件中的内容覆盖。")
         }
     }
 
@@ -146,14 +149,53 @@ struct BackupScreen: View {
         Card(padding: 16) {
             VStack(alignment: .leading, spacing: 8) {
                 sectionLabel("当前数据")
-                HStack(spacing: 18) {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 14), count: 3), spacing: 10) {
                     stat("\(store.events.count)", "记录")
                     stat("\(store.growth.count)", "成长点")
                     stat("\(store.vaccines.filter { $0.done }.count)/\(store.vaccines.count)", "疫苗")
+                    stat("\(store.medications.count)", "用药")
                     stat("\(store.foods.count)", "辅食")
                 }
             }
         }
+    }
+
+    private var autosaveCard: some View {
+        Card(padding: 18) {
+            VStack(alignment: .leading, spacing: 14) {
+                sectionLabel("自动保存")
+
+                HStack(alignment: .top, spacing: 10) {
+                    rowIcon("checkmark.shield", tint: Palette.mint600)
+
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text("自动保存已开启")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(Palette.ink)
+
+                        Text("每次新增、修改、删除后，都会立即保存到当前设备。")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Palette.ink2)
+
+                        Text(lastSavedText)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(store.theme.primary600)
+
+                        Text("自动保存文件保存在 App 的本地空间里，不会直接出现在「文件」App。若担心卸载或换机，请导出 JSON 备份。")
+                            .font(.system(size: 11))
+                            .foregroundStyle(Palette.ink3)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+        }
+    }
+
+    private var lastSavedText: String {
+        if let savedAt = store.lastSavedAt() {
+            return "最近保存：\(formatAutosaveTime(savedAt))"
+        }
+        return "最近保存：尚未生成本机保存文件"
     }
 
     private func stat(_ value: String, _ label: String) -> some View {
@@ -177,6 +219,13 @@ struct BackupScreen: View {
             .foregroundStyle(tint)
             .frame(width: 32, height: 32)
             .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
+    }
+
+    private func formatAutosaveTime(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "zh_CN")
+        f.dateFormat = "yyyy 年 M 月 d 日 HH:mm"
+        return f.string(from: date)
     }
 
     // MARK: — Actions

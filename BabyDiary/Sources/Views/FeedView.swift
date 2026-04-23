@@ -545,7 +545,7 @@ struct FeedScreen: View {
     }
 
     private func syncDraftToStore() {
-        store.feedDraft = currentDraft.hasActiveState ? currentDraft : nil
+        store.syncFeedDraft(currentDraft.hasActiveState ? currentDraft : nil)
     }
 
     private func draftPhase(from phase: Phase) -> FeedDraftPhase {

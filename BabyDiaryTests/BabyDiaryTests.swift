@@ -142,6 +142,39 @@ struct BabyDiaryTests {
         #expect(doneDate <= after)
     }
 
+    @Test func medicationRecordsSortNewestFirst() {
+        let store = AppStore()
+        let cal = Calendar.current
+        let older = cal.date(from: DateComponents(year: 2026, month: 4, day: 20, hour: 9))!
+        let newer = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 18))!
+        store.medications = []
+
+        store.addMedication(MedicationRecord(id: "m1", name: "维生素 D3", takenAt: older, dose: "1 粒", reason: "每日补充", reaction: .none))
+        store.addMedication(MedicationRecord(id: "m2", name: "对乙酰氨基酚", takenAt: newer, dose: "2.5 ml", reason: "发热", reaction: .observing))
+
+        #expect(store.medications.map(\.id) == ["m2", "m1"])
+    }
+
+    @Test func snapshotIncludesMedicationRecords() throws {
+        let store = AppStore()
+        let takenAt = Date()
+        let record = MedicationRecord(
+            id: "m1",
+            name: "头孢克洛",
+            takenAt: takenAt,
+            dose: "半包",
+            reason: "医生开具",
+            reaction: .allergic,
+            reactionNote: "皮疹"
+        )
+        store.medications = [record]
+
+        let snapshot = store.snapshot()
+
+        let medications = try #require(snapshot.medications)
+        #expect(medications == [record])
+    }
+
     @Test func pauseTimerBanksElapsedTimeAndResumeContinues() {
         let store = AppStore()
         let cal = Calendar.current
@@ -202,5 +235,6 @@ struct BabyDiaryTests {
 
         #expect(store.teeth.count == ToothPosition.all.count)
         #expect(store.teeth.allSatisfy { $0.eruptedAt == nil })
+        #expect(store.medications.isEmpty)
     }
 }

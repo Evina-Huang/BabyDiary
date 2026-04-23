@@ -64,14 +64,14 @@ enum AppIcon {
         var body: some View {
             Canvas { ctx, _ in
                 var curve = Path()
-                curve.move(to: .init(x: 4, y: 17))
-                curve.addCurve(to: .init(x: 10, y: 9), control1: .init(x: 7, y: 16), control2: .init(x: 9, y: 13))
-                curve.move(to: .init(x: 10, y: 9))
-                curve.addCurve(to: .init(x: 17, y: 17), control1: .init(x: 11, y: 12), control2: .init(x: 13, y: 15))
+                curve.move(to: .init(x: 4, y: 16.5))
+                curve.addCurve(to: .init(x: 11, y: 6.5), control1: .init(x: 7, y: 15.5), control2: .init(x: 9.5, y: 10.5))
+                curve.move(to: .init(x: 11, y: 6.5))
+                curve.addCurve(to: .init(x: 18, y: 16.5), control1: .init(x: 12.5, y: 10.5), control2: .init(x: 14.5, y: 14.5))
                 var baseline = Path()
                 baseline.move(to: .init(x: 3, y: 21))
                 baseline.addLine(to: .init(x: 21, y: 21))
-                let dots: [CGPoint] = [.init(x: 4, y: 17), .init(x: 10, y: 9), .init(x: 17, y: 17)]
+                let dots: [CGPoint] = [.init(x: 4, y: 16.5), .init(x: 11, y: 6.5), .init(x: 18, y: 16.5)]
                 let t = CGAffineTransform(scaleX: size/24, y: size/24)
                 ctx.stroke(curve.applying(t), with: .color(color), style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
                 ctx.stroke(baseline.applying(t), with: .color(color), style: StrokeStyle(lineWidth: 2, lineCap: .round))
@@ -351,6 +351,32 @@ enum AppIcon {
                 p.addLine(to: .init(x: 6, y: 20)); p.addLine(to: .init(x: 7, y: 21))
                 p.addLine(to: .init(x: 10, y: 18))
                 ctx.stroke(p.applying(t), with: .color(color), style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+            }
+            .frame(width: size, height: size)
+        }
+    }
+
+    struct Pill: View {
+        var size: CGFloat = 24
+        var color: Color
+        var body: some View {
+            Canvas { ctx, _ in
+                let t = CGAffineTransform(scaleX: size/24, y: size/24)
+                let capsule = Path(
+                    roundedRect: CGRect(x: 3, y: 8, width: 18, height: 8),
+                    cornerRadius: 4,
+                    style: .continuous
+                )
+                var divider = Path()
+                divider.move(to: .init(x: 12, y: 8))
+                divider.addLine(to: .init(x: 12, y: 16))
+                var shine = Path()
+                shine.move(to: .init(x: 6.5, y: 10.5))
+                shine.addLine(to: .init(x: 9, y: 10.5))
+                ctx.fill(capsule.applying(t), with: .color(color.opacity(0.18)))
+                ctx.stroke(capsule.applying(t), with: .color(color), style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+                ctx.stroke(divider.applying(t), with: .color(color), style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                ctx.stroke(shine.applying(t), with: .color(color.opacity(0.85)), style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
             }
             .frame(width: size, height: size)
         }

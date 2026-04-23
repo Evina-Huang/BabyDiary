@@ -53,7 +53,6 @@ struct RecordsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            TabTitleHeader(kicker: kickerText, title: "记录")
             ScreenBody {
                 monthCalendarHeader
 
@@ -86,16 +85,6 @@ struct RecordsView: View {
             )
             .environment(store)
         }
-    }
-
-    private var kickerText: String {
-        if let sel = selectedDate {
-            let f = DateFormatter()
-            f.locale = Locale(identifier: "zh_CN")
-            f.dateFormat = "M月d日 EEEE"
-            return f.string(from: sel)
-        }
-        return "全部"
     }
 
     @ViewBuilder

@@ -12,6 +12,7 @@ final class AppStore {
     var vaccines: [Vaccine] = []
     var growth: [GrowthPoint] = []
     var foods: [FoodItem] = []
+    var medications: [MedicationRecord] = []
     var teeth: [ToothRecord] = ToothPosition.all.map(ToothRecord.empty(for:))
     var milestones: [Milestone] = []
     var theme: AppTheme = .blossom
@@ -26,6 +27,7 @@ final class AppStore {
         s.events  = Array(s.events.prefix(4))
         s.vaccines = Array(s.vaccines.prefix(3))
         s.growth   = Array(s.growth.suffix(2))
+        s.medications = Array(s.medications.prefix(3))
         return s
     }()
 
@@ -111,6 +113,7 @@ final class AppStore {
 
     func startTimer(kind: EventKind, at date: Date = Date()) {
         activeTimer = RunningTimer(kind: kind, startedAt: date, accumulated: 0, resumedAt: date)
+        persist()
     }
 
     func pauseTimer(at date: Date = Date()) {
@@ -118,19 +121,28 @@ final class AppStore {
         timer.accumulated += max(0, date.timeIntervalSince(resumedAt))
         timer.resumedAt = nil
         activeTimer = timer
+        persist()
     }
 
     func resumeTimer(at date: Date = Date()) {
         guard var timer = activeTimer, timer.resumedAt == nil else { return }
         timer.resumedAt = date
         activeTimer = timer
+        persist()
     }
 
     @discardableResult
     func stopTimer() -> RunningTimer? {
+        guard activeTimer != nil else { return nil }
         let t = activeTimer
         activeTimer = nil
+        persist()
         return t
+    }
+
+    func syncFeedDraft(_ draft: FeedDraft?) {
+        feedDraft = draft
+        persist()
     }
 
     // MARK: — Vaccine plan management
@@ -222,6 +234,30 @@ final class AppStore {
         newPoint.ageMonths = ageMonths(on: newPoint.date)
         growth.append(newPoint)
         persist()
+    }
+
+    // MARK: — Medication
+
+    func addMedication(_ record: MedicationRecord) {
+        medications.append(record)
+        sortMedications()
+        persist()
+    }
+
+    func updateMedication(_ record: MedicationRecord) {
+        guard let idx = medications.firstIndex(where: { $0.id == record.id }) else { return }
+        medications[idx] = record
+        sortMedications()
+        persist()
+    }
+
+    func deleteMedication(_ id: String) {
+        medications.removeAll { $0.id == id }
+        persist()
+    }
+
+    private func sortMedications() {
+        medications.sort { $0.takenAt > $1.takenAt }
     }
 
     // MARK: — Milestones
@@ -391,6 +427,12 @@ final class AppStore {
             .init(id: "fd7", name: "鸡蛋黄", firstUsedAt: f.date(from: "2026-02-10")!, status: .allergic, timesEaten: 2,  observationDays: 7),
         ]
 
+        medications = [
+            .init(id: "md1", name: "维生素 D3", takenAt: at(3, 20), dose: "1 粒", reason: "每日补充", reaction: .none),
+            .init(id: "md2", name: "对乙酰氨基酚", takenAt: daysAgo(5, 21), dose: "2.5 ml", reason: "发热", reaction: .none, note: "体温下降后停用"),
+            .init(id: "md3", name: "头孢克洛", takenAt: f.date(from: "2026-03-18")!, dose: "半包", reason: "医生开具", reaction: .allergic, reactionNote: "服后出现皮疹，已停用"),
+        ]
+
         milestones = [
             .init(id: "ms_smile", date: f.date(from: "2025-12-05")!,
                   title: "第一次笑出声",
@@ -481,7 +523,7 @@ enum FeedDraftSide: String, Equatable, Codable {
 }
 
 enum SubScreen: String, Identifiable {
-    case sleep, feed, diaper, solid, vaccine, foodList, teeth, backup
+    case sleep, feed, diaper, solid, vaccine, medication, foodList, teeth, backup
     var id: String { rawValue }
 }
 
