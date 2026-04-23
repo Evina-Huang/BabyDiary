@@ -2,6 +2,7 @@ import Foundation
 import UIKit
 import SwiftUI
 import UniformTypeIdentifiers
+import WidgetKit
 
 // MARK: — Snapshot
 
@@ -80,6 +81,7 @@ struct DataSnapshot: Codable {
 extension AppStore {
     private static let storeFileName = "BabyDiary.json"
     private static let recoveryFileName = "BabyDiary.previous.json"
+    private static let didClearPresetDataKey = "BabyDiary.didClearPresetData.v1"
 
     static var persistenceDirectoryURL: URL = FileManager.default.urls(
         for: .documentDirectory,
@@ -95,10 +97,14 @@ extension AppStore {
     }
 
     /// Returns a store populated from disk if a backup exists,
-    /// otherwise the seeded demo data from `init()`.
+    /// otherwise an empty store for daily use.
     static func loadedOrSeeded() -> AppStore {
         let s = AppStore()
         _ = s.loadFromDisk()
+        s.clearPresetDataForPersonalUseIfNeeded()
+        s.publishWidgetSnapshot(reloadTimelines: false)
+        s.restoreSleepLiveActivityIfNeeded()
+        s.restoreFeedLiveActivityIfNeeded()
         return s
     }
 
@@ -131,6 +137,27 @@ extension AppStore {
         feedDraft = snap.feedDraft
     }
 
+    func clearPresetDataForPersonalUseIfNeeded() {
+        guard !UserDefaults.standard.bool(forKey: Self.didClearPresetDataKey) else { return }
+
+        baby = Self.defaultBaby()
+        events = []
+        vaccines = []
+        growth = []
+        foods = []
+        medications = []
+        milestones = []
+        teeth = ToothPosition.all.map(ToothRecord.empty(for:))
+        activeTimer = nil
+        feedDraft = nil
+
+        SleepLiveActivityController.end(timer: nil, babyName: baby.name)
+        FeedLiveActivityController.end(babyName: baby.name)
+
+        UserDefaults.standard.set(true, forKey: Self.didClearPresetDataKey)
+        persist(makeRecoveryCopy: false)
+    }
+
     @discardableResult
     func loadFromDisk() -> Bool {
         if let snap = Self.loadSnapshot(at: Self.storeURL) {
@@ -154,6 +181,48 @@ extension AppStore {
             try? fileManager.copyItem(at: Self.storeURL, to: Self.recoveryURL)
         }
         try? data.write(to: Self.storeURL, options: .atomic)
+        publishWidgetSnapshot()
+    }
+
+    func publishWidgetSnapshot(reloadTimelines: Bool = true) {
+        BabyDiaryShared.save(snapshot: widgetSnapshot())
+        if reloadTimelines {
+            WidgetCenter.shared.reloadAllTimelines()
+        }
+    }
+
+    private func widgetSnapshot() -> BabyDiaryWidgetSnapshot {
+        BabyDiaryWidgetSnapshot(
+            updatedAt: Date(),
+            babyName: baby.name,
+            lastFeed: widgetEvent(for: .feed),
+            lastSleep: widgetEvent(for: .sleep),
+            lastDiaper: widgetEvent(for: .diaper),
+            activeSleep: activeTimer.flatMap { timer in
+                guard timer.kind == .sleep else { return nil }
+                return BabyDiaryWidgetSleepTimer(
+                    startedAt: timer.startedAt,
+                    accumulated: timer.accumulated,
+                    resumedAt: timer.resumedAt
+                )
+            }
+        )
+    }
+
+    private func widgetEvent(for kind: EventKind) -> BabyDiaryWidgetEvent? {
+        events
+            .filter { $0.kind == kind }
+            .max { ($0.endAt ?? $0.at) < ($1.endAt ?? $1.at) }
+            .map { event in
+                BabyDiaryWidgetEvent(
+                    kind: BabyDiaryWidgetEventKind(rawValue: event.kind.rawValue) ?? .feed,
+                    occurredAt: event.endAt ?? event.at,
+                    startedAt: event.at,
+                    endedAt: event.endAt,
+                    title: event.title,
+                    subtitle: event.sub
+                )
+            }
     }
 
     func lastSavedAt() -> Date? {

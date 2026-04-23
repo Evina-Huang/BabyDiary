@@ -19,16 +19,38 @@ targets:
       - path: BabyDiary/Resources
         excludes:
           - "Info.plist"
+    dependencies:
+      - target: BabyDiaryWidgets
+        embed: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.evina.BabyDiary
         INFOPLIST_FILE: BabyDiary/Resources/Info.plist
+        CODE_SIGN_ENTITLEMENTS: BabyDiary/BabyDiary.entitlements
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: 5WF2DNSHC6
     scheme:
       testTargets:
         - BabyDiaryTests
+
+  BabyDiaryWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: BabyDiaryWidgets/Sources
+      - path: BabyDiary/Sources/Shared
+      - path: BabyDiaryWidgets/Resources
+        excludes:
+          - "Info.plist"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.evina.BabyDiary.Widgets
+        INFOPLIST_FILE: BabyDiaryWidgets/Resources/Info.plist
+        CODE_SIGN_ENTITLEMENTS: BabyDiaryWidgets/BabyDiaryWidgets.entitlements
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: 5WF2DNSHC6
+        APPLICATION_EXTENSION_API_ONLY: YES
 
   BabyDiaryTests:
     type: bundle.unit-test

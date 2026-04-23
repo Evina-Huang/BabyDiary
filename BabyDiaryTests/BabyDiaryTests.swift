@@ -10,15 +10,22 @@ struct BabyDiaryTests {
         #expect(e.sub == "120 ml")
     }
 
-    @Test func storeSeedsData() {
+    @Test func storeStartsEmptyForDailyUse() {
         let store = AppStore()
+        #expect(store.events.isEmpty)
+        #expect(store.vaccines.isEmpty)
+        #expect(store.growth.isEmpty)
+    }
+
+    @Test func demoStoreSeedsData() {
+        let store = AppStore(seedDemoData: true)
         #expect(!store.events.isEmpty)
         #expect(!store.vaccines.isEmpty)
         #expect(!store.growth.isEmpty)
     }
 
     @Test func deleteEventRemovesIt() {
-        let store = AppStore()
+        let store = AppStore(seedDemoData: true)
         let first = store.events[0]
         store.deleteEvent(first)
         #expect(!store.events.contains(first))

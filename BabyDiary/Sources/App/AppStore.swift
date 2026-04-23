@@ -3,11 +3,7 @@ import Observation
 
 @Observable
 final class AppStore {
-    var baby = Baby(
-        name: "小宝",
-        birthDate: Calendar.current.date(from: DateComponents(year: 2025, month: 10, day: 18)) ?? Date(),
-        gender: .girl
-    )
+    var baby: Baby
     var events: [Event] = []
     var vaccines: [Vaccine] = []
     var growth: [GrowthPoint] = []
@@ -19,10 +15,15 @@ final class AppStore {
     var activeTimer: RunningTimer? = nil
     var feedDraft: FeedDraft? = nil
 
-    init() { seed() }
+    init(seedDemoData: Bool = false) {
+        baby = seedDemoData ? Self.demoBaby() : Self.defaultBaby()
+        if seedDemoData {
+            seed()
+        }
+    }
 
     static let preview: AppStore = {
-        let s = AppStore()
+        let s = AppStore(seedDemoData: true)
         // Trim down to just enough data for canvas rendering
         s.events  = Array(s.events.prefix(4))
         s.vaccines = Array(s.vaccines.prefix(3))
@@ -30,6 +31,22 @@ final class AppStore {
         s.medications = Array(s.medications.prefix(3))
         return s
     }()
+
+    static func defaultBaby() -> Baby {
+        Baby(
+            name: "宝宝",
+            birthDate: Calendar.current.startOfDay(for: Date()),
+            gender: .girl
+        )
+    }
+
+    static func demoBaby() -> Baby {
+        Baby(
+            name: "小宝",
+            birthDate: Calendar.current.date(from: DateComponents(year: 2025, month: 10, day: 18)) ?? Date(),
+            gender: .girl
+        )
+    }
 
     func addEvent(_ e: Event) {
         events.insert(e, at: 0)
@@ -88,6 +105,12 @@ final class AppStore {
             refreshBirthDateDerivedData(previousBirthDate: oldBirthDate)
         }
         persist()
+        if let activeTimer, activeTimer.kind == .sleep {
+            SleepLiveActivityController.update(timer: activeTimer, babyName: baby.name)
+        }
+        if let feedDraft, feedDraft.hasLiveActivityState {
+            FeedLiveActivityController.update(draft: feedDraft, babyName: baby.name)
+        }
     }
 
     private func refreshBirthDateDerivedData(previousBirthDate: Date) {
@@ -112,8 +135,12 @@ final class AppStore {
     }
 
     func startTimer(kind: EventKind, at date: Date = Date()) {
-        activeTimer = RunningTimer(kind: kind, startedAt: date, accumulated: 0, resumedAt: date)
+        let timer = RunningTimer(kind: kind, startedAt: date, accumulated: 0, resumedAt: date)
+        activeTimer = timer
         persist()
+        if kind == .sleep {
+            SleepLiveActivityController.start(timer: timer, babyName: baby.name)
+        }
     }
 
     func pauseTimer(at date: Date = Date()) {
@@ -122,6 +149,9 @@ final class AppStore {
         timer.resumedAt = nil
         activeTimer = timer
         persist()
+        if timer.kind == .sleep {
+            SleepLiveActivityController.update(timer: timer, babyName: baby.name)
+        }
     }
 
     func resumeTimer(at date: Date = Date()) {
@@ -129,6 +159,9 @@ final class AppStore {
         timer.resumedAt = date
         activeTimer = timer
         persist()
+        if timer.kind == .sleep {
+            SleepLiveActivityController.update(timer: timer, babyName: baby.name)
+        }
     }
 
     @discardableResult
@@ -137,12 +170,26 @@ final class AppStore {
         let t = activeTimer
         activeTimer = nil
         persist()
+        if t?.kind == .sleep {
+            SleepLiveActivityController.end(timer: t, babyName: baby.name)
+        }
         return t
     }
 
     func syncFeedDraft(_ draft: FeedDraft?) {
+        guard feedDraft != draft else { return }
         feedDraft = draft
         persist()
+        FeedLiveActivityController.update(draft: draft, babyName: baby.name)
+    }
+
+    func restoreSleepLiveActivityIfNeeded() {
+        guard let activeTimer, activeTimer.kind == .sleep else { return }
+        SleepLiveActivityController.update(timer: activeTimer, babyName: baby.name)
+    }
+
+    func restoreFeedLiveActivityIfNeeded() {
+        FeedLiveActivityController.update(draft: feedDraft, babyName: baby.name)
     }
 
     // MARK: — Vaccine plan management
@@ -503,6 +550,15 @@ struct FeedDraft: Equatable, Codable {
 
     var hasActiveState: Bool {
         breastPhase != .idle || formulaPhase != .idle
+    }
+
+    var hasLiveActivityState: Bool {
+        switch mode {
+        case .breast:
+            return breastSubMode == .timer && (breastPhase == .running || breastPhase == .paused)
+        case .formula:
+            return formulaSubMode == .timer && (formulaPhase == .running || formulaPhase == .paused)
+        }
     }
 }
 

@@ -51,6 +51,7 @@ struct ContentView: View {
                 .environment(store)
                 .presentationDragIndicator(.hidden)
         }
+        .onOpenURL(perform: openDeepLink)
     }
 
     @ViewBuilder
@@ -65,6 +66,23 @@ struct ContentView: View {
         case .foodList: FoodListScreen(onBack: { sub = nil })
         case .teeth:    TeethScreen(onBack:    { sub = nil })
         case .backup:   BackupScreen(onBack:   { sub = nil })
+        }
+    }
+
+    private func openDeepLink(_ url: URL) {
+        guard url.scheme == "babydiary" else { return }
+        let destination = url.host ?? url.pathComponents.dropFirst().first
+        switch destination {
+        case BabyDiaryDestination.sleep.rawValue:
+            sub = .sleep
+        case BabyDiaryDestination.feed.rawValue:
+            sub = .feed
+        case BabyDiaryDestination.records.rawValue:
+            tab = .records
+            sub = nil
+        default:
+            tab = .home
+            sub = nil
         }
     }
 }
