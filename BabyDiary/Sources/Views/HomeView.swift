@@ -63,6 +63,7 @@ struct HomeView: View {
                     .padding(.top, 14)
 
             }
+            .scrollBounceBehavior(.basedOnSize)
         }
         .background(Palette.bg)
     }

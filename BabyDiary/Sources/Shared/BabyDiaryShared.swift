@@ -5,6 +5,7 @@ enum BabyDiaryDestination: String {
     case home
     case sleep
     case feed
+    case diaper
     case records
 }
 
@@ -57,6 +58,15 @@ struct BabyDiaryWidgetSleepTimer: Codable, Hashable {
     var resumedAt: Date?
 
     var isRunning: Bool { resumedAt != nil }
+
+    var timerReferenceDate: Date? {
+        guard let resumedAt else { return nil }
+        return resumedAt.addingTimeInterval(-accumulated)
+    }
+
+    func elapsed(at date: Date) -> TimeInterval {
+        accumulated + (resumedAt.map { max(0, date.timeIntervalSince($0)) } ?? 0)
+    }
 }
 
 struct BabyDiaryWidgetSnapshot: Codable, Hashable {
@@ -66,6 +76,7 @@ struct BabyDiaryWidgetSnapshot: Codable, Hashable {
     var lastSleep: BabyDiaryWidgetEvent?
     var lastDiaper: BabyDiaryWidgetEvent?
     var activeSleep: BabyDiaryWidgetSleepTimer?
+    var activeFeed: BabyDiaryFeedAttributes.ContentState?
 
     static let empty = BabyDiaryWidgetSnapshot(
         updatedAt: .distantPast,
@@ -73,7 +84,8 @@ struct BabyDiaryWidgetSnapshot: Codable, Hashable {
         lastFeed: nil,
         lastSleep: nil,
         lastDiaper: nil,
-        activeSleep: nil
+        activeSleep: nil,
+        activeFeed: nil
     )
 }
 

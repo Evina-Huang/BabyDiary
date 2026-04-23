@@ -48,6 +48,23 @@ final class AppStore {
         )
     }
 
+    static func screenshotTodayEvents(on date: Date = Date(), calendar cal: Calendar = .current) -> [Event] {
+        func today(_ h: Int, _ m: Int) -> Date {
+            cal.date(bySettingHour: h, minute: m, second: 0, of: date)!
+        }
+
+        return [
+            .init(id: "e_today_1904", kind: .feed,   at: today(19, 4), endAt: today(19, 11), title: "母乳 · 双侧", sub: "右 4分 · 左 3分 · 共 7分"),
+            .init(id: "e_today_1632", kind: .sleep,  at: today(16, 32), endAt: today(18, 3),  title: "睡眠 1时 31分", sub: "16:32 - 18:03"),
+            .init(id: "e_today_1623", kind: .diaper, at: today(16, 23), title: "臭臭", sub: "奶瓣"),
+            .init(id: "e_today_1505", kind: .feed,   at: today(15, 5), endAt: today(15, 13), title: "配方奶", sub: "230 ml · 15:05 - 15:13"),
+            .init(id: "e_today_1220", kind: .sleep,  at: today(12, 20), endAt: today(13, 49), title: "睡眠 1时 29分", sub: "12:20 - 13:49"),
+            .init(id: "e_today_1104", kind: .feed,   at: today(11, 4), endAt: today(11, 11), title: "配方奶", sub: "230 ml · 11:04 - 11:11"),
+            .init(id: "e_today_0714", kind: .sleep,  at: today(7, 14), endAt: today(9, 55),  title: "睡眠 2时 41分", sub: "07:14 - 09:55"),
+            .init(id: "e_today_0604", kind: .feed,   at: today(6, 4), endAt: today(6, 14),  title: "母乳 · 双侧", sub: "左 5分 · 右 5分 · 共 10分"),
+        ]
+    }
+
     func addEvent(_ e: Event) {
         events.insert(e, at: 0)
         persist()
@@ -431,19 +448,10 @@ final class AppStore {
             return d
         }
 
-        events = [
-            .init(id: "e1",  kind: .feed,   at: at(1, 15), title: "母乳 · 左侧", sub: "18分"),
-            .init(id: "e2",  kind: .diaper, at: at(2, 5),  title: "嘘嘘", sub: ""),
-            .init(id: "e3",  kind: .sleep,  at: at(4, 30), endAt: at(2, 45), title: "睡眠 1时 45分", sub: nil),
-            .init(id: "e4",  kind: .solid,  at: at(5, 0),  title: "南瓜泥", sub: "50g · 第一次吃"),
-            .init(id: "e5",  kind: .feed,   at: at(6, 20), title: "奶粉", sub: "120 ml"),
-            .init(id: "e6",  kind: .diaper, at: at(7, 40), title: "嘘嘘+臭臭", sub: ""),
-            .init(id: "e7",  kind: .sleep,  at: daysAgo(1, 22), endAt: daysAgo(0, 6, 30), title: "睡眠 8时 30分", sub: "22:00 - 06:30"),
-            .init(id: "e8",  kind: .feed,   at: daysAgo(1, 14), title: "母乳 · 右侧", sub: "22分"),
-            .init(id: "e9",  kind: .solid,  at: daysAgo(1, 12), title: "米糊", sub: "30g"),
-            .init(id: "e10", kind: .diaper, at: daysAgo(1, 9),  title: "嘘嘘", sub: ""),
-            .init(id: "e11", kind: .feed,   at: daysAgo(2, 8),  title: "奶粉", sub: "150 ml"),
-            .init(id: "e12", kind: .sleep,  at: daysAgo(2, 13), endAt: daysAgo(2, 15), title: "睡眠 2时 0分", sub: "13:00 - 15:00"),
+        events = Self.screenshotTodayEvents(on: now, calendar: cal) + [
+            .init(id: "e_yesterday_1400", kind: .feed, at: daysAgo(1, 14), title: "母乳 · 右侧", sub: "22分"),
+            .init(id: "e_yesterday_1200", kind: .solid, at: daysAgo(1, 12), title: "米糊", sub: "30g"),
+            .init(id: "e_yesterday_0900", kind: .diaper, at: daysAgo(1, 9), title: "嘘嘘", sub: ""),
         ]
 
         let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"

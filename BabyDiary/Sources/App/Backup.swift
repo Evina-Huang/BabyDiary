@@ -82,6 +82,7 @@ extension AppStore {
     private static let storeFileName = "BabyDiary.json"
     private static let recoveryFileName = "BabyDiary.previous.json"
     private static let didClearPresetDataKey = "BabyDiary.didClearPresetData.v1"
+    private static let didImportScreenshotEventsKey = "BabyDiary.didImportScreenshotEvents.2026-04-23"
 
     static var persistenceDirectoryURL: URL = FileManager.default.urls(
         for: .documentDirectory,
@@ -102,6 +103,7 @@ extension AppStore {
         let s = AppStore()
         _ = s.loadFromDisk()
         s.clearPresetDataForPersonalUseIfNeeded()
+        s.mergeScreenshotTodayEventsIfNeeded()
         s.publishWidgetSnapshot(reloadTimelines: false)
         s.restoreSleepLiveActivityIfNeeded()
         s.restoreFeedLiveActivityIfNeeded()
@@ -158,6 +160,42 @@ extension AppStore {
         persist(makeRecoveryCopy: false)
     }
 
+    func mergeScreenshotTodayEventsIfNeeded() {
+        guard !UserDefaults.standard.bool(forKey: Self.didImportScreenshotEventsKey) else { return }
+
+        let cal = Calendar.current
+        let screenshotEvents = Self.screenshotTodayEvents(calendar: cal)
+        let screenshotIDs = Set(screenshotEvents.map(\.id))
+        let screenshotSlots = Set(screenshotEvents.map { EventSlot($0, calendar: cal) })
+
+        events.removeAll { event in
+            screenshotIDs.contains(event.id) || screenshotSlots.contains(EventSlot(event, calendar: cal))
+        }
+        events.append(contentsOf: screenshotEvents)
+        events.sort { $0.at > $1.at }
+
+        UserDefaults.standard.set(true, forKey: Self.didImportScreenshotEventsKey)
+        persist()
+    }
+
+    private struct EventSlot: Hashable {
+        let kind: EventKind
+        let year: Int
+        let month: Int
+        let day: Int
+        let hour: Int
+        let minute: Int
+
+        init(_ event: Event, calendar cal: Calendar) {
+            kind = event.kind
+            year = cal.component(.year, from: event.at)
+            month = cal.component(.month, from: event.at)
+            day = cal.component(.day, from: event.at)
+            hour = cal.component(.hour, from: event.at)
+            minute = cal.component(.minute, from: event.at)
+        }
+    }
+
     @discardableResult
     func loadFromDisk() -> Bool {
         if let snap = Self.loadSnapshot(at: Self.storeURL) {
@@ -205,8 +243,44 @@ extension AppStore {
                     accumulated: timer.accumulated,
                     resumedAt: timer.resumedAt
                 )
-            }
+            },
+            activeFeed: activeFeedState()
         )
+    }
+
+    private func activeFeedState() -> BabyDiaryFeedAttributes.ContentState? {
+        guard let feedDraft, feedDraft.hasLiveActivityState else { return nil }
+
+        switch feedDraft.mode {
+        case .breast:
+            guard feedDraft.breastSubMode == .timer,
+                  feedDraft.breastPhase == .running || feedDraft.breastPhase == .paused else { return nil }
+            return BabyDiaryFeedAttributes.ContentState(
+                mode: .breast,
+                startedAt: feedDraft.breastSessionStart ?? feedDraft.breastSegmentStart ?? Date(),
+                accumulated: feedDraft.breastLeftDuration + feedDraft.breastRightDuration,
+                resumedAt: feedDraft.breastPhase == .running ? feedDraft.breastSegmentStart : nil,
+                updatedAt: Date(),
+                activeSide: feedDraft.breastActiveSide == .right ? .right : .left,
+                breastLeftDuration: feedDraft.breastLeftDuration,
+                breastRightDuration: feedDraft.breastRightDuration,
+                milliliters: nil
+            )
+        case .formula:
+            guard feedDraft.formulaSubMode == .timer,
+                  feedDraft.formulaPhase == .running || feedDraft.formulaPhase == .paused else { return nil }
+            return BabyDiaryFeedAttributes.ContentState(
+                mode: .formula,
+                startedAt: feedDraft.formulaSessionStart ?? feedDraft.formulaSegmentStart ?? Date(),
+                accumulated: feedDraft.formulaDuration,
+                resumedAt: feedDraft.formulaPhase == .running ? feedDraft.formulaSegmentStart : nil,
+                updatedAt: Date(),
+                activeSide: nil,
+                breastLeftDuration: 0,
+                breastRightDuration: 0,
+                milliliters: feedDraft.formulaMilliliters
+            )
+        }
     }
 
     private func widgetEvent(for kind: EventKind) -> BabyDiaryWidgetEvent? {

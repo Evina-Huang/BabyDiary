@@ -24,6 +24,69 @@ struct BabyDiaryTests {
         #expect(!store.growth.isEmpty)
     }
 
+    @Test func demoStoreSeedsScreenshotTodayEvents() throws {
+        let store = AppStore(seedDemoData: true)
+        let cal = Calendar.current
+        let todays = store.events.filter { cal.isDateInToday($0.at) }
+
+        #expect(todays.count == 8)
+        #expect(todays.map(\.id) == [
+            "e_today_1904",
+            "e_today_1632",
+            "e_today_1623",
+            "e_today_1505",
+            "e_today_1220",
+            "e_today_1104",
+            "e_today_0714",
+            "e_today_0604",
+        ])
+
+        let eveningFeed = try #require(todays.first { $0.id == "e_today_1904" })
+        #expect(eveningFeed.title == "母乳 · 双侧")
+        #expect(eveningFeed.sub == "右 4分 · 左 3分 · 共 7分")
+        #expect(cal.component(.hour, from: eveningFeed.at) == 19)
+        #expect(cal.component(.minute, from: eveningFeed.at) == 4)
+        let eveningFeedEnd = try #require(eveningFeed.endAt)
+        #expect(cal.component(.hour, from: eveningFeedEnd) == 19)
+        #expect(cal.component(.minute, from: eveningFeedEnd) == 11)
+
+        let diaper = try #require(todays.first { $0.id == "e_today_1623" })
+        #expect(diaper.title == "臭臭")
+        #expect(diaper.sub == "奶瓣")
+
+        let formula = try #require(todays.first { $0.id == "e_today_1505" })
+        #expect(formula.title == "配方奶")
+        #expect(formula.sub == "230 ml · 15:05 - 15:13")
+    }
+
+    @Test func screenshotTodayEventsMergeOnceWithoutDroppingOtherRecords() throws {
+        let defaultsKey = "BabyDiary.didImportScreenshotEvents.2026-04-23"
+        UserDefaults.standard.removeObject(forKey: defaultsKey)
+        defer { UserDefaults.standard.removeObject(forKey: defaultsKey) }
+
+        let store = AppStore()
+        let cal = Calendar.current
+        let duplicateSlot = cal.date(bySettingHour: 19, minute: 4, second: 0, of: Date())!
+        let customSolid = Event(id: "custom_solid", kind: .solid, at: Date(), title: "香蕉", sub: "20g")
+        store.events = [
+            Event(id: "old_same_slot", kind: .feed, at: duplicateSlot, title: "旧记录", sub: "待替换"),
+            customSolid,
+        ]
+
+        store.mergeScreenshotTodayEventsIfNeeded()
+
+        #expect(store.events.contains(customSolid))
+        #expect(!store.events.contains { $0.id == "old_same_slot" })
+        #expect(AppStore.screenshotTodayEvents().allSatisfy { seeded in
+            store.events.contains { $0.id == seeded.id }
+        })
+        let eventCountAfterFirstMerge = store.events.count
+
+        store.mergeScreenshotTodayEventsIfNeeded()
+
+        #expect(store.events.count == eventCountAfterFirstMerge)
+    }
+
     @Test func deleteEventRemovesIt() {
         let store = AppStore(seedDemoData: true)
         let first = store.events[0]

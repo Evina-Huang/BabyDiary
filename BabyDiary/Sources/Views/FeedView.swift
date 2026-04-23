@@ -539,7 +539,7 @@ struct FeedScreen: View {
         }
 
         if let last = lastFeed {
-            mode = last.title.contains("奶粉") ? .formula : .breast
+            mode = (last.title.contains("奶粉") || last.title.contains("配方奶")) ? .formula : .breast
             bActive = last.title.contains("右") ? .R : .L
         }
     }

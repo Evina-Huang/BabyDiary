@@ -78,7 +78,7 @@ struct EventEditSheet: View {
             else if event.title.contains("臭") || event.title == "便便" || event.title.contains("便") && !event.title.contains("两") { _dType = .init(initialValue: .dirty) }
             else { _dType = .init(initialValue: .both) }
         case .feed:
-            let isFormula = event.title.contains("奶粉")
+            let isFormula = event.title.contains("奶粉") || event.title.contains("配方奶")
             _feedMode = .init(initialValue: isFormula ? .formula : .breast)
             if isFormula {
                 _ml = .init(initialValue: Self.firstInt(in: event.sub ?? "") ?? 120)
@@ -568,7 +568,7 @@ struct EventEditSheet: View {
                     e.sub = "\(first) · 共 \(total)分"
                 }
             } else {
-                e.title = "奶粉"
+                e.title = original.title.contains("配方奶") ? "配方奶" : "奶粉"
                 e.sub = "\(ml) ml"
             }
         case .solid:
