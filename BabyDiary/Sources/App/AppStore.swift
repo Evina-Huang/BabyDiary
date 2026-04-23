@@ -34,6 +34,13 @@ final class AppStore {
         persist()
     }
 
+    func recentEvents(kind: EventKind, limit: Int = 20) -> [Event] {
+        Array(events
+            .filter { $0.kind == kind }
+            .sorted { $0.at > $1.at }
+            .prefix(limit))
+    }
+
     func deleteEvent(_ e: Event) {
         events.removeAll { $0.id == e.id }
         if e.kind == .solid {
@@ -71,6 +78,37 @@ final class AppStore {
         return max(0, months + days / 30.0)
     }
 
+    func updateBaby(_ updated: Baby) {
+        let oldBirthDate = baby.birthDate
+        let birthDateChanged = !Calendar.current.isDate(oldBirthDate, inSameDayAs: updated.birthDate)
+        baby = updated
+        if birthDateChanged {
+            refreshBirthDateDerivedData(previousBirthDate: oldBirthDate)
+        }
+        persist()
+    }
+
+    private func refreshBirthDateDerivedData(previousBirthDate: Date) {
+        for idx in growth.indices {
+            growth[idx].ageMonths = ageMonths(on: growth[idx].date)
+        }
+
+        let cal = Calendar.current
+        for idx in vaccines.indices {
+            let ageMonths = vaccines[idx].ageMonths
+            let oldRecommended = cal.date(byAdding: .month, value: ageMonths, to: previousBirthDate)
+            let shouldRefresh: Bool = {
+                guard let scheduled = vaccines[idx].scheduledDate else { return true }
+                guard let oldRecommended else { return false }
+                return cal.isDate(scheduled, inSameDayAs: oldRecommended)
+            }()
+            if shouldRefresh {
+                vaccines[idx].scheduledDate = recommendedDate(forMonths: ageMonths)
+            }
+        }
+        sortVaccines()
+    }
+
     func startTimer(kind: EventKind, at date: Date = Date()) {
         activeTimer = RunningTimer(kind: kind, startedAt: date, accumulated: 0, resumedAt: date)
     }
@@ -99,7 +137,9 @@ final class AppStore {
 
     /// 备选模板中尚未加入用户计划的那些。
     var availableVaccineTemplates: [VaccineTemplate] {
-        VaccineCatalog.presets.filter { t in !vaccines.contains { $0.id == t.id } }
+        VaccineCatalog.presets.filter { t in
+            !vaccines.contains { matchesTemplate($0, t) }
+        }
     }
 
     func recommendedDate(forMonths months: Int) -> Date {
@@ -159,6 +199,22 @@ final class AppStore {
             let bd = b.scheduledDate ?? Calendar.current.date(byAdding: .month, value: b.ageMonths, to: baby.birthDate) ?? Date()
             return ad < bd
         }
+    }
+
+    private func matchesTemplate(_ vaccine: Vaccine, _ template: VaccineTemplate) -> Bool {
+        if vaccine.id == template.id { return true }
+        guard vaccine.ageMonths == template.ageMonths else { return false }
+        let existing = normalizedVaccineName(vaccine.name)
+        let preset = normalizedVaccineName(template.name)
+        return existing == preset || existing.contains(preset) || preset.contains(existing)
+    }
+
+    private func normalizedVaccineName(_ name: String) -> String {
+        var out = name
+        [" ", "　", "(", ")", "（", "）", "第1剂", "第2剂", "第3剂", "第4剂", "第5剂"].forEach {
+            out = out.replacingOccurrences(of: $0, with: "")
+        }
+        return out
     }
 
     func addGrowth(_ g: GrowthPoint) {
@@ -317,9 +373,9 @@ final class AppStore {
             .init(id: "t_hepb2", name: "乙肝疫苗 第2剂",   ageLabel: "1 月龄", ageMonths: 1, scheduledDate: cal.date(byAdding: .month, value: 1, to: baby.birthDate), doneDate: df.date(from: "2025-11-20")),
             .init(id: "t_ipv1",  name: "脊灰疫苗 第1剂",   ageLabel: "2 月龄", ageMonths: 2, scheduledDate: cal.date(byAdding: .month, value: 2, to: baby.birthDate), doneDate: df.date(from: "2025-12-19")),
             .init(id: "t_dtp1",  name: "百白破疫苗 第1剂", ageLabel: "3 月龄", ageMonths: 3, scheduledDate: cal.date(byAdding: .month, value: 3, to: baby.birthDate), doneDate: df.date(from: "2026-01-20")),
-            .init(id: "t_ipv3",  name: "脊灰疫苗 第3剂",   ageLabel: "4 月龄", ageMonths: 4, scheduledDate: ipv3, doneDate: nil),
+            .init(id: "t_bopv",  name: "脊灰减毒活疫苗 (bOPV)", ageLabel: "4 月龄", ageMonths: 4, scheduledDate: ipv3, doneDate: nil),
             .init(id: "t_dtp3",  name: "百白破疫苗 第3剂", ageLabel: "5 月龄", ageMonths: 5, scheduledDate: dtp3, doneDate: nil),
-            .init(id: "t_mmr",   name: "麻腮风疫苗",       ageLabel: "8 月龄", ageMonths: 8, scheduledDate: mmr,  doneDate: nil),
+            .init(id: "t_mmr1",  name: "麻腮风疫苗 第1剂", ageLabel: "8 月龄", ageMonths: 8, scheduledDate: mmr,  doneDate: nil),
         ]
 
         let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"

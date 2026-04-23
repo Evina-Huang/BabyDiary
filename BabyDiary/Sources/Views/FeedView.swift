@@ -74,6 +74,8 @@ struct FeedScreen: View {
 
         SegPill(selection: $mode, options: [(.breast, "母乳"), (.formula, "奶粉")])
             .frame(maxWidth: .infinity)
+            .disabled(!isIdle)
+            .opacity(isIdle ? 1 : 0.65)
 
         if mode == .breast {
             breastSection(now: now)
@@ -223,6 +225,8 @@ struct FeedScreen: View {
 
         VStack(spacing: 16) {
             SegPill(selection: $fSub, options: [(.timer, "计时"), (.manual, "手动输入")])
+                .disabled(fPhase != .idle)
+                .opacity(fPhase == .idle ? 1 : 0.65)
 
             if fSub == .timer {
                 VStack(spacing: 14) {
@@ -336,7 +340,7 @@ struct FeedScreen: View {
     // MARK: — History
 
     private var historySection: some View {
-        let history = Array(store.events.filter { $0.kind == .feed }.prefix(20))
+        let history = store.recentEvents(kind: .feed)
         return VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
                 Text("最近记录")

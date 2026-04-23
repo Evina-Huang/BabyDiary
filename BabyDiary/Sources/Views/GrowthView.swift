@@ -102,6 +102,15 @@ struct GrowthView: View {
     private var prev: GrowthPoint? {
         sorted.count >= 2 ? sorted[sorted.count - 2] : nil
     }
+    private var parsedNewWeight: Double? { positiveNumber(wInput) }
+    private var parsedNewHeight: Double? { positiveNumber(hInput) }
+    private var canSubmitMeasurement: Bool {
+        guard wInput.trimmingCharacters(in: .whitespaces).isEmpty || parsedNewWeight != nil else { return false }
+        guard hInput.trimmingCharacters(in: .whitespaces).isEmpty || parsedNewHeight != nil else { return false }
+        guard parsedNewWeight != nil || parsedNewHeight != nil else { return false }
+        return (parsedNewWeight ?? latest?.weightKg) != nil &&
+            (parsedNewHeight ?? latest?.heightCm) != nil
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -407,16 +416,17 @@ struct GrowthView: View {
                         Button(action: submit) {
                             Text("保存")
                                 .font(.system(size: 14, weight: .heavy))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(canSubmitMeasurement ? .white : Palette.ink3)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 14)
-                                .background(store.theme.primary,
+                                .background(canSubmitMeasurement ? store.theme.primary : Palette.bg2,
                                             in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                                .shadowPill(tint: store.theme.primary600)
+                                .shadowPill(tint: canSubmitMeasurement ? store.theme.primary600 : .clear)
                         }
                         .buttonStyle(PressableStyle())
                         .frame(maxWidth: .infinity)
                         .layoutPriority(2)
+                        .disabled(!canSubmitMeasurement)
                     }
                 }
             }
@@ -424,11 +434,9 @@ struct GrowthView: View {
     }
 
     private func submit() {
-        let w = Double(wInput.trimmingCharacters(in: .whitespaces))
-        let h = Double(hInput.trimmingCharacters(in: .whitespaces))
-        guard w != nil || h != nil else { return }
-        let useW = w ?? latest?.weightKg ?? 0
-        let useH = h ?? latest?.heightCm ?? 0
+        guard canSubmitMeasurement,
+              let useW = parsedNewWeight ?? latest?.weightKg,
+              let useH = parsedNewHeight ?? latest?.heightCm else { return }
         let measuredAt = Date()
         store.addGrowth(.init(
             id: "g" + UUID().uuidString.prefix(6).lowercased(),
@@ -439,6 +447,12 @@ struct GrowthView: View {
             headCm: nil))
         wInput = ""; hInput = ""
         withAnimation(.spring()) { adding = false }
+    }
+
+    private func positiveNumber(_ value: String) -> Double? {
+        let trimmed = value.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty, let parsed = Double(trimmed), parsed > 0 else { return nil }
+        return parsed
     }
 
     // MARK: — History

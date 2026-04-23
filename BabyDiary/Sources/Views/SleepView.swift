@@ -30,7 +30,6 @@ struct SleepScreen: View {
         }
         .background(Palette.bg)
         .onAppear(perform: syncDraftFromTimer)
-        .onChange(of: store.activeTimer) { _, _ in syncDraftFromTimer() }
         .onDisappear(perform: handleScreenDisappear)
         .sheet(item: $activePicker) { picker in
             SleepPickerSheet(picker: picker,
@@ -191,7 +190,7 @@ struct SleepScreen: View {
     }
 
     private var historySection: some View {
-        let history = Array(store.events.filter { $0.kind == .sleep }.prefix(20))
+        let history = store.recentEvents(kind: .sleep)
         return VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
                 Text("最近记录")

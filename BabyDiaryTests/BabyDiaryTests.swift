@@ -24,6 +24,21 @@ struct BabyDiaryTests {
         #expect(!store.events.contains(first))
     }
 
+    @Test func recentEventsSortsByEventTime() {
+        let store = AppStore()
+        let cal = Calendar.current
+        let old = cal.date(from: DateComponents(year: 2026, month: 4, day: 20, hour: 8))!
+        let latest = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 8))!
+        let middleOtherKind = cal.date(from: DateComponents(year: 2026, month: 4, day: 21, hour: 8))!
+        store.events = [
+            Event(id: "old", kind: .feed, at: old, title: "奶粉", sub: "90 ml"),
+            Event(id: "diaper", kind: .diaper, at: middleOtherKind, title: "嘘嘘"),
+            Event(id: "latest", kind: .feed, at: latest, title: "奶粉", sub: "120 ml"),
+        ]
+
+        #expect(store.recentEvents(kind: .feed).map(\.id) == ["latest", "old"])
+    }
+
     @Test func deleteSolidEventRemovesFoodEntryWhenLastUse() {
         let store = AppStore()
         let triedAt = Date()
@@ -72,6 +87,43 @@ struct BabyDiaryTests {
         store.updateGrowth(updated)
 
         #expect(store.growth[0].ageMonths == 3)
+    }
+
+    @Test func updateBabyRefreshesBirthDateDerivedData() {
+        let store = AppStore()
+        let cal = Calendar.current
+        let oldBirth = cal.date(from: DateComponents(year: 2026, month: 1, day: 1))!
+        let newBirth = cal.date(from: DateComponents(year: 2026, month: 2, day: 1))!
+        let measured = cal.date(from: DateComponents(year: 2026, month: 4, day: 1))!
+        let oldRecommended = cal.date(byAdding: .month, value: 2, to: oldBirth)!
+        let newRecommended = cal.date(byAdding: .month, value: 2, to: newBirth)!
+        let customDate = cal.date(from: DateComponents(year: 2026, month: 5, day: 5))!
+
+        store.baby.birthDate = oldBirth
+        store.growth = [
+            GrowthPoint(id: "g1", date: measured, ageMonths: 99, weightKg: 6, heightCm: 62, headCm: nil)
+        ]
+        store.vaccines = [
+            Vaccine(id: "v1", name: "推荐疫苗", ageLabel: "2 月龄", ageMonths: 2, scheduledDate: oldRecommended, doneDate: nil),
+            Vaccine(id: "v2", name: "自定义日期疫苗", ageLabel: "3 月龄", ageMonths: 3, scheduledDate: customDate, doneDate: nil),
+        ]
+
+        var baby = store.baby
+        baby.birthDate = newBirth
+        store.updateBaby(baby)
+
+        #expect(store.growth[0].ageMonths == 2)
+        #expect(cal.isDate(store.vaccines.first { $0.id == "v1" }!.scheduledDate!, inSameDayAs: newRecommended))
+        #expect(store.vaccines.first { $0.id == "v2" }!.scheduledDate == customDate)
+    }
+
+    @Test func availableVaccineTemplatesHideLegacyEquivalent() {
+        let store = AppStore()
+        store.vaccines = [
+            Vaccine(id: "legacy_mmr", name: "麻腮风疫苗", ageLabel: "8 月龄", ageMonths: 8, scheduledDate: nil, doneDate: nil)
+        ]
+
+        #expect(!store.availableVaccineTemplates.contains { $0.id == "t_mmr1" })
     }
 
     @Test func toggleVaccineUsesActualCompletionDate() throws {

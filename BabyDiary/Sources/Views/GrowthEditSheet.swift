@@ -30,7 +30,8 @@ struct GrowthEditSheet: View {
     }
 
     private var dateInFuture: Bool {
-        date > Calendar.current.startOfDay(for: Date()).addingTimeInterval(24 * 3600)
+        let cal = Calendar.current
+        return cal.startOfDay(for: date) > cal.startOfDay(for: Date())
     }
 
     private var canSave: Bool {
@@ -47,7 +48,7 @@ struct GrowthEditSheet: View {
                         VStack(alignment: .leading, spacing: 8) {
                             FieldLabel(text: "日期")
                             DatePicker("", selection: $date,
-                                       in: ...Date().addingTimeInterval(24 * 3600),
+                                       in: ...Date(),
                                        displayedComponents: .date)
                                 .labelsHidden()
                                 .datePickerStyle(.compact)

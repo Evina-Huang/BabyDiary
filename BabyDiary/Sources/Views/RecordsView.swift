@@ -20,30 +20,34 @@ struct RecordsView: View {
         return base.sorted { $0.at > $1.at }
     }
 
-    private struct Group: Identifiable {
+    private struct DayGroup: Identifiable {
+        let day: Date
         let label: String
         let items: [Event]
-        var id: String { label }
+        var id: String { String(day.timeIntervalSinceReferenceDate) }
     }
 
-    private var groups: [Group] {
-        var out: [Group] = []
-        var currentLabel: String? = nil
+    private var groups: [DayGroup] {
+        let cal = Calendar.current
+        var out: [DayGroup] = []
+        var currentDay: Date? = nil
         var bucket: [Event] = []
         for e in filteredSorted {
-            let lbl = formatDateLabel(e.at)
-            if currentLabel == nil {
-                currentLabel = lbl
+            let day = cal.startOfDay(for: e.at)
+            if currentDay == nil {
+                currentDay = day
                 bucket = [e]
-            } else if currentLabel == lbl {
+            } else if let currentDay, cal.isDate(day, inSameDayAs: currentDay) {
                 bucket.append(e)
             } else {
-                out.append(.init(label: currentLabel!, items: bucket))
-                currentLabel = lbl
+                out.append(.init(day: currentDay!, label: groupDateLabel(currentDay!), items: bucket))
+                currentDay = day
                 bucket = [e]
             }
         }
-        if let l = currentLabel { out.append(.init(label: l, items: bucket)) }
+        if let currentDay {
+            out.append(.init(day: currentDay, label: groupDateLabel(currentDay), items: bucket))
+        }
         return out
     }
 
@@ -149,7 +153,19 @@ struct RecordsView: View {
         return "\(y) 年 \(m) 月 · 全部"
     }
 
-    private func groupBlock(_ g: Group) -> some View {
+    private func groupDateLabel(_ date: Date) -> String {
+        let cal = Calendar.current
+        if cal.isDateInToday(date) { return "今天" }
+        if cal.isDateInYesterday(date) { return "昨天" }
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "zh_CN")
+        f.dateFormat = cal.isDate(date, equalTo: Date(), toGranularity: .year)
+            ? "M月d日"
+            : "yyyy年M月d日"
+        return f.string(from: date)
+    }
+
+    private func groupBlock(_ g: DayGroup) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             Text(g.label)
                 .font(.system(size: 13, weight: .heavy))

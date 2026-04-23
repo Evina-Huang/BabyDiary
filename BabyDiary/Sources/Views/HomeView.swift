@@ -579,8 +579,7 @@ private struct EditBabyScreen: View {
                         b.birthDate = birthDate
                         b.gender = gender
                         b.avatarData = avatarData
-                        store.baby = b
-                        store.persist()
+                        store.updateBaby(b)
                         onClose()
                     }
                     .padding(.top, 6)

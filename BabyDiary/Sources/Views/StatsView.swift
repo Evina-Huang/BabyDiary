@@ -181,9 +181,12 @@ private struct PatternChart: View {
     private func dayColumn(_ d: Date) -> some View {
         let cal = Calendar.current
         let isToday = cal.isDateInToday(d)
-        let dayEvents = events.filter { cal.isDate($0.at, inSameDayAs: d) && matchesFilter($0) }
-        let sleeps = dayEvents.filter { $0.kind == .sleep && $0.duration != nil }
-        let points = dayEvents.filter { !($0.kind == .sleep && $0.duration != nil) }
+        let sleeps = events.filter {
+            $0.kind == .sleep && $0.duration != nil && matchesFilter($0) && sleepOverlapsDay($0, d)
+        }
+        let points = events.filter {
+            cal.isDate($0.at, inSameDayAs: d) && matchesFilter($0) && !($0.kind == .sleep && $0.duration != nil)
+        }
 
         return VStack(spacing: 6) {
             ZStack(alignment: .topLeading) {
@@ -214,12 +217,11 @@ private struct PatternChart: View {
     @ViewBuilder
     private func sleepBar(for s: Event, on day: Date) -> some View {
         let cal = Calendar.current
-        if let dur = s.duration {
+        if let endAt = s.endAt {
             let dayStart = cal.startOfDay(for: day)
-            let dayEnd = cal.date(byAdding: .day, value: 1, to: dayStart)!.addingTimeInterval(-1)
+            let dayEnd = cal.date(byAdding: .day, value: 1, to: dayStart)!
             let a = max(s.at.timeIntervalSince(dayStart), 0)
-            let end = s.at.addingTimeInterval(dur)
-            let b = min(end.timeIntervalSince(dayStart), dayEnd.timeIntervalSince(dayStart))
+            let b = min(endAt.timeIntervalSince(dayStart), dayEnd.timeIntervalSince(dayStart))
             let topHours = a / 3600
             let durHours = max((b - a) / 3600, 0.1)
             GeometryReader { geo in
@@ -230,6 +232,14 @@ private struct PatternChart: View {
                     .offset(x: 2, y: yOffset(forHour: topHours))
             }
         }
+    }
+
+    private func sleepOverlapsDay(_ s: Event, _ day: Date) -> Bool {
+        guard let endAt = s.endAt else { return false }
+        let cal = Calendar.current
+        let dayStart = cal.startOfDay(for: day)
+        let dayEnd = cal.date(byAdding: .day, value: 1, to: dayStart)!
+        return s.at < dayEnd && endAt > dayStart
     }
 
     private func eventDot(_ e: Event) -> some View {

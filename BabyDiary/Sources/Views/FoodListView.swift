@@ -109,10 +109,14 @@ private struct FoodRow: View {
     @Environment(AppStore.self) private var store
 
     var body: some View {
-        Button(action: onEdit) {
+        if food.isObservationDue {
             rowContent
+        } else {
+            Button(action: onEdit) {
+                rowContent
+            }
+            .buttonStyle(PressableStyle())
         }
-        .buttonStyle(PressableStyle())
     }
 
     private var rowContent: some View {
