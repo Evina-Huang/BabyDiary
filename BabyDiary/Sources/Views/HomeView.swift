@@ -350,7 +350,7 @@ private struct DailySummaryStrip: View {
 
             HStack(spacing: 8) {
                 SummaryCell(tint: Palette.lavender, ink: Palette.lavenderInk,
-                            value: formatDurShort(sleepSec), label: "睡眠")
+                            value: formatDurShort(sleepSec).replacingOccurrences(of: " ", with: ""), label: "睡眠")
                 SummaryCell(tint: Palette.pink, ink: Palette.pinkInk,
                             value: "\(feed)次", label: "喂奶")
                 SummaryCell(tint: Palette.blue, ink: Palette.blueInk,
@@ -370,6 +370,9 @@ private struct DailySummaryStrip: View {
                     .tracking(-0.32)
                     .monospacedDigit()
                     .foregroundStyle(ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+                    .allowsTightening(true)
                 Text(label)
                     .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(ink.opacity(0.75))
