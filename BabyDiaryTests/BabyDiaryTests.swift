@@ -109,6 +109,45 @@ struct BabyDiaryTests {
         #expect(store.recentEvents(kind: .feed).map(\.id) == ["latest", "old"])
     }
 
+    @Test func dailySummarySeparatesBreastAndFormulaTotals() {
+        let store = AppStore()
+        let cal = Calendar.current
+        let day = cal.date(from: DateComponents(year: 2026, month: 4, day: 24, hour: 12))!
+
+        store.events = [
+            Event(id: "breast", kind: .feed, at: cal.date(from: DateComponents(year: 2026, month: 4, day: 24, hour: 7, minute: 30))!, title: "母乳 · 双侧", sub: "右 9分 · 左 8分 · 共 17分"),
+            Event(id: "formula_old", kind: .feed, at: cal.date(from: DateComponents(year: 2026, month: 4, day: 24, hour: 11, minute: 0))!, title: "配方奶", sub: "210 ml · 10:55 - 11:00"),
+            Event(id: "formula_new", kind: .feed, at: cal.date(from: DateComponents(year: 2026, month: 4, day: 24, hour: 15, minute: 0))!, title: "奶粉", sub: "250 ml"),
+            Event(id: "sleep", kind: .sleep, at: cal.date(from: DateComponents(year: 2026, month: 4, day: 24, hour: 12, minute: 20))!, endAt: cal.date(from: DateComponents(year: 2026, month: 4, day: 24, hour: 13, minute: 49))!, title: "睡眠 1时29分", sub: "12:20 - 13:49"),
+            Event(id: "diaper", kind: .diaper, at: cal.date(from: DateComponents(year: 2026, month: 4, day: 24, hour: 16, minute: 20))!, title: "嘘嘘"),
+            Event(id: "solid", kind: .solid, at: cal.date(from: DateComponents(year: 2026, month: 4, day: 24, hour: 18, minute: 0))!, title: "米糊", sub: "30g"),
+        ]
+
+        let summary = store.dailySummary(on: day, now: day)
+
+        #expect(summary.feedCount == 3)
+        #expect(summary.breastCount == 1)
+        #expect(summary.breastDuration == 17 * 60)
+        #expect(summary.formulaCount == 2)
+        #expect(summary.formulaMilliliters == 460)
+        #expect(summary.sleepCount == 1)
+        #expect(summary.sleepDuration == 89 * 60)
+        #expect(summary.diaperCount == 1)
+        #expect(summary.solidCount == 1)
+    }
+
+    @Test func diaperEventTypeParsesExistingTitles() {
+        #expect(DiaperEventType.from(title: "嘘嘘") == .wet)
+        #expect(DiaperEventType.from(title: "臭臭") == .dirty)
+        #expect(DiaperEventType.from(title: "嘘嘘+臭臭") == .both)
+    }
+
+    @Test func diaperNoteOptionsKeepPresetsAndAppendCurrentCustomValue() {
+        #expect(DiaperNotePreset.options(including: nil).contains("奶瓣"))
+        #expect(DiaperNotePreset.options(including: "自定义备注").last == "自定义备注")
+        #expect(DiaperNotePreset.options(including: "稀便").filter { $0 == "稀便" }.count == 1)
+    }
+
     @Test func deleteSolidEventRemovesFoodEntryWhenLastUse() {
         let store = AppStore()
         let triedAt = Date()
@@ -267,6 +306,41 @@ struct BabyDiaryTests {
         let resumed = try! #require(store.activeTimer)
         #expect(resumed.resumedAt == resumedAt)
         #expect(resumed.elapsed(at: end) == 65 * 60)
+    }
+
+    @Test func sleepDurationCountsOnlyTodayPortionForCrossDayRecords() {
+        let store = AppStore()
+        let cal = Calendar.current
+        let day = cal.date(from: DateComponents(year: 2026, month: 4, day: 24, hour: 12))!
+        let overnightStart = cal.date(from: DateComponents(year: 2026, month: 4, day: 23, hour: 23, minute: 30))!
+        let overnightEnd = cal.date(from: DateComponents(year: 2026, month: 4, day: 24, hour: 1, minute: 15))!
+        let napStart = cal.date(from: DateComponents(year: 2026, month: 4, day: 24, hour: 13, minute: 0))!
+        let napEnd = cal.date(from: DateComponents(year: 2026, month: 4, day: 24, hour: 14, minute: 0))!
+
+        store.events = [
+            Event(id: "overnight", kind: .sleep, at: overnightStart, endAt: overnightEnd, title: "睡眠 1时45分", sub: "23:30 - 01:15"),
+            Event(id: "nap", kind: .sleep, at: napStart, endAt: napEnd, title: "睡眠 1时", sub: "13:00 - 14:00"),
+        ]
+
+        #expect(store.sleepDuration(on: day, now: day) == 135 * 60)
+    }
+
+    @Test func sleepDurationCountsRunningSleepAfterMidnight() {
+        let store = AppStore()
+        let cal = Calendar.current
+        let start = cal.date(from: DateComponents(year: 2026, month: 4, day: 23, hour: 23, minute: 30))!
+        let now = cal.date(from: DateComponents(year: 2026, month: 4, day: 24, hour: 1, minute: 0))!
+
+        store.startTimer(kind: .sleep, at: start)
+
+        #expect(store.sleepDuration(on: now, now: now) == 60 * 60)
+    }
+
+    @Test func feedDraftDefaultsMatchFormulaManualEntry() {
+        let draft = FeedDraft()
+
+        #expect(draft.formulaSubMode == .manual)
+        #expect(draft.formulaMilliliters == 210)
     }
 
     @Test func sleepEventTitleUsesDurationFromManualTimes() {

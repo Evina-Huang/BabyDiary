@@ -13,7 +13,6 @@ struct FeedScreen: View {
     enum Side: String, Hashable { case L, R }
 
     @State private var mode: Mode = .breast
-    @State private var saved = false
 
     // Breast sub-mode (timer vs manual)
     @State private var bSub: FormulaSub = .timer
@@ -31,14 +30,16 @@ struct FeedScreen: View {
     @State private var bSessionEnd: Date? = nil
 
     // Formula state
-    @State private var fSub: FormulaSub = .timer
+    @State private var fSub: FormulaSub = .manual
     @State private var fPhase: Phase = .idle
     @State private var fDurMs: TimeInterval = 0
     @State private var fSegStart: Date? = nil
     @State private var fSessionStart: Date? = nil
     @State private var fSessionEnd: Date? = nil
-    @State private var ml: Int = 120
+    @State private var ml: Int = 210
     @State private var time: Date = .now
+
+    private let formulaPresetValues = [120, 150, 180, 210, 240]
 
     var body: some View {
         VStack(spacing: 0) {
@@ -120,8 +121,8 @@ struct FeedScreen: View {
                 StepperInput(value: $bManualMinR, step: 1, min: 0, max: 120, suffix: "分")
             }
             InlineWheelTimePicker(time: $bManualTime, theme: store.theme)
-            CTAButton(title: saved ? "✓ 已保存" : "保存记录",
-                      variant: saved ? .secondary : .primary,
+            CTAButton(title: "保存记录",
+                      variant: .primary,
                       theme: store.theme,
                       action: saveBreastManual)
                 .padding(.top, 4)
@@ -159,8 +160,8 @@ struct FeedScreen: View {
             }
 
             if bPhase != .idle {
-                CTAButton(title: saved ? "✓ 已保存" : "完成,保存",
-                          variant: saved ? .secondary : .primary, theme: store.theme,
+                CTAButton(title: "完成,保存",
+                          variant: .primary, theme: store.theme,
                           action: saveBreast)
                 Button("清空重来") { resetBreast() }
                     .font(.system(size: 13, weight: .bold))
@@ -268,8 +269,8 @@ struct FeedScreen: View {
             } else {
                 mlInput
                 manualTimePicker
-                CTAButton(title: saved ? "✓ 已保存" : "保存记录",
-                          variant: saved ? .secondary : .primary,
+                CTAButton(title: "保存记录",
+                          variant: .primary,
                           theme: store.theme,
                           action: saveFormulaManual)
                     .padding(.top, 4)
@@ -302,8 +303,8 @@ struct FeedScreen: View {
             HStack(spacing: 10) {
                 CTAButton(title: "重来", variant: .ghost, theme: store.theme, action: resetFormula)
                     .frame(maxWidth: .infinity)
-                CTAButton(title: saved ? "✓ 已保存" : "保存记录",
-                          variant: saved ? .secondary : .primary,
+                CTAButton(title: "保存记录",
+                          variant: .primary,
                           theme: store.theme,
                           action: saveFormulaTimer)
                     .frame(maxWidth: .infinity)
@@ -316,18 +317,22 @@ struct FeedScreen: View {
             FieldLabel(text: "奶量 (ml)")
             StepperInput(value: $ml, step: 10, min: 10, max: 300, suffix: "ml")
             HStack(spacing: 8) {
-                ForEach([60, 90, 120, 150, 180], id: \.self) { v in
+                ForEach(formulaPresetValues, id: \.self) { v in
                     Button {
                         ml = v
                     } label: {
                         Text("\(v) ml")
                             .font(.system(size: 13, weight: .bold))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.84)
                             .foregroundStyle(ml == v ? .white : Palette.ink2)
-                            .padding(.horizontal, 14).padding(.vertical, 8)
+                            .frame(maxWidth: .infinity)
+                            .padding(.horizontal, 6).padding(.vertical, 10)
                             .background(ml == v ? store.theme.primary : Palette.bg2,
                                         in: Capsule())
                     }
                     .buttonStyle(PressableStyle())
+                    .frame(maxWidth: .infinity)
                 }
             }
         }
@@ -372,7 +377,7 @@ struct FeedScreen: View {
     private func repeatLast(_ last: Event) {
         let now = Date()
         store.addEvent(.init(kind: .feed, at: now, title: last.title, sub: last.sub))
-        flash()
+        onBack()
     }
 
     private func startOn(_ side: Side) {
@@ -433,7 +438,8 @@ struct FeedScreen: View {
             title = "母乳 · 右侧"; sub = "\(tot)分"
         }
         store.addEvent(.init(kind: .feed, at: start, endAt: end, title: title, sub: sub))
-        resetBreast(); flash()
+        resetBreast()
+        onBack()
     }
 
     private func saveBreastManual() {
@@ -449,8 +455,7 @@ struct FeedScreen: View {
             title = "母乳 · 右侧"; sub = "\(tot)分"
         }
         store.addEvent(.init(kind: .feed, at: bManualTime, endAt: bManualTime, title: title, sub: sub))
-        bManualMinL = 10; bManualMinR = 0; bManualTime = Date()
-        flash()
+        onBack()
     }
 
     private func startFormula() {
@@ -475,16 +480,12 @@ struct FeedScreen: View {
         store.addEvent(.init(kind: .feed, at: e,
                              title: "奶粉",
                              sub: "\(ml) ml · \(hhmm(s)) - \(hhmm(e))"))
-        resetFormula(); flash()
+        resetFormula()
+        onBack()
     }
     private func saveFormulaManual() {
         store.addEvent(.init(kind: .feed, at: time, title: "奶粉", sub: "\(ml) ml"))
-        time = Date(); flash()
-    }
-
-    private func flash() {
-        saved = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { saved = false }
+        onBack()
     }
 
     private var currentDraft: FeedDraft {

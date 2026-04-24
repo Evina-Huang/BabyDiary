@@ -15,7 +15,6 @@ struct SolidScreen: View {
     @State private var unit: Unit = .g
     @State private var time: Date = .now
     @State private var notes: String = ""
-    @State private var saved = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -229,17 +228,17 @@ struct SolidScreen: View {
 
     private var saveButton: some View {
         let enabled = !selectedNames.isEmpty
-        let bg: Color = saved ? Palette.mint : (enabled ? store.theme.primary : Palette.bg2)
-        let fg: Color = (enabled || saved) ? .white : Palette.ink3
+        let bg: Color = enabled ? store.theme.primary : Palette.bg2
+        let fg: Color = enabled ? .white : Palette.ink3
         return Button(action: submit) {
-            Text(saved ? "✓ 已保存" : "保存记录")
+            Text("保存记录")
                 .font(.system(size: 17, weight: .heavy))
                 .tracking(-0.17)
                 .foregroundStyle(fg)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 18)
                 .background(bg, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-                .shadowPill(tint: (enabled || saved) ? bg.opacity(0.9) : .clear)
+                .shadowPill(tint: enabled ? bg.opacity(0.9) : .clear)
         }
         .buttonStyle(PressableStyle())
         .disabled(!enabled)
@@ -297,12 +296,7 @@ struct SolidScreen: View {
         for foodName in selectedNames {
             store.recordSolidFood(foodName, at: time, observationDays: observationDaysMap[foodName] ?? 3)
         }
-        withAnimation { saved = true }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
-            withAnimation { saved = false }
-        }
-        selectedNames = []; observationDaysMap = [:]; customInput = ""; amount = ""; notes = ""
-        time = Date()
+        onBack()
     }
 }
 

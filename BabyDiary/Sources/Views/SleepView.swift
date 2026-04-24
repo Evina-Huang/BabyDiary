@@ -6,7 +6,6 @@ struct SleepScreen: View {
 
     @State private var draftStart: Date = .now
     @State private var draftEnd: Date = .now
-    @State private var saved = false
     @State private var activePicker: SleepPicker?
 
     private var timer: RunningTimer? { store.activeTimer }
@@ -103,8 +102,8 @@ struct SleepScreen: View {
                                   theme: store.theme) {
                             isRunning ? pauseSleep(at: now) : resumeSleep(at: now)
                         }
-                        CTAButton(title: saved ? "✓ 已保存" : "保存记录",
-                                  variant: saved ? .secondary : .primary,
+                        CTAButton(title: "保存记录",
+                                  variant: .primary,
                                   theme: store.theme) {
                             saveSleep(now: now)
                         }
@@ -136,11 +135,8 @@ struct SleepScreen: View {
                                      onPickDate: { activePicker = .startDate },
                                      onPickTime: { activePicker = .startTime })
                     .onChange(of: draftStart) { _, newValue in
-                        if isRunning {
-                            saved = false
-                        } else {
+                        if !isRunning {
                             draftEnd = max(draftEnd, newValue)
-                            saved = false
                         }
                     }
 
@@ -151,7 +147,6 @@ struct SleepScreen: View {
                                      onPickTime: { activePicker = .endTime })
                     .disabled(isRunning)
                     .opacity(isRunning ? 0.65 : 1)
-                    .onChange(of: draftEnd) { _, _ in saved = false }
             }
         }
     }
@@ -227,7 +222,6 @@ struct SleepScreen: View {
     }
 
     private func startSleep(at now: Date) {
-        saved = false
         draftStart = now
         draftEnd = now
         store.startTimer(kind: .sleep, at: now)
@@ -236,7 +230,6 @@ struct SleepScreen: View {
     private func pauseSleep(at now: Date) {
         store.pauseTimer(at: now)
         draftEnd = now
-        saved = false
     }
 
     private func resumeSleep(at now: Date) {
@@ -244,7 +237,6 @@ struct SleepScreen: View {
             draftEnd = now
         }
         store.resumeTimer(at: now)
-        saved = false
     }
 
     private func saveSleep(now: Date) {
@@ -264,8 +256,7 @@ struct SleepScreen: View {
             sub: "\(formatTime(draftStart)) - \(formatTime(draftEnd))"
         ))
         store.stopTimer()
-        saved = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { saved = false }
+        onBack()
     }
 
     private func handleBack() {
@@ -278,7 +269,6 @@ struct SleepScreen: View {
         if store.activeTimer == nil {
             draftStart = .now
             draftEnd = .now
-            saved = false
         }
     }
 
@@ -288,7 +278,6 @@ struct SleepScreen: View {
         }
         draftStart = .now
         draftEnd = .now
-        saved = false
         activePicker = nil
     }
 
