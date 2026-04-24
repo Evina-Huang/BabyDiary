@@ -85,7 +85,8 @@ struct VaccineScreen: View {
         .sheet(isPresented: $showAddCustom) {
             VaccineAddCustomSheet { showAddCustom = false }
                 .environment(store)
-                .presentationDetents([.medium])
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
         }
         .overlay {
             if let vaccine = editingCompleted {
@@ -629,12 +630,15 @@ private struct VaccineAddCustomSheet: View {
     @State private var ageMonths: Int = 6
     @State private var useCustomDate = false
     @State private var scheduled: Date = Date()
+    @FocusState private var nameFocused: Bool
 
     var body: some View {
         NavigationStack {
             Form {
                 Section("疫苗信息") {
                     TextField("疫苗名称", text: $name)
+                        .focused($nameFocused)
+                        .submitLabel(.done)
                     Stepper(value: $ageMonths, in: 0...72) {
                         HStack {
                             Text("推荐月龄")
@@ -673,7 +677,14 @@ private struct VaccineAddCustomSheet: View {
                     }
                     .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("完成") {
+                        nameFocused = false
+                    }
+                }
             }
+            .scrollDismissesKeyboard(.interactively)
         }
     }
 }

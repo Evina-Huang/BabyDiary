@@ -1,10 +1,11 @@
 import SwiftUI
 
 // Edit sheet for existing events. Field structure mirrors each add flow:
-// diaper is a type picker, feed (breast) is side + minutes, feed (formula)
-// is ml, sleep is start+end, solid is name + amount stepper + notes. Title
-// and sub strings are always rebuilt from the structured inputs — never
-// free-text-edited — to match the new-record experience.
+// diaper is a type picker + optional stool note, feed (breast) is side +
+// minutes, feed (formula) is ml, sleep is start+end, solid is name + amount
+// stepper + notes. Title and sub strings are always rebuilt from the
+// structured inputs — never free-text-edited — to match the new-record
+// experience.
 struct EventEditSheet: View {
     private enum ExpandedTimeField {
         case start
@@ -28,12 +29,8 @@ struct EventEditSheet: View {
     @State private var endAt: Date
 
     // Diaper
-    enum DType: String, Hashable, CaseIterable { case wet, dirty, both
-        var label: String { self == .wet ? "嘘嘘" : self == .dirty ? "臭臭" : "嘘嘘+臭臭" }
-        var sub: String { "" }
-        var emoji: String { self == .wet ? "💧" : self == .dirty ? "💩" : "💧💩" }
-    }
-    @State private var dType: DType = .wet
+    @State private var dType: DiaperEventType = .wet
+    @State private var diaperNote: String = ""
 
     // Feed
     enum FeedMode: String, Hashable { case breast, formula }
@@ -72,13 +69,11 @@ struct EventEditSheet: View {
         // Parse existing data per kind
         switch event.kind {
         case .diaper:
-            if event.title.contains("嘘嘘") || (event.title.contains("湿") && !event.title.contains("便")) {
-                _dType = .init(initialValue: event.title.contains("臭") ? .both : .wet)
-            }
-            else if event.title.contains("臭") || event.title == "便便" || event.title.contains("便") && !event.title.contains("两") { _dType = .init(initialValue: .dirty) }
-            else { _dType = .init(initialValue: .both) }
+            let parsedType = DiaperEventType.from(title: event.title)
+            _dType = .init(initialValue: parsedType)
+            _diaperNote = .init(initialValue: parsedType.allowsNote ? (event.sub ?? "") : "")
         case .feed:
-            let isFormula = event.title.contains("奶粉")
+            let isFormula = event.title.contains("奶粉") || event.title.contains("配方奶")
             _feedMode = .init(initialValue: isFormula ? .formula : .breast)
             if isFormula {
                 _ml = .init(initialValue: Self.firstInt(in: event.sub ?? "") ?? 120)
@@ -222,8 +217,13 @@ struct EventEditSheet: View {
     private var diaperForm: some View {
         VStack(alignment: .leading, spacing: 10) {
             FieldLabel(text: "类型")
-            ForEach(DType.allCases, id: \.self) { o in
-                Button { dType = o } label: {
+            ForEach(DiaperEventType.allCases, id: \.self) { o in
+                Button {
+                    dType = o
+                    if !o.allowsNote {
+                        diaperNote = ""
+                    }
+                } label: {
                     HStack(spacing: 12) {
                         Text(o.emoji).font(.system(size: 20))
                             .frame(width: 36, height: 36)
@@ -232,9 +232,11 @@ struct EventEditSheet: View {
                             Text(o.label)
                                 .font(.system(size: 14, weight: .heavy))
                                 .foregroundStyle(Palette.ink)
-                            Text(o.sub)
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(Palette.ink3)
+                            if !o.subtitle.isEmpty {
+                                Text(o.subtitle)
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(Palette.ink3)
+                            }
                         }
                         Spacer(minLength: 0)
                         Circle()
@@ -250,6 +252,52 @@ struct EventEditSheet: View {
                 }
                 .buttonStyle(PressableStyle())
             }
+
+            if dType.allowsNote {
+                diaperNotePicker
+                    .padding(.top, 4)
+            }
+        }
+    }
+
+    private var diaperNotePicker: some View {
+        let noteOptions = DiaperNotePreset.options(including: diaperNote)
+        let columns = [GridItem(.adaptive(minimum: 84), spacing: 8)]
+
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                FieldLabel(text: "备注")
+                if !diaperNote.isEmpty {
+                    Button("清空") { diaperNote = "" }
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(Palette.ink3)
+                        .buttonStyle(.plain)
+                }
+            }
+
+            LazyVGrid(columns: columns, alignment: .leading, spacing: 8) {
+                ForEach(noteOptions, id: \.self) { note in
+                    let on = diaperNote == note
+                    Button {
+                        diaperNote = on ? "" : note
+                    } label: {
+                        Text(note)
+                            .font(.system(size: 13, weight: .heavy))
+                            .tracking(-0.13)
+                            .foregroundStyle(on ? Palette.yellowInk : Palette.ink2)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(on ? Palette.yellow : Palette.bg2, in: Capsule())
+                    }
+                    .buttonStyle(PressableStyle())
+                }
+            }
+
+            TextField("自己填写", text: $diaperNote)
+                .font(.system(size: 16, weight: .semibold))
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
     }
 
@@ -553,7 +601,8 @@ struct EventEditSheet: View {
         switch original.kind {
         case .diaper:
             e.title = dType.label
-            e.sub = dType.sub
+            let trimmedNote = diaperNote.trimmingCharacters(in: .whitespacesAndNewlines)
+            e.sub = dType.allowsNote && !trimmedNote.isEmpty ? trimmedNote : nil
         case .feed:
             if feedMode == .breast {
                 e.title = "母乳 · \(breastSide.label)"
@@ -568,7 +617,7 @@ struct EventEditSheet: View {
                     e.sub = "\(first) · 共 \(total)分"
                 }
             } else {
-                e.title = "奶粉"
+                e.title = original.title.contains("配方奶") ? "配方奶" : "奶粉"
                 e.sub = "\(ml) ml"
             }
         case .solid:

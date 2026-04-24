@@ -155,13 +155,19 @@ struct RecordsView: View {
     }
 
     private func groupBlock(_ g: DayGroup) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
+        let summary = store.dailySummary(on: g.day)
+        return VStack(alignment: .leading, spacing: 0) {
             Text(g.label)
                 .font(.system(size: 13, weight: .heavy))
                 .tracking(0.52)
                 .foregroundStyle(Palette.ink3)
                 .padding(.horizontal, 6)
                 .padding(.bottom, 8)
+            if !summary.isEmpty {
+                DailySummaryText(summary: summary)
+                    .padding(.horizontal, 6)
+                    .padding(.bottom, 10)
+            }
             Card(padding: 0) {
                 VStack(spacing: 0) {
                     ForEach(Array(g.items.enumerated()), id: \.element.id) { i, e in
@@ -171,6 +177,75 @@ struct RecordsView: View {
                                  onEdit: { editing = $0 })
                             .padding(.horizontal, 16)
                     }
+                }
+            }
+        }
+    }
+}
+
+private struct DailySummaryText: View {
+    let summary: DailyEventSummary
+
+    private struct Item: Identifiable {
+        let id: String
+        let title: String
+        let color: Color
+    }
+
+    private var items: [Item] {
+        var rows: [Item] = []
+        if summary.breastCount > 0 {
+            rows.append(.init(
+                id: "breast",
+                title: "母乳 \(summary.breastCount)次 \(formatDurShort(summary.breastDuration))",
+                color: Palette.pinkInk
+            ))
+        }
+        if summary.formulaCount > 0 {
+            rows.append(.init(
+                id: "formula",
+                title: "奶粉 \(summary.formulaCount)次 \(summary.formulaMilliliters)ml",
+                color: Color(hex: 0xFF8B7B)
+            ))
+        }
+        if summary.sleepCount > 0 {
+            rows.append(.init(
+                id: "sleep",
+                title: "睡眠 \(summary.sleepCount)次 \(formatDurShort(summary.sleepDuration))",
+                color: Palette.lavenderInk
+            ))
+        }
+        if summary.diaperCount > 0 {
+            rows.append(.init(
+                id: "diaper",
+                title: "换尿布 \(summary.diaperCount)次",
+                color: Palette.blueInk
+            ))
+        }
+        if summary.solidCount > 0 {
+            rows.append(.init(
+                id: "solid",
+                title: "辅食 \(summary.solidCount)次",
+                color: Palette.yellowInk
+            ))
+        }
+        return rows
+    }
+
+    var body: some View {
+        let columns = Array(repeating: GridItem(.flexible(), alignment: .leading), count: 2)
+
+        LazyVGrid(columns: columns, alignment: .leading, spacing: 8) {
+            ForEach(items) { item in
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(item.color)
+                        .frame(width: 6, height: 6)
+                    Text(item.title)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Palette.ink2)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.86)
                 }
             }
         }

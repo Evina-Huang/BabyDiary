@@ -1,9 +1,21 @@
 import SwiftUI
 
+fileprivate enum FloatingDockMetrics {
+    static let width: CGFloat = 208
+    static let horizontalInset: CGFloat = 18
+    static let topInset: CGFloat = 12
+    static let bottomInset: CGFloat = 92
+}
+
 struct ContentView: View {
     @Environment(AppStore.self) private var store
     @State private var tab: MainTab = .home
     @State private var sub: SubScreen? = nil
+    @State private var dockSide: FloatingDockSide = .right
+    @State private var dockY: CGFloat? = nil
+    @State private var dockSize: CGSize = .zero
+    @State private var suppressDockOpen = false
+    @GestureState private var dockDragTranslation: CGSize = .zero
 
     var body: some View {
         Group {
@@ -17,30 +29,67 @@ struct ContentView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Palette.bg.ignoresSafeArea())
-        .overlay(alignment: .bottomTrailing) {
-            VStack(alignment: .trailing, spacing: 10) {
-                if let feedDraft = store.feedDraft,
-                   feedDraft.hasActiveState,
-                   sub != .feed {
-                    ActiveFeedDock(draft: feedDraft,
-                                   theme: store.theme,
-                                   onOpen: { sub = .feed },
-                                   onClose: { store.syncFeedDraft(nil) })
-                        .transition(.move(edge: .trailing).combined(with: .opacity))
-                }
+        .overlay {
+            GeometryReader { proxy in
+                if hasFloatingDock {
+                    let displayedOrigin = displayedDockOrigin(in: proxy.size)
+                    VStack(alignment: .trailing, spacing: 10) {
+                        if let feedDraft = store.feedDraft,
+                           feedDraft.hasActiveState,
+                           sub != .feed {
+                            ActiveFeedDock(draft: feedDraft,
+                                           theme: store.theme,
+                                           onOpen: {
+                                               guard !suppressDockOpen else { return }
+                                               sub = .feed
+                                           },
+                                           onClose: { store.syncFeedDraft(nil) })
+                                .transition(.move(edge: .trailing).combined(with: .opacity))
+                        }
 
-                if let timer = store.activeTimer,
-                   timer.kind == .sleep,
-                   sub != .sleep {
-                    ActiveSleepDock(timer: timer,
-                                    theme: store.theme,
-                                    onOpen: { sub = .sleep },
-                                    onClose: { store.stopTimer() })
-                        .transition(.move(edge: .trailing).combined(with: .opacity))
+                        if let timer = store.activeTimer,
+                           timer.kind == .sleep,
+                           sub != .sleep {
+                            ActiveSleepDock(timer: timer,
+                                            theme: store.theme,
+                                            onOpen: {
+                                                guard !suppressDockOpen else { return }
+                                                sub = .sleep
+                                            },
+                                            onClose: { store.stopTimer() })
+                                .transition(.move(edge: .trailing).combined(with: .opacity))
+                        }
+                    }
+                    .background(
+                        GeometryReader { geo in
+                            Color.clear
+                                .preference(key: FloatingDockSizeKey.self, value: geo.size)
+                        }
+                    )
+                    .onPreferenceChange(FloatingDockSizeKey.self) { newSize in
+                        dockSize = newSize
+                        dockY = clampedDockOrigin(
+                            CGPoint(x: 0, y: dockY ?? defaultDockOrigin(in: proxy.size).y),
+                            in: proxy.size
+                        ).y
+                    }
+                    .offset(x: displayedOrigin.x, y: displayedOrigin.y)
+                    .highPriorityGesture(dockDragGesture(in: proxy.size))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .onAppear {
+                        dockY = clampedDockOrigin(
+                            CGPoint(x: 0, y: dockY ?? defaultDockOrigin(in: proxy.size).y),
+                            in: proxy.size
+                        ).y
+                    }
+                    .onChange(of: proxy.size) { _, newSize in
+                        dockY = clampedDockOrigin(
+                            CGPoint(x: 0, y: dockY ?? defaultDockOrigin(in: newSize).y),
+                            in: newSize
+                        ).y
+                    }
                 }
             }
-            .padding(.trailing, 18)
-            .padding(.bottom, 92)
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             AppTabBar(tab: $tab)
@@ -77,6 +126,8 @@ struct ContentView: View {
             sub = .sleep
         case BabyDiaryDestination.feed.rawValue:
             sub = .feed
+        case BabyDiaryDestination.diaper.rawValue:
+            sub = .diaper
         case BabyDiaryDestination.records.rawValue:
             tab = .records
             sub = nil
@@ -85,6 +136,105 @@ struct ContentView: View {
             sub = nil
         }
     }
+
+    private var hasFloatingDock: Bool {
+        (store.feedDraft?.hasActiveState == true && sub != .feed) ||
+        ((store.activeTimer?.kind == .sleep) && sub != .sleep)
+    }
+
+    private func displayedDockOrigin(in containerSize: CGSize) -> CGPoint {
+        let base = clampedDockOrigin(
+            CGPoint(
+                x: dockSide == .left ? horizontalLimits(in: containerSize).lowerBound : horizontalLimits(in: containerSize).upperBound,
+                y: dockY ?? defaultDockOrigin(in: containerSize).y
+            ),
+            in: containerSize
+        )
+        return clampedDockOrigin(
+            CGPoint(x: base.x + dockDragTranslation.width,
+                    y: base.y + dockDragTranslation.height),
+            in: containerSize
+        )
+    }
+
+    private func dockDragGesture(in containerSize: CGSize) -> some Gesture {
+        DragGesture(minimumDistance: 6)
+            .updating($dockDragTranslation) { value, state, _ in
+                state = value.translation
+            }
+            .onChanged { value in
+                if isDockDrag(value.translation) {
+                    suppressDockOpen = true
+                }
+            }
+            .onEnded { value in
+                let base = clampedDockOrigin(
+                    CGPoint(
+                        x: dockSide == .left ? horizontalLimits(in: containerSize).lowerBound : horizontalLimits(in: containerSize).upperBound,
+                        y: dockY ?? defaultDockOrigin(in: containerSize).y
+                    ),
+                    in: containerSize
+                )
+                let clamped = clampedDockOrigin(
+                    CGPoint(
+                        x: base.x + value.translation.width,
+                        y: base.y + value.translation.height
+                    ),
+                    in: containerSize
+                )
+                withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
+                    dockSide = snappedDockSide(in: containerSize, origin: clamped)
+                    dockY = clamped.y
+                }
+                if isDockDrag(value.translation) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                        suppressDockOpen = false
+                    }
+                } else {
+                    suppressDockOpen = false
+                }
+            }
+    }
+
+    private func isDockDrag(_ translation: CGSize) -> Bool {
+        max(abs(translation.width), abs(translation.height)) > 8
+    }
+
+    private func defaultDockOrigin(in containerSize: CGSize) -> CGPoint {
+        CGPoint(
+            x: horizontalLimits(in: containerSize).upperBound,
+            y: verticalLimits(in: containerSize).upperBound
+        )
+    }
+
+    private func clampedDockOrigin(_ origin: CGPoint, in containerSize: CGSize) -> CGPoint {
+        CGPoint(
+            x: min(horizontalLimits(in: containerSize).upperBound, max(horizontalLimits(in: containerSize).lowerBound, origin.x)),
+            y: min(verticalLimits(in: containerSize).upperBound, max(verticalLimits(in: containerSize).lowerBound, origin.y))
+        )
+    }
+
+    private func snappedDockSide(in containerSize: CGSize, origin: CGPoint) -> FloatingDockSide {
+        let xLimits = horizontalLimits(in: containerSize)
+        return origin.x <= (xLimits.lowerBound + xLimits.upperBound) / 2 ? .left : .right
+    }
+
+    private func horizontalLimits(in containerSize: CGSize) -> ClosedRange<CGFloat> {
+        let minX = FloatingDockMetrics.horizontalInset
+        let maxX = max(minX, containerSize.width - FloatingDockMetrics.width - FloatingDockMetrics.horizontalInset)
+        return minX...maxX
+    }
+
+    private func verticalLimits(in containerSize: CGSize) -> ClosedRange<CGFloat> {
+        let minY = FloatingDockMetrics.topInset
+        let maxY = max(minY, containerSize.height - dockSize.height - FloatingDockMetrics.bottomInset)
+        return minY...maxY
+    }
+}
+
+private enum FloatingDockSide {
+    case left
+    case right
 }
 
 private struct ActiveSleepDock: View {
@@ -145,8 +295,9 @@ private struct ActiveSleepDock: View {
                             .stroke(Color.white.opacity(0.5), lineWidth: 1)
                     )
                     .shadow(color: theme.primary.opacity(0.12), radius: 18, x: 0, y: 10)
+                    .frame(width: FloatingDockMetrics.width, alignment: .leading)
                 }
-                .buttonStyle(PressableStyle())
+                .buttonStyle(.plain)
 
                 Button(action: onClose) {
                     Image(systemName: "xmark")
@@ -159,6 +310,7 @@ private struct ActiveSleepDock: View {
                 .padding(.top, 7)
                 .padding(.trailing, 7)
             }
+            .frame(width: FloatingDockMetrics.width, alignment: .leading)
         }
     }
 }
@@ -219,8 +371,9 @@ private struct ActiveFeedDock: View {
                             .stroke(Color.white.opacity(0.5), lineWidth: 1)
                     )
                     .shadow(color: theme.primary.opacity(0.12), radius: 18, x: 0, y: 10)
+                    .frame(width: FloatingDockMetrics.width, alignment: .leading)
                 }
-                .buttonStyle(PressableStyle())
+                .buttonStyle(.plain)
 
                 Button(action: onClose) {
                     Image(systemName: "xmark")
@@ -233,6 +386,7 @@ private struct ActiveFeedDock: View {
                 .padding(.top, 7)
                 .padding(.trailing, 7)
             }
+            .frame(width: FloatingDockMetrics.width, alignment: .leading)
         }
     }
 
@@ -278,6 +432,14 @@ private struct DockPulseDot: View {
             .scaleEffect(on ? 0.8 : 1.0)
             .animation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true), value: on)
             .onAppear { on = true }
+    }
+}
+
+private struct FloatingDockSizeKey: PreferenceKey {
+    static var defaultValue: CGSize = .zero
+
+    static func reduce(value: inout CGSize, nextValue: () -> CGSize) {
+        value = nextValue()
     }
 }
 

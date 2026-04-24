@@ -48,6 +48,23 @@ final class AppStore {
         )
     }
 
+    static func screenshotTodayEvents(on date: Date = Date(), calendar cal: Calendar = .current) -> [Event] {
+        func today(_ h: Int, _ m: Int) -> Date {
+            cal.date(bySettingHour: h, minute: m, second: 0, of: date)!
+        }
+
+        return [
+            .init(id: "e_today_1904", kind: .feed,   at: today(19, 4), endAt: today(19, 11), title: "母乳 · 双侧", sub: "右 4分 · 左 3分 · 共 7分"),
+            .init(id: "e_today_1632", kind: .sleep,  at: today(16, 32), endAt: today(18, 3),  title: "睡眠 1时 31分", sub: "16:32 - 18:03"),
+            .init(id: "e_today_1623", kind: .diaper, at: today(16, 23), title: "臭臭", sub: "奶瓣"),
+            .init(id: "e_today_1505", kind: .feed,   at: today(15, 5), endAt: today(15, 13), title: "配方奶", sub: "230 ml · 15:05 - 15:13"),
+            .init(id: "e_today_1220", kind: .sleep,  at: today(12, 20), endAt: today(13, 49), title: "睡眠 1时 29分", sub: "12:20 - 13:49"),
+            .init(id: "e_today_1104", kind: .feed,   at: today(11, 4), endAt: today(11, 11), title: "配方奶", sub: "230 ml · 11:04 - 11:11"),
+            .init(id: "e_today_0714", kind: .sleep,  at: today(7, 14), endAt: today(9, 55),  title: "睡眠 2时 41分", sub: "07:14 - 09:55"),
+            .init(id: "e_today_0604", kind: .feed,   at: today(6, 4), endAt: today(6, 14),  title: "母乳 · 双侧", sub: "左 5分 · 右 5分 · 共 10分"),
+        ]
+    }
+
     func addEvent(_ e: Event) {
         events.insert(e, at: 0)
         persist()
@@ -58,6 +75,55 @@ final class AppStore {
             .filter { $0.kind == kind }
             .sorted { $0.at > $1.at }
             .prefix(limit))
+    }
+
+    func dailySummary(on day: Date, now: Date = Date()) -> DailyEventSummary {
+        let cal = Calendar.current
+        let interval = dayInterval(for: day)
+        var summary = DailyEventSummary()
+
+        for event in events {
+            switch event.kind {
+            case .feed:
+                guard cal.isDate(event.at, inSameDayAs: day) else { continue }
+                summary.feedCount += 1
+                if isFormulaFeed(event) {
+                    summary.formulaCount += 1
+                    summary.formulaMilliliters += formulaMilliliters(for: event)
+                } else if isBreastFeed(event) {
+                    summary.breastCount += 1
+                    summary.breastDuration += breastDuration(for: event)
+                }
+            case .diaper:
+                guard cal.isDate(event.at, inSameDayAs: day) else { continue }
+                summary.diaperCount += 1
+            case .solid:
+                guard cal.isDate(event.at, inSameDayAs: day) else { continue }
+                summary.solidCount += 1
+            case .sleep:
+                let overlap = sleepOverlapDuration(for: event, in: interval)
+                if overlap > 0 {
+                    summary.sleepCount += 1
+                    summary.sleepDuration += overlap
+                }
+            }
+        }
+
+        let activeSleep = activeSleepDuration(in: interval, now: now)
+        if activeSleep > 0 {
+            summary.sleepCount += 1
+            summary.sleepDuration += activeSleep
+        }
+
+        return summary
+    }
+
+    func sleepDuration(on day: Date, now: Date = Date()) -> TimeInterval {
+        let interval = dayInterval(for: day)
+        let loggedSleep = events.reduce(0) { partialResult, event in
+            partialResult + sleepOverlapDuration(for: event, in: interval)
+        }
+        return loggedSleep + activeSleepDuration(in: interval, now: now)
     }
 
     func deleteEvent(_ e: Event) {
@@ -276,6 +342,65 @@ final class AppStore {
         return out
     }
 
+    private func dayInterval(for day: Date) -> DateInterval {
+        let dayStart = Calendar.current.startOfDay(for: day)
+        let dayEnd = Calendar.current.date(byAdding: .day, value: 1, to: dayStart) ?? dayStart
+        return DateInterval(start: dayStart, end: dayEnd)
+    }
+
+    private func sleepOverlapDuration(for event: Event, in interval: DateInterval) -> TimeInterval {
+        guard event.kind == .sleep, let endAt = event.endAt else { return 0 }
+        let overlapStart = Swift.max(event.at, interval.start)
+        let overlapEnd = Swift.min(endAt, interval.end)
+        return Swift.max(0, overlapEnd.timeIntervalSince(overlapStart))
+    }
+
+    private func activeSleepDuration(in interval: DateInterval, now: Date) -> TimeInterval {
+        guard let activeTimer, activeTimer.kind == .sleep else { return 0 }
+        let nowCapped = Swift.min(now, interval.end)
+
+        if activeTimer.startedAt >= interval.start, activeTimer.startedAt < interval.end {
+            return activeTimer.elapsed(at: nowCapped)
+        }
+
+        guard let resumedAt = activeTimer.resumedAt else { return 0 }
+        return Swift.max(0, nowCapped.timeIntervalSince(Swift.max(resumedAt, interval.start)))
+    }
+
+    private func isFormulaFeed(_ event: Event) -> Bool {
+        guard event.kind == .feed else { return false }
+        return event.title.contains("奶粉") || event.title.contains("配方奶")
+    }
+
+    private func isBreastFeed(_ event: Event) -> Bool {
+        event.kind == .feed && event.title.contains("母乳")
+    }
+
+    private func formulaMilliliters(for event: Event) -> Int {
+        firstCapturedInt(in: event.sub, pattern: #"(\d+)\s*ml"#) ?? 0
+    }
+
+    private func breastDuration(for event: Event) -> TimeInterval {
+        guard isBreastFeed(event) else { return 0 }
+        if let totalMinutes = firstCapturedInt(in: event.sub, pattern: #"共\s*(\d+)\s*分"#)
+            ?? firstCapturedInt(in: event.sub, pattern: #"(\d+)\s*分"#) {
+            return TimeInterval(totalMinutes * 60)
+        }
+        return max(0, event.duration ?? 0)
+    }
+
+    private func firstCapturedInt(in text: String?, pattern: String) -> Int? {
+        guard let text else { return nil }
+        let range = NSRange(text.startIndex..., in: text)
+        guard let regex = try? NSRegularExpression(pattern: pattern),
+              let match = regex.firstMatch(in: text, range: range),
+              match.numberOfRanges > 1,
+              let valueRange = Range(match.range(at: 1), in: text) else {
+            return nil
+        }
+        return Int(text[valueRange])
+    }
+
     func addGrowth(_ g: GrowthPoint) {
         var newPoint = g
         newPoint.ageMonths = ageMonths(on: newPoint.date)
@@ -431,19 +556,10 @@ final class AppStore {
             return d
         }
 
-        events = [
-            .init(id: "e1",  kind: .feed,   at: at(1, 15), title: "母乳 · 左侧", sub: "18分"),
-            .init(id: "e2",  kind: .diaper, at: at(2, 5),  title: "嘘嘘", sub: ""),
-            .init(id: "e3",  kind: .sleep,  at: at(4, 30), endAt: at(2, 45), title: "睡眠 1时 45分", sub: nil),
-            .init(id: "e4",  kind: .solid,  at: at(5, 0),  title: "南瓜泥", sub: "50g · 第一次吃"),
-            .init(id: "e5",  kind: .feed,   at: at(6, 20), title: "奶粉", sub: "120 ml"),
-            .init(id: "e6",  kind: .diaper, at: at(7, 40), title: "嘘嘘+臭臭", sub: ""),
-            .init(id: "e7",  kind: .sleep,  at: daysAgo(1, 22), endAt: daysAgo(0, 6, 30), title: "睡眠 8时 30分", sub: "22:00 - 06:30"),
-            .init(id: "e8",  kind: .feed,   at: daysAgo(1, 14), title: "母乳 · 右侧", sub: "22分"),
-            .init(id: "e9",  kind: .solid,  at: daysAgo(1, 12), title: "米糊", sub: "30g"),
-            .init(id: "e10", kind: .diaper, at: daysAgo(1, 9),  title: "嘘嘘", sub: ""),
-            .init(id: "e11", kind: .feed,   at: daysAgo(2, 8),  title: "奶粉", sub: "150 ml"),
-            .init(id: "e12", kind: .sleep,  at: daysAgo(2, 13), endAt: daysAgo(2, 15), title: "睡眠 2时 0分", sub: "13:00 - 15:00"),
+        events = Self.screenshotTodayEvents(on: now, calendar: cal) + [
+            .init(id: "e_yesterday_1400", kind: .feed, at: daysAgo(1, 14), title: "母乳 · 右侧", sub: "22分"),
+            .init(id: "e_yesterday_1200", kind: .solid, at: daysAgo(1, 12), title: "米糊", sub: "30g"),
+            .init(id: "e_yesterday_0900", kind: .diaper, at: daysAgo(1, 9), title: "嘘嘘", sub: ""),
         ]
 
         let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"
@@ -507,6 +623,22 @@ final class AppStore {
     }
 }
 
+struct DailyEventSummary: Equatable {
+    var feedCount: Int = 0
+    var breastCount: Int = 0
+    var breastDuration: TimeInterval = 0
+    var formulaCount: Int = 0
+    var formulaMilliliters: Int = 0
+    var sleepCount: Int = 0
+    var sleepDuration: TimeInterval = 0
+    var diaperCount: Int = 0
+    var solidCount: Int = 0
+
+    var isEmpty: Bool {
+        breastCount == 0 && formulaCount == 0 && sleepCount == 0 && diaperCount == 0 && solidCount == 0
+    }
+}
+
 // Sub-screens launched from the Home screen as iOS sheets.
 // Represents an in-progress, user-initiated timer (sleep today; feed later).
 // Modeled so a future Live Activity / Widget can serialize exactly this shape.
@@ -539,13 +671,13 @@ struct FeedDraft: Equatable, Codable {
     var breastSessionStart: Date? = nil
     var breastSessionEnd: Date? = nil
 
-    var formulaSubMode: FeedDraftSubMode = .timer
+    var formulaSubMode: FeedDraftSubMode = .manual
     var formulaPhase: FeedDraftPhase = .idle
     var formulaDuration: TimeInterval = 0
     var formulaSegmentStart: Date? = nil
     var formulaSessionStart: Date? = nil
     var formulaSessionEnd: Date? = nil
-    var formulaMilliliters: Int = 120
+    var formulaMilliliters: Int = 210
     var formulaTime: Date = .now
 
     var hasActiveState: Bool {

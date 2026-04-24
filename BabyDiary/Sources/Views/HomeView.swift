@@ -63,6 +63,7 @@ struct HomeView: View {
                     .padding(.top, 14)
 
             }
+            .scrollBounceBehavior(.basedOnSize)
         }
         .background(Palette.bg)
     }
@@ -337,41 +338,56 @@ private struct DailySummaryStrip: View {
     @Environment(AppStore.self) private var store
     var body: some View {
         TimelineView(.periodic(from: .now, by: 30)) { ctx in
-            let cal = Calendar.current
-            let todays = store.events.filter { cal.isDateInToday($0.at) }
-            let feed = todays.filter { $0.kind == .feed }.count
-            let diaper = todays.filter { $0.kind == .diaper }.count
-            let solid = todays.filter { $0.kind == .solid }.count
-            let sleepSec: TimeInterval = todays
-                .filter { $0.kind == .sleep }
-                .compactMap(\.duration)
-                .reduce(0, +) + (store.activeTimer.map { $0.elapsed(at: ctx.date) } ?? 0)
+            let summary = store.dailySummary(on: ctx.date, now: ctx.date)
 
             HStack(spacing: 8) {
                 SummaryCell(tint: Palette.lavender, ink: Palette.lavenderInk,
-                            value: formatDurShort(sleepSec), label: "睡眠")
+                            value: formatDurShort(summary.sleepDuration).replacingOccurrences(of: " ", with: ""),
+                            label: "睡眠")
                 SummaryCell(tint: Palette.pink, ink: Palette.pinkInk,
-                            value: "\(feed)次", label: "喂奶")
+                            value: "\(summary.feedCount)次",
+                            label: "喂奶",
+                            detail: "奶粉\(summary.formulaMilliliters)ml")
                 SummaryCell(tint: Palette.blue, ink: Palette.blueInk,
-                            value: "\(diaper)次", label: "尿布")
+                            value: "\(summary.diaperCount)次", label: "尿布")
                 SummaryCell(tint: Palette.yellow, ink: Palette.yellowInk,
-                            value: "\(solid)次", label: "辅食")
+                            value: "\(summary.solidCount)次", label: "辅食")
             }
         }
     }
 
     private struct SummaryCell: View {
-        let tint: Color, ink: Color, value: String, label: String
+        let tint: Color
+        let ink: Color
+        let value: String
+        let label: String
+        var detail: String? = nil
+
         var body: some View {
-            VStack(spacing: 2) {
+            VStack(spacing: 3) {
                 Text(value)
                     .font(.system(size: 16, weight: .black))
                     .tracking(-0.32)
                     .monospacedDigit()
                     .foregroundStyle(ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+                    .allowsTightening(true)
                 Text(label)
                     .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(ink.opacity(0.75))
+                if let detail {
+                    Text(detail)
+                        .font(.system(size: 9, weight: .bold))
+                        .monospacedDigit()
+                        .foregroundStyle(ink.opacity(0.72))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                } else {
+                    Text(" ")
+                        .font(.system(size: 9, weight: .bold))
+                        .hidden()
+                }
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 10).padding(.horizontal, 6)
