@@ -23,6 +23,7 @@ struct FeedScreen: View {
     // Breast timer state
     @State private var bPhase: Phase = .idle
     @State private var bActive: Side = .L
+    @State private var bFirstSide: Side? = nil
     @State private var bLeftMs: TimeInterval = 0
     @State private var bRightMs: TimeInterval = 0
     @State private var bSegStart: Date? = nil
@@ -61,7 +62,32 @@ struct FeedScreen: View {
     }
 
     private var lastFeed: Event? {
-        store.events.filter { $0.kind == .feed }.max(by: { $0.at < $1.at })
+        store.mostRecentEvent(kind: .feed)
+    }
+
+    private var lastBreastFeed: Event? {
+        store.mostRecentBreastFeedEvent()
+    }
+
+    private var recommendedBreastSide: Side {
+        guard let endingSide = lastBreastFeed?.breastEndingSide else { return .L }
+        return endingSide == .right ? .R : .L
+    }
+
+    private func restoredFirstSide(from draft: FeedDraft) -> Side? {
+        if let firstSide = draft.breastFirstSide {
+            return firstSide == .left ? .L : .R
+        }
+        if draft.breastLeftDuration == 0, draft.breastRightDuration == 0 {
+            return draft.breastActiveSide == .left ? .L : .R
+        }
+        if draft.breastLeftDuration == 0 {
+            return .R
+        }
+        if draft.breastRightDuration == 0 {
+            return .L
+        }
+        return nil
     }
 
     @ViewBuilder
@@ -132,7 +158,7 @@ struct FeedScreen: View {
     @ViewBuilder
     private func breastTimerBlock(liveL: TimeInterval, liveR: TimeInterval, total: TimeInterval) -> some View {
         VStack(spacing: 14) {
-            if lastFeed != nil, bPhase == .idle {
+            if lastBreastFeed != nil, bPhase == .idle {
                 Text("💡 上次从\(bActive == .R ? "右" : "左")边结束")
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(Palette.ink2)
@@ -181,16 +207,19 @@ struct FeedScreen: View {
         let action: () -> Void
 
         var body: some View {
+            let isPaused = active && phase == .paused
+            let activeInk = isPaused ? Palette.yellowInk : Palette.pinkInk
+            let activeTint = isPaused ? Palette.yellow : Palette.pink
             Button(action: action) {
                 VStack(spacing: 4) {
                     Text(label)
                         .font(.system(size: 13, weight: .heavy))
-                        .foregroundStyle(active ? Palette.pinkInk : Palette.ink2)
+                        .foregroundStyle(active ? activeInk : Palette.ink2)
                     Text(formatMMSS(ms))
                         .font(.system(size: 28, weight: .black))
                         .tracking(-0.56)
                         .monospacedDigit()
-                        .foregroundStyle(active ? Palette.pinkInk : Palette.ink)
+                        .foregroundStyle(active ? activeInk : Palette.ink)
                     if active, phase == .running {
                         HStack(spacing: 5) {
                             Circle().fill(Palette.pinkInk).frame(width: 6, height: 6)
@@ -205,12 +234,12 @@ struct FeedScreen: View {
                             .font(.system(size: 10, weight: .heavy))
                             .tracking(0.6)
                             .textCase(.uppercase)
-                            .foregroundStyle(Palette.pinkInk)
+                            .foregroundStyle(Palette.yellowInk)
                     }
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 20).padding(.horizontal, 12)
-                .background(active ? Palette.pink : Palette.bg2,
+                .background(active ? activeTint : Palette.bg2,
                             in: RoundedRectangle(cornerRadius: 20, style: .continuous))
             }
             .buttonStyle(PressableStyle())
@@ -236,7 +265,7 @@ struct FeedScreen: View {
                             .font(.system(size: 46, weight: .black))
                             .tracking(-1.38)
                             .monospacedDigit()
-                            .foregroundStyle(fPhase == .idle ? Palette.ink3 : Palette.pinkInk)
+                            .foregroundStyle(timerInk(for: fPhase))
                         if fPhase == .running {
                             HStack(spacing: 6) {
                                 Circle().fill(Palette.pinkInk).frame(width: 6, height: 6)
@@ -251,7 +280,7 @@ struct FeedScreen: View {
                                 .font(.system(size: 11, weight: .heavy))
                                 .tracking(0.66)
                                 .textCase(.uppercase)
-                                .foregroundStyle(Palette.pinkInk)
+                                .foregroundStyle(Palette.yellowInk)
                         } else if fPhase == .stopped, let s = fSessionStart, let e = fSessionEnd {
                             Text("\(hhmm(s)) - \(hhmm(e))")
                                 .font(.system(size: 13, weight: .heavy))
@@ -261,7 +290,7 @@ struct FeedScreen: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.horizontal, 16).padding(.vertical, 22)
-                    .background(fPhase == .idle ? Palette.bg2 : Palette.pink,
+                    .background(timerTint(for: fPhase),
                                 in: RoundedRectangle(cornerRadius: 20, style: .continuous))
 
                     formulaActionRow
@@ -342,6 +371,28 @@ struct FeedScreen: View {
         InlineWheelTimePicker(time: $time, theme: store.theme)
     }
 
+    private func timerInk(for phase: Phase) -> Color {
+        switch phase {
+        case .idle:
+            return Palette.ink3
+        case .paused:
+            return Palette.yellowInk
+        case .running, .stopped:
+            return Palette.pinkInk
+        }
+    }
+
+    private func timerTint(for phase: Phase) -> Color {
+        switch phase {
+        case .idle:
+            return Palette.bg2
+        case .paused:
+            return Palette.yellow
+        case .running, .stopped:
+            return Palette.pink
+        }
+    }
+
     // MARK: — History
 
     private var historySection: some View {
@@ -384,7 +435,12 @@ struct FeedScreen: View {
         let now = Date()
         switch bPhase {
         case .idle:
-            bActive = side; bSegStart = now; bSessionStart = now; bSessionEnd = nil; bPhase = .running
+            bActive = side
+            bFirstSide = side
+            bSegStart = now
+            bSessionStart = now
+            bSessionEnd = nil
+            bPhase = .running
         case .running:
             if side == bActive {
                 pauseBreast(at: now)
@@ -419,7 +475,14 @@ struct FeedScreen: View {
         bPhase = .running
     }
     private func resetBreast() {
-        bPhase = .idle; bLeftMs = 0; bRightMs = 0; bSegStart = nil; bSessionStart = nil; bSessionEnd = nil
+        bPhase = .idle
+        bActive = recommendedBreastSide
+        bFirstSide = nil
+        bLeftMs = 0
+        bRightMs = 0
+        bSegStart = nil
+        bSessionStart = nil
+        bSessionEnd = nil
     }
     private func saveBreast() {
         let now = Date()
@@ -431,7 +494,9 @@ struct FeedScreen: View {
         let tot = max(1, Int(((l + r) / 60).rounded()))
         let title: String; let sub: String
         if l > 0 && r > 0 {
-            title = "母乳 · 双侧"; sub = "左 \(lMin)分 · 右 \(rMin)分 · 共 \(tot)分"
+            let firstSide: BreastFeedSide = (bFirstSide ?? .L) == .L ? .left : .right
+            title = "母乳 · 双侧"
+            sub = orderedBreastFeedSummary(leftMinutes: lMin, rightMinutes: rMin, firstSide: firstSide)
         } else if l > 0 {
             title = "母乳 · 左侧"; sub = "\(tot)分"
         } else {
@@ -497,6 +562,7 @@ struct FeedScreen: View {
             breastManualTime: bManualTime,
             breastPhase: draftPhase(from: bPhase),
             breastActiveSide: bActive == .L ? .left : .right,
+            breastFirstSide: bFirstSide.map { $0 == .L ? .left : .right },
             breastLeftDuration: bLeftMs,
             breastRightDuration: bRightMs,
             breastSegmentStart: bSegStart,
@@ -522,6 +588,7 @@ struct FeedScreen: View {
             bManualTime = draft.breastManualTime
             bPhase = phase(from: draft.breastPhase)
             bActive = draft.breastActiveSide == .left ? .L : .R
+            bFirstSide = restoredFirstSide(from: draft)
             bLeftMs = draft.breastLeftDuration
             bRightMs = draft.breastRightDuration
             bSegStart = draft.breastSegmentStart
@@ -540,9 +607,9 @@ struct FeedScreen: View {
         }
 
         if let last = lastFeed {
-            mode = (last.title.contains("奶粉") || last.title.contains("配方奶")) ? .formula : .breast
-            bActive = last.title.contains("右") ? .R : .L
+            mode = last.isFormulaFeed ? .formula : .breast
         }
+        bActive = recommendedBreastSide
     }
 
     private func syncDraftToStore() {

@@ -404,25 +404,23 @@ private struct SinceLastRow: View {
     var body: some View {
         TimelineView(.periodic(from: .now, by: 60)) { ctx in
             let now = ctx.date
-            let lastFeed   = store.events.filter { $0.kind == .feed   }.max(by: { $0.at < $1.at })
-            let lastDiaper = store.events.filter { $0.kind == .diaper }.max(by: { $0.at < $1.at })
-            let lastSleepEnd = store.events
-                .filter { $0.kind == .sleep && $0.endAt != nil }
-                .max(by: { ($0.endAt ?? .distantPast) < ($1.endAt ?? .distantPast) })
+            let lastFeed = store.mostRecentEvent(kind: .feed)
+            let lastDiaper = store.mostRecentEvent(kind: .diaper)
+            let lastSleepEnd = store.mostRecentEvent(kind: .sleep)
             let sleepItem: (String, String, Color)? = {
                 if let timer = store.activeTimer, timer.kind == .sleep {
                     return ("睡眠", timer.isRunning ? "进行中" : "已暂停", Palette.lavenderInk)
                 }
-                if let event = lastSleepEnd {
-                    return ("睡眠", fmt(now.timeIntervalSince(event.endAt ?? now)), Palette.lavenderInk)
+                if let event = lastSleepEnd, let endedAt = event.endAt {
+                    return ("睡眠", fmt(now.timeIntervalSince(endedAt)), Palette.lavenderInk)
                 }
                 return nil
             }()
 
             let items: [(String, String, Color)] = [
-                lastFeed.map   { ("喂奶", fmt(now.timeIntervalSince($0.at)), Palette.pinkInk) },
+                lastFeed.map   { ("喂奶", fmt(now.timeIntervalSince($0.occurredAt)), Palette.pinkInk) },
                 sleepItem,
-                lastDiaper.map { ("尿布", fmt(now.timeIntervalSince($0.at)), Palette.blueInk) },
+                lastDiaper.map { ("尿布", fmt(now.timeIntervalSince($0.occurredAt)), Palette.blueInk) },
             ].compactMap { $0 }
 
             if !items.isEmpty {

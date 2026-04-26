@@ -10,12 +10,17 @@ struct SleepScreen: View {
 
     private var timer: RunningTimer? { store.activeTimer }
     private var isRunning: Bool { timer?.isRunning ?? false }
-    private var effectiveEnd: Date { isRunning ? .now : draftEnd }
-    private var displayDuration: TimeInterval {
-        if isRunning, let timer {
-            return max(0, timer.elapsed(at: .now) + timer.startedAt.timeIntervalSince(draftStart))
+    private func displayDuration(at now: Date) -> TimeInterval {
+        guard let timer else { return 0 }
+        if timer.isRunning {
+            return max(0, timer.elapsed(at: now) + timer.startedAt.timeIntervalSince(draftStart))
         }
-        return max(0, draftEnd.timeIntervalSince(draftStart))
+
+        let draftedDuration = max(0, draftEnd.timeIntervalSince(draftStart))
+        if draftedDuration > 0 {
+            return draftedDuration
+        }
+        return max(0, timer.accumulated)
     }
 
     var body: some View {
@@ -83,7 +88,7 @@ struct SleepScreen: View {
                 .padding(.horizontal, 12).padding(.vertical, 6)
                 .background(Color.white.opacity(0.6), in: Capsule())
 
-                Text(timer == nil ? "00分 00秒" : formatDur(displayDuration))
+                Text(timer == nil ? "00分 00秒" : formatDur(displayDuration(at: now)))
                     .font(.system(size: 56, weight: .black))
                     .tracking(-1.68)
                     .monospacedDigit()
@@ -100,18 +105,18 @@ struct SleepScreen: View {
                         CTAButton(title: isRunning ? "⏸ 暂停" : "▶ 继续",
                                   variant: .ghost,
                                   theme: store.theme) {
-                            isRunning ? pauseSleep(at: now) : resumeSleep(at: now)
+                            isRunning ? pauseSleep() : resumeSleep()
                         }
                         CTAButton(title: "保存记录",
                                   variant: .primary,
                                   theme: store.theme) {
-                            saveSleep(now: now)
+                            saveSleep()
                         }
                     }
                     .padding(.top, 22)
                 } else {
                     CTAButton(title: "😴 开始睡觉", theme: store.theme) {
-                        startSleep(at: now)
+                        startSleep()
                     }
                     .padding(.top, 22)
                 }
@@ -221,25 +226,25 @@ struct SleepScreen: View {
         draftEnd = timer.startedAt.addingTimeInterval(timer.accumulated)
     }
 
-    private func startSleep(at now: Date) {
+    private func startSleep(at now: Date = Date()) {
         draftStart = now
         draftEnd = now
         store.startTimer(kind: .sleep, at: now)
     }
 
-    private func pauseSleep(at now: Date) {
+    private func pauseSleep(at now: Date = Date()) {
         store.pauseTimer(at: now)
         draftEnd = now
     }
 
-    private func resumeSleep(at now: Date) {
+    private func resumeSleep(at now: Date = Date()) {
         if draftEnd > now {
             draftEnd = now
         }
         store.resumeTimer(at: now)
     }
 
-    private func saveSleep(now: Date) {
+    private func saveSleep(now: Date = Date()) {
         guard let timer = store.activeTimer else { return }
         if timer.isRunning {
             store.pauseTimer(at: now)

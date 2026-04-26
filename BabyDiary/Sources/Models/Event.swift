@@ -74,6 +74,11 @@ enum DiaperNotePreset: String, CaseIterable, Hashable {
     }
 }
 
+enum BreastFeedSide: String, Codable, Hashable {
+    case left
+    case right
+}
+
 struct Event: Identifiable, Hashable, Codable {
     let id: String
     var kind: EventKind
@@ -102,4 +107,55 @@ struct Event: Identifiable, Hashable, Codable {
         guard let endAt else { return nil }
         return endAt.timeIntervalSince(at)
     }
+
+    var occurredAt: Date {
+        endAt ?? at
+    }
+
+    var isFormulaFeed: Bool {
+        kind == .feed && (title.contains("奶粉") || title.contains("配方奶"))
+    }
+
+    var isBreastFeed: Bool {
+        kind == .feed && title.contains("母乳")
+    }
+
+    var breastEndingSide: BreastFeedSide? {
+        guard isBreastFeed else { return nil }
+
+        if title.contains("双侧") {
+            let leftIndex = sub?.range(of: "左", options: .backwards)?.lowerBound
+            let rightIndex = sub?.range(of: "右", options: .backwards)?.lowerBound
+            switch (leftIndex, rightIndex) {
+            case let (.some(left), .some(right)):
+                return left > right ? .left : .right
+            case (.some, .none):
+                return .left
+            case (.none, .some):
+                return .right
+            default:
+                return nil
+            }
+        }
+
+        if title.contains("右侧") {
+            return .right
+        }
+        if title.contains("左侧") {
+            return .left
+        }
+        return nil
+    }
+}
+
+func orderedBreastFeedSummary(
+    leftMinutes: Int,
+    rightMinutes: Int,
+    firstSide: BreastFeedSide
+) -> String {
+    let total = leftMinutes + rightMinutes
+    let first = firstSide == .left
+        ? "左 \(leftMinutes)分 · 右 \(rightMinutes)分"
+        : "右 \(rightMinutes)分 · 左 \(leftMinutes)分"
+    return "\(first) · 共 \(total)分"
 }

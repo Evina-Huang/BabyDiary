@@ -610,11 +610,11 @@ struct EventEditSheet: View {
                 case .left, .right:
                     e.sub = "\(breastMinutes)分"
                 case .both:
-                    let total = leftMinutes + rightMinutes
-                    let first = firstSide == .left
-                        ? "左 \(leftMinutes)分 · 右 \(rightMinutes)分"
-                        : "右 \(rightMinutes)分 · 左 \(leftMinutes)分"
-                    e.sub = "\(first) · 共 \(total)分"
+                    e.sub = orderedBreastFeedSummary(
+                        leftMinutes: leftMinutes,
+                        rightMinutes: rightMinutes,
+                        firstSide: firstSide == .left ? .left : .right
+                    )
                 }
             } else {
                 e.title = original.title.contains("配方奶") ? "配方奶" : "奶粉"

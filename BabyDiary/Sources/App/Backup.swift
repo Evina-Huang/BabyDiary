@@ -284,19 +284,16 @@ extension AppStore {
     }
 
     private func widgetEvent(for kind: EventKind) -> BabyDiaryWidgetEvent? {
-        events
-            .filter { $0.kind == kind }
-            .max { ($0.endAt ?? $0.at) < ($1.endAt ?? $1.at) }
-            .map { event in
-                BabyDiaryWidgetEvent(
-                    kind: BabyDiaryWidgetEventKind(rawValue: event.kind.rawValue) ?? .feed,
-                    occurredAt: event.endAt ?? event.at,
-                    startedAt: event.at,
-                    endedAt: event.endAt,
-                    title: event.title,
-                    subtitle: event.sub
-                )
-            }
+        mostRecentEvent(kind: kind).map { event in
+            BabyDiaryWidgetEvent(
+                kind: BabyDiaryWidgetEventKind(rawValue: event.kind.rawValue) ?? .feed,
+                occurredAt: event.occurredAt,
+                startedAt: event.at,
+                endedAt: event.endAt,
+                title: event.title,
+                subtitle: event.sub
+            )
+        }
     }
 
     func lastSavedAt() -> Date? {

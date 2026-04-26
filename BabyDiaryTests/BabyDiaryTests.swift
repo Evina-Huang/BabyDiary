@@ -109,6 +109,44 @@ struct BabyDiaryTests {
         #expect(store.recentEvents(kind: .feed).map(\.id) == ["latest", "old"])
     }
 
+    @Test func mostRecentEventUsesFeedEndTime() throws {
+        let store = AppStore()
+        let cal = Calendar.current
+        let earlyStart = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 8, minute: 0))!
+        let earlyEnd = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 8, minute: 30))!
+        let laterStart = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 8, minute: 20))!
+        let laterEnd = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 8, minute: 25))!
+        store.events = [
+            Event(id: "later_start", kind: .feed, at: laterStart, endAt: laterEnd, title: "母乳 · 左侧", sub: "5分"),
+            Event(id: "later_end", kind: .feed, at: earlyStart, endAt: earlyEnd, title: "母乳 · 右侧", sub: "30分"),
+        ]
+
+        let event = try #require(store.mostRecentEvent(kind: .feed))
+        #expect(event.id == "later_end")
+        #expect(event.occurredAt == earlyEnd)
+    }
+
+    @Test func mostRecentBreastFeedIgnoresLaterFormulaEntry() throws {
+        let store = AppStore()
+        let cal = Calendar.current
+        let breastStart = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 7, minute: 0))!
+        let breastEnd = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 7, minute: 12))!
+        let formulaTime = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 8, minute: 30))!
+        store.events = [
+            Event(id: "formula", kind: .feed, at: formulaTime, title: "奶粉", sub: "180 ml"),
+            Event(id: "breast", kind: .feed, at: breastStart, endAt: breastEnd, title: "母乳 · 双侧", sub: "右 7分 · 左 5分 · 共 12分"),
+        ]
+
+        let event = try #require(store.mostRecentBreastFeedEvent())
+        #expect(event.id == "breast")
+        #expect(event.breastEndingSide == .left)
+    }
+
+    @Test func breastFeedSummaryKeepsFirstSideOrder() {
+        #expect(orderedBreastFeedSummary(leftMinutes: 7, rightMinutes: 3, firstSide: .left) == "左 7分 · 右 3分 · 共 10分")
+        #expect(orderedBreastFeedSummary(leftMinutes: 7, rightMinutes: 3, firstSide: .right) == "右 3分 · 左 7分 · 共 10分")
+    }
+
     @Test func dailySummarySeparatesBreastAndFormulaTotals() {
         let store = AppStore()
         let cal = Calendar.current

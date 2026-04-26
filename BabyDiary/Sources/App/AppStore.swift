@@ -77,6 +77,18 @@ final class AppStore {
             .prefix(limit))
     }
 
+    func mostRecentEvent(kind: EventKind) -> Event? {
+        events
+            .filter { $0.kind == kind }
+            .max { $0.occurredAt < $1.occurredAt }
+    }
+
+    func mostRecentBreastFeedEvent() -> Event? {
+        events
+            .filter(\.isBreastFeed)
+            .max { $0.occurredAt < $1.occurredAt }
+    }
+
     func dailySummary(on day: Date, now: Date = Date()) -> DailyEventSummary {
         let cal = Calendar.current
         let interval = dayInterval(for: day)
@@ -368,12 +380,11 @@ final class AppStore {
     }
 
     private func isFormulaFeed(_ event: Event) -> Bool {
-        guard event.kind == .feed else { return false }
-        return event.title.contains("奶粉") || event.title.contains("配方奶")
+        event.isFormulaFeed
     }
 
     private func isBreastFeed(_ event: Event) -> Bool {
-        event.kind == .feed && event.title.contains("母乳")
+        event.isBreastFeed
     }
 
     private func formulaMilliliters(for event: Event) -> Int {
@@ -665,6 +676,7 @@ struct FeedDraft: Equatable, Codable {
     var breastManualTime: Date = .now
     var breastPhase: FeedDraftPhase = .idle
     var breastActiveSide: FeedDraftSide = .left
+    var breastFirstSide: FeedDraftSide? = nil
     var breastLeftDuration: TimeInterval = 0
     var breastRightDuration: TimeInterval = 0
     var breastSegmentStart: Date? = nil
