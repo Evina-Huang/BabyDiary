@@ -126,6 +126,33 @@ struct BabyDiaryTests {
         #expect(event.occurredAt == earlyEnd)
     }
 
+    @Test func feedReminderDueDateUsesLastFeedEndTime() throws {
+        let store = AppStore()
+        let cal = Calendar.current
+        let start = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 8, minute: 0))!
+        let end = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 8, minute: 20))!
+        let now = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 9, minute: 0))!
+        store.feedReminder = FeedReminderSettings(isEnabled: true, intervalHours: 4, anchorAt: nil)
+        store.events = [
+            Event(id: "feed", kind: .feed, at: start, endAt: end, title: "母乳 · 左侧", sub: "20分")
+        ]
+
+        let due = try #require(store.nextFeedReminderDueDate(now: now))
+
+        #expect(due == cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 12, minute: 20))!)
+    }
+
+    @Test func feedReminderPlannerUsesAnchorWhenNoFeed() throws {
+        let cal = Calendar.current
+        let anchor = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 7, minute: 0))!
+        let now = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 7, minute: 30))!
+        let settings = FeedReminderSettings(isEnabled: true, intervalHours: 4, anchorAt: anchor)
+
+        let due = try #require(FeedReminderPlanner.dueDate(settings: settings, lastFeed: nil, now: now))
+
+        #expect(due == cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 11, minute: 0))!)
+    }
+
     @Test func mostRecentBreastFeedIgnoresLaterFormulaEntry() throws {
         let store = AppStore()
         let cal = Calendar.current
@@ -320,6 +347,17 @@ struct BabyDiaryTests {
 
         let medications = try #require(snapshot.medications)
         #expect(medications == [record])
+    }
+
+    @Test func snapshotIncludesFeedReminderSettings() throws {
+        let store = AppStore()
+        let anchor = Date()
+        store.feedReminder = FeedReminderSettings(isEnabled: true, intervalHours: 4, anchorAt: anchor)
+
+        let snapshot = store.snapshot()
+        let reminder = try #require(snapshot.feedReminder)
+
+        #expect(reminder == store.feedReminder)
     }
 
     @Test func pauseTimerBanksElapsedTimeAndResumeContinues() {

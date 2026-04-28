@@ -1,0 +1,568 @@
+{
+  "version": 4,
+  "exportedAt": "2026-04-28T09:56:32Z",
+  "baby": {
+    "name": "小宝",
+    "birthDate": "2025-10-17T16:00:00Z",
+    "gender": "girl",
+    "avatarData": "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"
+  },
+  "events": [
+    {
+      "id": "e_today_1904",
+      "kind": "feed",
+      "at": "2026-04-28T11:04:00Z",
+      "endAt": "2026-04-28T11:11:00Z",
+      "title": "母乳 · 双侧",
+      "sub": "右 4分 · 左 3分 · 共 7分"
+    },
+    {
+      "id": "e_today_1632",
+      "kind": "sleep",
+      "at": "2026-04-28T08:32:00Z",
+      "endAt": "2026-04-28T10:03:00Z",
+      "title": "睡眠 1时 31分",
+      "sub": "16:32 - 18:03"
+    },
+    {
+      "id": "e_today_1623",
+      "kind": "diaper",
+      "at": "2026-04-28T08:23:00Z",
+      "title": "臭臭",
+      "sub": "奶瓣"
+    },
+    {
+      "id": "e_today_1505",
+      "kind": "feed",
+      "at": "2026-04-28T07:05:00Z",
+      "endAt": "2026-04-28T07:13:00Z",
+      "title": "配方奶",
+      "sub": "230 ml · 15:05 - 15:13"
+    },
+    {
+      "id": "e_today_1220",
+      "kind": "sleep",
+      "at": "2026-04-28T04:20:00Z",
+      "endAt": "2026-04-28T05:49:00Z",
+      "title": "睡眠 1时 29分",
+      "sub": "12:20 - 13:49"
+    },
+    {
+      "id": "e_today_1104",
+      "kind": "feed",
+      "at": "2026-04-28T03:04:00Z",
+      "endAt": "2026-04-28T03:11:00Z",
+      "title": "配方奶",
+      "sub": "230 ml · 11:04 - 11:11"
+    },
+    {
+      "id": "e_today_0714",
+      "kind": "sleep",
+      "at": "2026-04-27T23:14:00Z",
+      "endAt": "2026-04-28T01:55:00Z",
+      "title": "睡眠 2时 41分",
+      "sub": "07:14 - 09:55"
+    },
+    {
+      "id": "e_today_0604",
+      "kind": "feed",
+      "at": "2026-04-27T22:04:00Z",
+      "endAt": "2026-04-27T22:14:00Z",
+      "title": "母乳 · 双侧",
+      "sub": "左 5分 · 右 5分 · 共 10分"
+    },
+    {
+      "id": "e_yesterday_1400",
+      "kind": "feed",
+      "at": "2026-04-27T06:00:00Z",
+      "title": "母乳 · 右侧",
+      "sub": "22分"
+    },
+    {
+      "id": "e_yesterday_1200",
+      "kind": "solid",
+      "at": "2026-04-27T04:00:00Z",
+      "title": "米糊",
+      "sub": "30g"
+    },
+    {
+      "id": "e_yesterday_0900",
+      "kind": "diaper",
+      "at": "2026-04-27T01:00:00Z",
+      "title": "嘘嘘",
+      "sub": ""
+    }
+  ],
+  "vaccines": [
+    {
+      "id": "t_bcg",
+      "name": "卡介苗 (BCG)",
+      "ageLabel": "出生时",
+      "ageMonths": 0,
+      "scheduledDate": "2025-10-17T16:00:00Z",
+      "doneDate": "2025-10-18T00:00:00Z",
+      "isCustom": false
+    },
+    {
+      "id": "t_hepb1",
+      "name": "乙肝疫苗 第1剂",
+      "ageLabel": "出生时",
+      "ageMonths": 0,
+      "scheduledDate": "2025-10-17T16:00:00Z",
+      "doneDate": "2025-10-18T00:00:00Z",
+      "isCustom": false
+    },
+    {
+      "id": "t_hepb2",
+      "name": "乙肝疫苗 第2剂",
+      "ageLabel": "1 月龄",
+      "ageMonths": 1,
+      "scheduledDate": "2025-11-17T16:00:00Z",
+      "doneDate": "2025-11-20T00:00:00Z",
+      "isCustom": false
+    },
+    {
+      "id": "t_ipv1",
+      "name": "脊灰疫苗 第1剂",
+      "ageLabel": "2 月龄",
+      "ageMonths": 2,
+      "scheduledDate": "2025-12-17T16:00:00Z",
+      "doneDate": "2025-12-19T00:00:00Z",
+      "isCustom": false
+    },
+    {
+      "id": "t_dtp1",
+      "name": "百白破疫苗 第1剂",
+      "ageLabel": "3 月龄",
+      "ageMonths": 3,
+      "scheduledDate": "2026-01-17T16:00:00Z",
+      "doneDate": "2026-01-20T00:00:00Z",
+      "isCustom": false
+    },
+    {
+      "id": "t_bopv",
+      "name": "脊灰减毒活疫苗 (bOPV)",
+      "ageLabel": "4 月龄",
+      "ageMonths": 4,
+      "scheduledDate": "2026-02-17T16:00:00Z",
+      "doneDate": null,
+      "isCustom": false
+    },
+    {
+      "id": "t_dtp3",
+      "name": "百白破疫苗 第3剂",
+      "ageLabel": "5 月龄",
+      "ageMonths": 5,
+      "scheduledDate": "2026-03-17T16:00:00Z",
+      "doneDate": null,
+      "isCustom": false
+    },
+    {
+      "id": "t_mmr1",
+      "name": "麻腮风疫苗 第1剂",
+      "ageLabel": "8 月龄",
+      "ageMonths": 8,
+      "scheduledDate": "2026-06-17T16:00:00Z",
+      "doneDate": null,
+      "isCustom": false
+    }
+  ],
+  "growth": [
+    {
+      "id": "g1",
+      "date": "2025-10-18T00:00:00Z",
+      "ageMonths": 0,
+      "weightKg": 3.2,
+      "heightCm": 50.0,
+      "headCm": null
+    },
+    {
+      "id": "g2",
+      "date": "2025-11-18T00:00:00Z",
+      "ageMonths": 1,
+      "weightKg": 4.3,
+      "heightCm": 54.5,
+      "headCm": null
+    },
+    {
+      "id": "g3",
+      "date": "2025-12-18T00:00:00Z",
+      "ageMonths": 2,
+      "weightKg": 5.5,
+      "heightCm": 58.2,
+      "headCm": null
+    },
+    {
+      "id": "g4",
+      "date": "2026-01-18T00:00:00Z",
+      "ageMonths": 3,
+      "weightKg": 6.5,
+      "heightCm": 61.0,
+      "headCm": null
+    },
+    {
+      "id": "g5",
+      "date": "2026-02-18T00:00:00Z",
+      "ageMonths": 4,
+      "weightKg": 7.2,
+      "heightCm": 63.8,
+      "headCm": null
+    },
+    {
+      "id": "g6",
+      "date": "2026-03-18T00:00:00Z",
+      "ageMonths": 5,
+      "weightKg": 7.7,
+      "heightCm": 66.2,
+      "headCm": null
+    },
+    {
+      "id": "g7",
+      "date": "2026-04-15T00:00:00Z",
+      "ageMonths": 6,
+      "weightKg": 8.1,
+      "heightCm": 68.0,
+      "headCm": null
+    }
+  ],
+  "foods": [
+    {
+      "id": "fd1",
+      "name": "南瓜泥",
+      "firstUsedAt": "2026-04-28T06:00:00Z",
+      "status": "observing",
+      "timesEaten": 1,
+      "observationDays": 3,
+      "notes": null
+    },
+    {
+      "id": "fd2",
+      "name": "胡萝卜",
+      "firstUsedAt": "2026-04-26T01:00:00Z",
+      "status": "observing",
+      "timesEaten": 2,
+      "observationDays": 3,
+      "notes": null
+    },
+    {
+      "id": "fd3",
+      "name": "豌豆泥",
+      "firstUsedAt": "2026-04-24T02:00:00Z",
+      "status": "observing",
+      "timesEaten": 3,
+      "observationDays": 5,
+      "notes": null
+    },
+    {
+      "id": "fd4",
+      "name": "米糊",
+      "firstUsedAt": "2026-03-01T00:00:00Z",
+      "status": "safe",
+      "timesEaten": 12,
+      "observationDays": 3,
+      "notes": null
+    },
+    {
+      "id": "fd5",
+      "name": "苹果泥",
+      "firstUsedAt": "2026-03-10T00:00:00Z",
+      "status": "safe",
+      "timesEaten": 8,
+      "observationDays": 3,
+      "notes": null
+    },
+    {
+      "id": "fd6",
+      "name": "香蕉",
+      "firstUsedAt": "2026-03-20T00:00:00Z",
+      "status": "safe",
+      "timesEaten": 6,
+      "observationDays": 3,
+      "notes": null
+    },
+    {
+      "id": "fd7",
+      "name": "鸡蛋黄",
+      "firstUsedAt": "2026-02-10T00:00:00Z",
+      "status": "allergic",
+      "timesEaten": 2,
+      "observationDays": 7,
+      "notes": "曾出现口周红疹"
+    }
+  ],
+  "medications": [
+    {
+      "id": "md1",
+      "name": "维生素 D3",
+      "takenAt": "2026-04-28T07:20:00Z",
+      "dose": "1 粒",
+      "reason": "每日补充",
+      "reaction": "none",
+      "reactionNote": null,
+      "note": null
+    },
+    {
+      "id": "md2",
+      "name": "对乙酰氨基酚",
+      "takenAt": "2026-04-23T13:00:00Z",
+      "dose": "2.5 ml",
+      "reason": "发热",
+      "reaction": "none",
+      "reactionNote": null,
+      "note": "体温下降后停用"
+    },
+    {
+      "id": "md3",
+      "name": "头孢克洛",
+      "takenAt": "2026-03-18T00:00:00Z",
+      "dose": "半包",
+      "reason": "医生开具",
+      "reaction": "allergic",
+      "reactionNote": "服后出现皮疹，已停用",
+      "note": null
+    }
+  ],
+  "teeth": [
+    {
+      "id": "th_upper_left_secondMolar",
+      "position": {
+        "jaw": "upper",
+        "side": "left",
+        "kind": "secondMolar"
+      },
+      "eruptedAt": null,
+      "note": null
+    },
+    {
+      "id": "th_upper_left_firstMolar",
+      "position": {
+        "jaw": "upper",
+        "side": "left",
+        "kind": "firstMolar"
+      },
+      "eruptedAt": null,
+      "note": null
+    },
+    {
+      "id": "th_upper_left_canine",
+      "position": {
+        "jaw": "upper",
+        "side": "left",
+        "kind": "canine"
+      },
+      "eruptedAt": null,
+      "note": null
+    },
+    {
+      "id": "th_upper_left_lateralIncisor",
+      "position": {
+        "jaw": "upper",
+        "side": "left",
+        "kind": "lateralIncisor"
+      },
+      "eruptedAt": null,
+      "note": null
+    },
+    {
+      "id": "th_upper_left_centralIncisor",
+      "position": {
+        "jaw": "upper",
+        "side": "left",
+        "kind": "centralIncisor"
+      },
+      "eruptedAt": "2026-04-24T00:00:00Z",
+      "note": "上门牙也看到小白点"
+    },
+    {
+      "id": "th_upper_right_centralIncisor",
+      "position": {
+        "jaw": "upper",
+        "side": "right",
+        "kind": "centralIncisor"
+      },
+      "eruptedAt": null,
+      "note": null
+    },
+    {
+      "id": "th_upper_right_lateralIncisor",
+      "position": {
+        "jaw": "upper",
+        "side": "right",
+        "kind": "lateralIncisor"
+      },
+      "eruptedAt": null,
+      "note": null
+    },
+    {
+      "id": "th_upper_right_canine",
+      "position": {
+        "jaw": "upper",
+        "side": "right",
+        "kind": "canine"
+      },
+      "eruptedAt": null,
+      "note": null
+    },
+    {
+      "id": "th_upper_right_firstMolar",
+      "position": {
+        "jaw": "upper",
+        "side": "right",
+        "kind": "firstMolar"
+      },
+      "eruptedAt": null,
+      "note": null
+    },
+    {
+      "id": "th_upper_right_secondMolar",
+      "position": {
+        "jaw": "upper",
+        "side": "right",
+        "kind": "secondMolar"
+      },
+      "eruptedAt": null,
+      "note": null
+    },
+    {
+      "id": "th_lower_left_secondMolar",
+      "position": {
+        "jaw": "lower",
+        "side": "left",
+        "kind": "secondMolar"
+      },
+      "eruptedAt": null,
+      "note": null
+    },
+    {
+      "id": "th_lower_left_firstMolar",
+      "position": {
+        "jaw": "lower",
+        "side": "left",
+        "kind": "firstMolar"
+      },
+      "eruptedAt": null,
+      "note": null
+    },
+    {
+      "id": "th_lower_left_canine",
+      "position": {
+        "jaw": "lower",
+        "side": "left",
+        "kind": "canine"
+      },
+      "eruptedAt": null,
+      "note": null
+    },
+    {
+      "id": "th_lower_left_lateralIncisor",
+      "position": {
+        "jaw": "lower",
+        "side": "left",
+        "kind": "lateralIncisor"
+      },
+      "eruptedAt": null,
+      "note": null
+    },
+    {
+      "id": "th_lower_left_centralIncisor",
+      "position": {
+        "jaw": "lower",
+        "side": "left",
+        "kind": "centralIncisor"
+      },
+      "eruptedAt": "2026-04-03T00:00:00Z",
+      "note": "第一颗牙冒尖了"
+    },
+    {
+      "id": "th_lower_right_centralIncisor",
+      "position": {
+        "jaw": "lower",
+        "side": "right",
+        "kind": "centralIncisor"
+      },
+      "eruptedAt": "2026-04-12T00:00:00Z",
+      "note": null
+    },
+    {
+      "id": "th_lower_right_lateralIncisor",
+      "position": {
+        "jaw": "lower",
+        "side": "right",
+        "kind": "lateralIncisor"
+      },
+      "eruptedAt": null,
+      "note": null
+    },
+    {
+      "id": "th_lower_right_canine",
+      "position": {
+        "jaw": "lower",
+        "side": "right",
+        "kind": "canine"
+      },
+      "eruptedAt": null,
+      "note": null
+    },
+    {
+      "id": "th_lower_right_firstMolar",
+      "position": {
+        "jaw": "lower",
+        "side": "right",
+        "kind": "firstMolar"
+      },
+      "eruptedAt": null,
+      "note": null
+    },
+    {
+      "id": "th_lower_right_secondMolar",
+      "position": {
+        "jaw": "lower",
+        "side": "right",
+        "kind": "secondMolar"
+      },
+      "eruptedAt": null,
+      "note": null
+    }
+  ],
+  "milestones": [
+    {
+      "id": "ms_smile",
+      "date": "2025-12-05T00:00:00Z",
+      "title": "第一次笑出声",
+      "note": "爸爸做鬼脸时突然咯咯笑。",
+      "emoji": "😊",
+      "photoData": null
+    },
+    {
+      "id": "ms_roll",
+      "date": "2026-02-22T00:00:00Z",
+      "title": "第一次翻身",
+      "note": "从仰卧翻到趴着，自己还愣了一下。",
+      "emoji": "🌀",
+      "photoData": null
+    },
+    {
+      "id": "ms_tooth",
+      "date": "2026-04-03T00:00:00Z",
+      "title": "第一颗牙冒尖",
+      "note": "下门牙有一点点小白点。",
+      "emoji": "🦷",
+      "photoData": null
+    },
+    {
+      "id": "ms_mama",
+      "date": "2026-04-10T00:00:00Z",
+      "title": "会叫“妈妈”",
+      "note": "声音很轻，但听得很清楚。",
+      "emoji": "💞",
+      "photoData": null
+    }
+  ],
+  "activeTimer": null,
+  "feedDraft": null,
+  "feedReminder": {
+    "isEnabled": false,
+    "intervalHours": 4,
+    "anchorAt": null
+  }
+}

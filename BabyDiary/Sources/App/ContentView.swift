@@ -101,6 +101,9 @@ struct ContentView: View {
                 .presentationDragIndicator(.hidden)
         }
         .onOpenURL(perform: openDeepLink)
+        .onReceive(NotificationCenter.default.publisher(for: .babyDiaryNotificationDestination)) { notification in
+            openNotificationDestination(notification)
+        }
     }
 
     @ViewBuilder
@@ -114,6 +117,7 @@ struct ContentView: View {
         case .medication: MedicationScreen(onBack: { sub = nil })
         case .foodList: FoodListScreen(onBack: { sub = nil })
         case .teeth:    TeethScreen(onBack:    { sub = nil })
+        case .settings: SettingsScreen(onBack: { sub = nil })
         case .backup:   BackupScreen(onBack:   { sub = nil })
         }
     }
@@ -121,6 +125,14 @@ struct ContentView: View {
     private func openDeepLink(_ url: URL) {
         guard url.scheme == "babydiary" else { return }
         let destination = url.host ?? url.pathComponents.dropFirst().first
+        openDestination(destination)
+    }
+
+    private func openNotificationDestination(_ notification: Notification) {
+        openDestination(notification.userInfo?["destination"] as? String)
+    }
+
+    private func openDestination(_ destination: String?) {
         switch destination {
         case BabyDiaryDestination.sleep.rawValue:
             sub = .sleep

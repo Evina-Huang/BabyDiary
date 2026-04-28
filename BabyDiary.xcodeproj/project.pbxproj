@@ -33,6 +33,7 @@
 		84CAC6C4C0C65888C4F9E770 /* TeethScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9BA817C6B1233EF476B94E2 /* TeethScreen.swift */; };
 		8761C4018D55BF3AD2A03BAB /* FoodListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5491D057510332F88BFA9834 /* FoodListView.swift */; };
 		90ABE298AC1C11C50BE48859 /* MedicationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 528EEC76326D70C7FD37F0D7 /* MedicationView.swift */; };
+		9620B6B471DEA5CA6509B3C8 /* FeedReminder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66CB446149AC609234372B30 /* FeedReminder.swift */; };
 		972A70388DA4655BA6F1198D /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5BA15EF9E3E52299271C1A3 /* Theme.swift */; };
 		A15C5809230D08E7735D9957 /* Vaccine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0707DB66BE6B3F5B718679C3 /* Vaccine.swift */; };
 		A2FE292F8D0D4AA6E009334B /* Medication.swift in Sources */ = {isa = PBXBuildFile; fileRef = B91AA56638ABDA8CA0DE76F9 /* Medication.swift */; };
@@ -44,6 +45,7 @@
 		C8ABA57A566961EC9833ABF7 /* FoodItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0181DA81854724D428DE31A5 /* FoodItem.swift */; };
 		C9EE5DEC31801EB78F0521B2 /* AppStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA9831391FD58F873506339A /* AppStore.swift */; };
 		DC77C5471B6A77860BA20FA9 /* Event.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2183741F6B070696BCE37F88 /* Event.swift */; };
+		EC1FC5207763AF78470A30E2 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F71941D70AF2E5DE6961DFB /* SettingsView.swift */; };
 		F0973BA60503F9CA78BF7355 /* BabyDiaryShared.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DBA50674F4531D448005E6D /* BabyDiaryShared.swift */; };
 		F54BB321D8CEA42CFCC4412E /* BabyDiaryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11499DE74B462B78A849A44F /* BabyDiaryTests.swift */; };
 /* End PBXBuildFile section */
@@ -86,11 +88,13 @@
 		11499DE74B462B78A849A44F /* BabyDiaryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BabyDiaryTests.swift; sourceTree = "<group>"; };
 		207C1F685155DB510F75BDDD /* Tooth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tooth.swift; sourceTree = "<group>"; };
 		2183741F6B070696BCE37F88 /* Event.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Event.swift; sourceTree = "<group>"; };
+		2F71941D70AF2E5DE6961DFB /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		3710482D2313F83730310BD8 /* GrowthEditSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GrowthEditSheet.swift; sourceTree = "<group>"; };
 		528EEC76326D70C7FD37F0D7 /* MedicationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MedicationView.swift; sourceTree = "<group>"; };
 		5491D057510332F88BFA9834 /* FoodListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoodListView.swift; sourceTree = "<group>"; };
 		5BB8A1502A4004C9B7359A97 /* BabyDiaryWidgets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BabyDiaryWidgets.swift; sourceTree = "<group>"; };
 		65AC155878DF39E04CA789EA /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		66CB446149AC609234372B30 /* FeedReminder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedReminder.swift; sourceTree = "<group>"; };
 		6D500E176081E9F39321BC6F /* Icons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Icons.swift; sourceTree = "<group>"; };
 		6F76EAD923BE8FA56D20274E /* GrowthPoint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GrowthPoint.swift; sourceTree = "<group>"; };
 		72D7D108F4BB04D6737EF131 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -131,6 +135,7 @@
 				A3792BD5CAF341914797907E /* Backup.swift */,
 				65AC155878DF39E04CA789EA /* ContentView.swift */,
 				CBDF9F096F67D311ED7EA3D0 /* FeedLiveActivityController.swift */,
+				66CB446149AC609234372B30 /* FeedReminder.swift */,
 				BAED707E20B33DD884A46C30 /* SleepLiveActivityController.swift */,
 				C5BA15EF9E3E52299271C1A3 /* Theme.swift */,
 			);
@@ -264,6 +269,7 @@
 				528EEC76326D70C7FD37F0D7 /* MedicationView.swift */,
 				0D43A3CBA6BB96433C61C4C2 /* MilestoneEditSheet.swift */,
 				846242867B8E637561712FE3 /* RecordsView.swift */,
+				2F71941D70AF2E5DE6961DFB /* SettingsView.swift */,
 				C61F3580FA78D7EEF0F4C739 /* SleepView.swift */,
 				F2E3BE778F004091A6BFD447 /* SolidView.swift */,
 				D263718D27C28E0CF528F25F /* StatsView.swift */,
@@ -414,6 +420,7 @@
 				DC77C5471B6A77860BA20FA9 /* Event.swift in Sources */,
 				B38A9B9C9F2E3B8C0F6D7771 /* EventEditSheet.swift in Sources */,
 				68C222DBD2AC77120642CFF6 /* FeedLiveActivityController.swift in Sources */,
+				9620B6B471DEA5CA6509B3C8 /* FeedReminder.swift in Sources */,
 				3CA11A2C3704EBDEBCAA2E75 /* FeedView.swift in Sources */,
 				C8ABA57A566961EC9833ABF7 /* FoodItem.swift in Sources */,
 				8761C4018D55BF3AD2A03BAB /* FoodListView.swift in Sources */,
@@ -429,6 +436,7 @@
 				16A20FE891C5F8BA016A49DF /* MilestoneEditSheet.swift in Sources */,
 				38084E6AF5C55B0345AF5E92 /* Primitives.swift in Sources */,
 				49338A5D7D855A968B61839F /* RecordsView.swift in Sources */,
+				EC1FC5207763AF78470A30E2 /* SettingsView.swift in Sources */,
 				23BCBE04722574C69B023FF2 /* SleepLiveActivityController.swift in Sources */,
 				06B4E6F4B3F1348B99D0E3BF /* SleepView.swift in Sources */,
 				104C48F6EB4128DF961E251B /* SolidView.swift in Sources */,

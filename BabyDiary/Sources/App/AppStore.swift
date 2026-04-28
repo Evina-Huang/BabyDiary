@@ -14,6 +14,7 @@ final class AppStore {
     var theme: AppTheme = .blossom
     var activeTimer: RunningTimer? = nil
     var feedDraft: FeedDraft? = nil
+    var feedReminder: FeedReminderSettings = .init()
 
     init(seedDemoData: Bool = false) {
         baby = seedDemoData ? Self.demoBaby() : Self.defaultBaby()
@@ -68,6 +69,9 @@ final class AppStore {
     func addEvent(_ e: Event) {
         events.insert(e, at: 0)
         persist()
+        if e.kind == .feed {
+            refreshFeedReminderSchedule()
+        }
     }
 
     func recentEvents(kind: EventKind, limit: Int = 20) -> [Event] {
@@ -144,6 +148,9 @@ final class AppStore {
             syncSolidFoods(named: Set(solidFoodNames(in: e)))
         }
         persist()
+        if e.kind == .feed {
+            refreshFeedReminderSchedule()
+        }
     }
 
     func updateEvent(_ e: Event) {
@@ -154,6 +161,9 @@ final class AppStore {
             syncSolidFoods(named: Set(solidFoodNames(in: original) + solidFoodNames(in: e)))
         }
         persist()
+        if original.kind == .feed || e.kind == .feed {
+            refreshFeedReminderSchedule()
+        }
     }
 
     func updateGrowth(_ g: GrowthPoint) {
@@ -189,6 +199,7 @@ final class AppStore {
         if let feedDraft, feedDraft.hasLiveActivityState {
             FeedLiveActivityController.update(draft: feedDraft, babyName: baby.name)
         }
+        refreshFeedReminderSchedule()
     }
 
     private func refreshBirthDateDerivedData(previousBirthDate: Date) {
@@ -268,6 +279,42 @@ final class AppStore {
 
     func restoreFeedLiveActivityIfNeeded() {
         FeedLiveActivityController.update(draft: feedDraft, babyName: baby.name)
+    }
+
+    func setFeedReminderEnabled(_ isEnabled: Bool) {
+        guard feedReminder.isEnabled != isEnabled else { return }
+        feedReminder.isEnabled = isEnabled
+        feedReminder.anchorAt = isEnabled ? Date() : nil
+        persist()
+        refreshFeedReminderSchedule()
+    }
+
+    func updateFeedReminderInterval(hours: Int) {
+        let clamped = FeedReminderSettings.clampedIntervalHours(hours)
+        guard feedReminder.intervalHours != clamped else { return }
+        feedReminder.intervalHours = clamped
+        if mostRecentEvent(kind: .feed) == nil {
+            feedReminder.anchorAt = Date()
+        }
+        persist()
+        refreshFeedReminderSchedule()
+    }
+
+    func nextFeedReminderDueDate(now: Date = Date()) -> Date? {
+        FeedReminderPlanner.dueDate(
+            settings: feedReminder,
+            lastFeed: mostRecentEvent(kind: .feed),
+            now: now
+        )
+    }
+
+    func refreshFeedReminderSchedule(now: Date = Date()) {
+        FeedReminderNotificationController.sync(
+            settings: feedReminder,
+            lastFeed: mostRecentEvent(kind: .feed),
+            babyName: baby.name,
+            now: now
+        )
     }
 
     // MARK: — Vaccine plan management
@@ -723,7 +770,7 @@ enum FeedDraftSide: String, Equatable, Codable {
 }
 
 enum SubScreen: String, Identifiable {
-    case sleep, feed, diaper, solid, vaccine, medication, foodList, teeth, backup
+    case sleep, feed, diaper, solid, vaccine, medication, foodList, teeth, settings, backup
     var id: String { rawValue }
 }
 

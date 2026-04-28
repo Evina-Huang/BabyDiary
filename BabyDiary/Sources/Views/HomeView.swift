@@ -28,15 +28,27 @@ struct HomeView: View {
                     }
                 }
                 Spacer()
-                Button { onOpen(.backup) } label: {
-                    Image(systemName: "square.and.arrow.up.on.square")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(store.theme.primary600)
-                        .frame(width: 40, height: 40)
-                        .background(store.theme.primaryTint, in: Circle())
+                HStack(spacing: 10) {
+                    Button { onOpen(.settings) } label: {
+                        Image(systemName: "gearshape")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(store.theme.primary600)
+                            .frame(width: 40, height: 40)
+                            .background(store.theme.primaryTint, in: Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("设置")
+
+                    Button { onOpen(.backup) } label: {
+                        Image(systemName: "square.and.arrow.up.on.square")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(store.theme.primary600)
+                            .frame(width: 40, height: 40)
+                            .background(store.theme.primaryTint, in: Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("数据备份")
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("数据备份")
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 20).padding(.top, 10).padding(.bottom, 2)

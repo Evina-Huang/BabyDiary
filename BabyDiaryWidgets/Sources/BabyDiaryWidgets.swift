@@ -177,8 +177,10 @@ struct LastFeedWidgetView: View {
             moduleValue(item, size: 25, minimumScale: 0.72)
             Text(item.detail)
                 .font(.system(size: 12, weight: .semibold))
+                .fontWidth(.compressed)
                 .foregroundStyle(BDColor.ink3)
                 .lineLimit(2)
+                .minimumScaleFactor(0.78)
         }
         .padding(4)
     }
@@ -258,8 +260,10 @@ struct LastFeedWidgetView: View {
                 .minimumScaleFactor(0.8)
             Text(item.detail)
                 .font(.system(size: 11, weight: .semibold))
+                .fontWidth(.compressed)
                 .foregroundStyle(BDColor.ink2)
                 .lineLimit(1)
+                .minimumScaleFactor(0.75)
         }
     }
 
@@ -341,14 +345,18 @@ struct LastFeedWidgetView: View {
 
             Text(item.detail)
                 .font(.system(size: 12, weight: .semibold))
+                .fontWidth(.compressed)
                 .foregroundStyle(BDColor.ink2)
                 .lineLimit(1)
+                .minimumScaleFactor(0.72)
 
             if let date = item.date {
                 Text(date)
                     .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(BDColor.ink3)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             Spacer(minLength: 0)
@@ -377,8 +385,10 @@ struct LastFeedWidgetView: View {
                 moduleValue(item, text: item.rowValue ?? item.value, size: 26, minimumScale: 0.72)
                 Text(item.detail)
                     .font(.system(size: 13, weight: .semibold))
+                    .fontWidth(.compressed)
                     .foregroundStyle(BDColor.ink2)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.72)
             }
             .layoutPriority(1)
 
@@ -389,8 +399,10 @@ struct LastFeedWidgetView: View {
                     .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(BDColor.ink3)
                     .multilineTextAlignment(.trailing)
-                    .lineLimit(2)
-                    .frame(maxWidth: 76, alignment: .trailing)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+                    .frame(width: 72, alignment: .trailing)
+                    .layoutPriority(1)
             }
         }
         .padding(13)
@@ -404,25 +416,19 @@ struct LastFeedWidgetView: View {
         size: CGFloat,
         minimumScale: CGFloat
     ) -> some View {
-        Group {
-            if let referenceDate = item.timerReferenceDate {
-                Text(referenceDate, style: .timer)
-            } else {
-                Text(text ?? item.value)
-            }
-        }
-        .font(.system(size: size, weight: .black))
-        .fontWidth(.compressed)
+        ElapsedValueText(
+            referenceDate: item.timerReferenceDate,
+            fallback: text ?? item.value,
+            size: size,
+            minimumScale: minimumScale
+        )
         .foregroundStyle(BDColor.ink)
-        .monospacedDigit()
-        .minimumScaleFactor(minimumScale)
-        .lineLimit(1)
     }
 
     @ViewBuilder
     private func inlineValue(_ item: WidgetModuleContent) -> some View {
         if let referenceDate = item.timerReferenceDate {
-            Text(referenceDate, style: .timer)
+            Text(timerInterval: elapsedTimerInterval(startingAt: referenceDate), countsDown: false, showsHours: true)
         } else {
             Text("\(item.title) \(shortValueText(for: item))")
         }
@@ -431,7 +437,7 @@ struct LastFeedWidgetView: View {
     @ViewBuilder
     private func shortValue(_ item: WidgetModuleContent) -> some View {
         if let referenceDate = item.timerReferenceDate {
-            Text(referenceDate, style: .timer)
+            Text(timerInterval: elapsedTimerInterval(startingAt: referenceDate), countsDown: false, showsHours: true)
         } else {
             Text(shortValueText(for: item))
         }
@@ -535,7 +541,8 @@ struct LastFeedWidgetView: View {
             return event.title
         }
         guard let subtitle = event.subtitle, !subtitle.isEmpty else { return event.title }
-        return "\(event.title) · \(subtitle)"
+        let compactSubtitle = subtitle.replacingOccurrences(of: " - ", with: "-")
+        return "\(event.title) · \(compactSubtitle)"
     }
 }
 
@@ -709,16 +716,12 @@ struct FeedElapsedText: View {
     var size: CGFloat
 
     var body: some View {
-        Group {
-            if let reference = state.timerReferenceDate {
-                Text(reference, style: .timer)
-            } else {
-                Text(formatDuration(state.accumulated))
-            }
-        }
-        .font(.system(size: size, weight: .black))
-        .monospacedDigit()
-        .minimumScaleFactor(0.7)
+        ElapsedValueText(
+            referenceDate: state.timerReferenceDate,
+            fallback: formatDuration(state.accumulated),
+            size: size,
+            minimumScale: 0.55
+        )
     }
 }
 
@@ -727,16 +730,35 @@ struct SleepElapsedText: View {
     var size: CGFloat
 
     var body: some View {
+        ElapsedValueText(
+            referenceDate: state.timerReferenceDate,
+            fallback: formatDuration(state.accumulated),
+            size: size,
+            minimumScale: 0.55
+        )
+    }
+}
+
+private struct ElapsedValueText: View {
+    let referenceDate: Date?
+    let fallback: String
+    let size: CGFloat
+    var weight: Font.Weight = .black
+    var minimumScale: CGFloat = 0.7
+
+    var body: some View {
         Group {
-            if let reference = state.timerReferenceDate {
-                Text(reference, style: .timer)
+            if let referenceDate {
+                Text(timerInterval: elapsedTimerInterval(startingAt: referenceDate), countsDown: false, showsHours: true)
             } else {
-                Text(formatDuration(state.accumulated))
+                Text(fallback)
             }
         }
-        .font(.system(size: size, weight: .black))
+        .font(.system(size: size, weight: weight))
+        .fontWidth(.compressed)
         .monospacedDigit()
-        .minimumScaleFactor(0.7)
+        .lineLimit(1)
+        .minimumScaleFactor(minimumScale)
     }
 }
 
@@ -746,19 +768,14 @@ private struct CompactDynamicIslandTimer: View {
     let tint: Color
 
     var body: some View {
-        Group {
-            if let referenceDate {
-                Text(referenceDate, style: .timer)
-            } else {
-                Text(formatDuration(accumulated))
-            }
-        }
-        .font(.system(size: 11, weight: .semibold, design: .rounded))
-        .fontWidth(.compressed)
-        .monospacedDigit()
+        ElapsedValueText(
+            referenceDate: referenceDate,
+            fallback: formatDuration(accumulated),
+            size: 11,
+            weight: .semibold,
+            minimumScale: 0.45
+        )
         .foregroundStyle(tint)
-        .lineLimit(1)
-        .minimumScaleFactor(0.45)
         .frame(width: 42, alignment: .trailing)
     }
 }
@@ -944,13 +961,18 @@ private func condensedRelativeText(since date: Date?, now: Date) -> String {
 }
 
 private func dateLine(_ date: Date) -> String {
-    Calendar.current.isDateInToday(date)
-        ? "今天 \(timeText(date))"
-        : date.formatted(.dateTime.month(.defaultDigits).day().hour().minute().locale(Locale(identifier: "zh_CN")))
+    if Calendar.current.isDateInToday(date) {
+        return timeText(date)
+    }
+    return date.formatted(.dateTime.month(.defaultDigits).day().hour().minute().locale(Locale(identifier: "zh_CN")))
 }
 
 private func timeText(_ date: Date) -> String {
     date.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits).locale(Locale(identifier: "zh_CN")))
+}
+
+private func elapsedTimerInterval(startingAt date: Date) -> ClosedRange<Date> {
+    date...date.addingTimeInterval(7 * 24 * 60 * 60)
 }
 
 private func formatDuration(_ seconds: TimeInterval) -> String {

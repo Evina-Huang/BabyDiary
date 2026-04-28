@@ -7,7 +7,7 @@ import WidgetKit
 // MARK: — Snapshot
 
 struct DataSnapshot: Codable {
-    var version: Int = 3
+    var version: Int = 4
     var exportedAt: Date = Date()
     var baby: Baby
     var events: [Event]
@@ -19,9 +19,10 @@ struct DataSnapshot: Codable {
     var milestones: [Milestone]? = nil
     var activeTimer: RunningTimer? = nil
     var feedDraft: FeedDraft? = nil
+    var feedReminder: FeedReminderSettings? = nil
 
     init(
-        version: Int = 3,
+        version: Int = 4,
         exportedAt: Date = Date(),
         baby: Baby,
         events: [Event],
@@ -32,7 +33,8 @@ struct DataSnapshot: Codable {
         teeth: [ToothRecord]? = nil,
         milestones: [Milestone]? = nil,
         activeTimer: RunningTimer? = nil,
-        feedDraft: FeedDraft? = nil
+        feedDraft: FeedDraft? = nil,
+        feedReminder: FeedReminderSettings? = nil
     ) {
         self.version = version
         self.exportedAt = exportedAt
@@ -46,10 +48,11 @@ struct DataSnapshot: Codable {
         self.milestones = milestones
         self.activeTimer = activeTimer
         self.feedDraft = feedDraft
+        self.feedReminder = feedReminder
     }
 
     init(
-        version: Int = 3,
+        version: Int = 4,
         exportedAt: Date = Date(),
         baby: Baby,
         events: [Event],
@@ -71,7 +74,8 @@ struct DataSnapshot: Codable {
             teeth: teeth,
             milestones: milestones,
             activeTimer: nil,
-            feedDraft: nil
+            feedDraft: nil,
+            feedReminder: nil
         )
     }
 }
@@ -107,6 +111,7 @@ extension AppStore {
         s.publishWidgetSnapshot(reloadTimelines: false)
         s.restoreSleepLiveActivityIfNeeded()
         s.restoreFeedLiveActivityIfNeeded()
+        s.refreshFeedReminderSchedule()
         return s
     }
 
@@ -115,7 +120,7 @@ extension AppStore {
                      growth: growth, foods: foods, medications: medications,
                      teeth: teeth,
                      milestones: milestones, activeTimer: activeTimer,
-                     feedDraft: feedDraft)
+                     feedDraft: feedDraft, feedReminder: feedReminder)
     }
 
     func apply(_ snap: DataSnapshot) {
@@ -137,6 +142,7 @@ extension AppStore {
         }
         activeTimer = snap.activeTimer
         feedDraft = snap.feedDraft
+        feedReminder = snap.feedReminder ?? .init()
     }
 
     func clearPresetDataForPersonalUseIfNeeded() {
@@ -152,9 +158,11 @@ extension AppStore {
         teeth = ToothPosition.all.map(ToothRecord.empty(for:))
         activeTimer = nil
         feedDraft = nil
+        feedReminder = .init()
 
         SleepLiveActivityController.end(timer: nil, babyName: baby.name)
         FeedLiveActivityController.end(babyName: baby.name)
+        FeedReminderNotificationController.cancel()
 
         UserDefaults.standard.set(true, forKey: Self.didClearPresetDataKey)
         persist(makeRecoveryCopy: false)
@@ -324,6 +332,7 @@ extension AppStore {
         let snap = try Self.decodeSnapshot(from: data)
         apply(snap)
         persist()
+        refreshFeedReminderSchedule()
     }
 
     func exportPDF() throws -> URL {
