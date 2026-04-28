@@ -27,7 +27,7 @@ struct BabyDiaryTests {
     @Test func demoStoreSeedsScreenshotTodayEvents() throws {
         let store = AppStore(seedDemoData: true)
         let cal = Calendar.current
-        let todays = store.events.filter { cal.isDateInToday($0.at) }
+        let todays = store.events.filter { cal.isDateInToday($0.at) && $0.id.hasPrefix("e_today_") }
 
         #expect(todays.count == 8)
         #expect(todays.map(\.id) == [
@@ -57,6 +57,47 @@ struct BabyDiaryTests {
         let formula = try #require(todays.first { $0.id == "e_today_1505" })
         #expect(formula.title == "配方奶")
         #expect(formula.sub == "230 ml · 15:05 - 15:13")
+    }
+
+    @Test func simulatorSevenDayTestEventsCoverSevenDays() {
+        let cal = Calendar(identifier: .gregorian)
+        let base = cal.date(from: DateComponents(year: 2026, month: 4, day: 29, hour: 18))!
+        let events = AppStore.simulatorSevenDayTestEvents(on: base, calendar: cal)
+        let expectedKinds = Set(EventKind.allCases)
+        let days = Set(events.map { cal.startOfDay(for: $0.at) })
+
+        #expect(days.count == 7)
+
+        for offset in 0...6 {
+            let day = cal.startOfDay(for: cal.date(byAdding: .day, value: -offset, to: base)!)
+            let eventsOnDay = events.filter { cal.isDate($0.at, inSameDayAs: day) }
+            #expect(!eventsOnDay.isEmpty)
+            #expect(expectedKinds.isSubset(of: Set(eventsOnDay.map(\.kind))))
+        }
+    }
+
+    @Test func simulatorSevenDayTestDataMergeKeepsCustomRecords() {
+        let cal = Calendar(identifier: .gregorian)
+        let base = cal.date(from: DateComponents(year: 2026, month: 4, day: 29, hour: 18))!
+        let customDate = cal.date(from: DateComponents(year: 2026, month: 4, day: 28, hour: 14))!
+        let store = AppStore()
+        let custom = Event(id: "custom_keep", kind: .feed, at: customDate, title: "自定义记录", sub: "90 ml")
+        let staleSeed = Event(
+            id: "\(AppStore.simulatorSevenDayEventIDPrefix)d3_feed_0620",
+            kind: .feed,
+            at: cal.date(from: DateComponents(year: 2024, month: 1, day: 1, hour: 6))!,
+            title: "旧测试记录"
+        )
+        store.events = [custom, staleSeed]
+
+        store.mergeSimulatorSevenDayTestData(now: base, calendar: cal, persistChanges: false)
+
+        #expect(store.events.contains(custom))
+        #expect(!store.events.contains(staleSeed))
+        #expect(store.events.contains {
+            $0.id == "\(AppStore.simulatorSevenDayEventIDPrefix)d3_feed_0620" &&
+            cal.isDate($0.at, inSameDayAs: cal.date(byAdding: .day, value: -3, to: base)!)
+        })
     }
 
     @Test func screenshotTodayEventsMergeOnceWithoutDroppingOtherRecords() throws {
@@ -417,6 +458,50 @@ struct BabyDiaryTests {
 
         #expect(draft.formulaSubMode == .manual)
         #expect(draft.formulaMilliliters == 210)
+    }
+
+    @Test func shortcutStartsBreastFeedDraftWithoutDuplicating() throws {
+        let store = AppStore()
+        let cal = Calendar.current
+        let start = cal.date(from: DateComponents(year: 2026, month: 4, day: 28, hour: 9, minute: 0))!
+        let later = cal.date(byAdding: .minute, value: 10, to: start)!
+
+        let firstResult = store.startFeedFromShortcut(at: start)
+        let firstDraft = try #require(store.feedDraft)
+
+        #expect(firstResult == .started)
+        #expect(firstDraft.mode == .breast)
+        #expect(firstDraft.breastSubMode == .timer)
+        #expect(firstDraft.breastPhase == .running)
+        #expect(firstDraft.breastSessionStart == start)
+        #expect(firstDraft.breastSegmentStart == start)
+        #expect(firstDraft.breastFirstSide == firstDraft.breastActiveSide)
+
+        let duplicateResult = store.startFeedFromShortcut(at: later)
+
+        #expect(duplicateResult == .alreadyActive)
+        #expect(store.feedDraft == firstDraft)
+    }
+
+    @Test func shortcutStartsSleepTimerWithoutDuplicating() throws {
+        let store = AppStore()
+        let cal = Calendar.current
+        let start = cal.date(from: DateComponents(year: 2026, month: 4, day: 28, hour: 20, minute: 30))!
+        let later = cal.date(byAdding: .minute, value: 15, to: start)!
+
+        let firstResult = store.startSleepFromShortcut(at: start)
+        let firstTimer = try #require(store.activeTimer)
+
+        #expect(firstResult == .started)
+        #expect(firstTimer.kind == .sleep)
+        #expect(firstTimer.startedAt == start)
+        #expect(firstTimer.resumedAt == start)
+        #expect(firstTimer.accumulated == 0)
+
+        let duplicateResult = store.startSleepFromShortcut(at: later)
+
+        #expect(duplicateResult == .alreadyActive)
+        #expect(store.activeTimer == firstTimer)
     }
 
     @Test func sleepEventTitleUsesDurationFromManualTimes() {

@@ -9,6 +9,7 @@ fileprivate enum FloatingDockMetrics {
 
 struct ContentView: View {
     @Environment(AppStore.self) private var store
+    @Environment(\.scenePhase) private var scenePhase
     @State private var tab: MainTab = .home
     @State private var sub: SubScreen? = nil
     @State private var dockSide: FloatingDockSide = .right
@@ -29,6 +30,7 @@ struct ContentView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Palette.bg.ignoresSafeArea())
+        .onAppear(perform: registerShortcutHandling)
         .overlay {
             GeometryReader { proxy in
                 if hasFloatingDock {
@@ -104,6 +106,13 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .babyDiaryNotificationDestination)) { notification in
             openNotificationDestination(notification)
         }
+        .onReceive(NotificationCenter.default.publisher(for: .babyDiaryShortcutDestination)) { notification in
+            openShortcutDestination(notification)
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            guard newPhase == .active else { return }
+            registerShortcutHandling()
+        }
     }
 
     @ViewBuilder
@@ -130,6 +139,22 @@ struct ContentView: View {
 
     private func openNotificationDestination(_ notification: Notification) {
         openDestination(notification.userInfo?["destination"] as? String)
+    }
+
+    private func openShortcutDestination(_ notification: Notification) {
+        _ = BabyDiaryShortcutCoordinator.consumePendingDestination()
+        openDestination(notification.userInfo?["destination"] as? String)
+    }
+
+    private func registerShortcutHandling() {
+        BabyDiaryShortcutCoordinator.register(store)
+        openPendingShortcutDestination()
+    }
+
+    private func openPendingShortcutDestination() {
+        guard let destination = BabyDiaryShortcutCoordinator.consumePendingDestination() else { return }
+        _ = store.loadFromDisk()
+        openDestination(destination.rawValue)
     }
 
     private func openDestination(_ destination: String?) {

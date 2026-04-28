@@ -145,4 +145,5 @@ enum FeedReminderNotificationController {
 
 extension Notification.Name {
     static let babyDiaryNotificationDestination = Notification.Name("BabyDiary.notificationDestination")
+    static let babyDiaryShortcutDestination = Notification.Name("BabyDiary.shortcutDestination")
 }

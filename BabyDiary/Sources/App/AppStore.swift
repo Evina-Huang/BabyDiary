@@ -66,6 +66,119 @@ final class AppStore {
         ]
     }
 
+    static let simulatorSevenDayEventIDPrefix = "e_sim7d_"
+
+    static func simulatorSevenDayTestEvents(on date: Date = Date(), calendar cal: Calendar = .current) -> [Event] {
+        func at(dayOffset: Int, hour: Int, minute: Int = 0) -> Date {
+            let day = cal.date(byAdding: .day, value: -dayOffset, to: date) ?? date
+            return cal.date(bySettingHour: hour, minute: minute, second: 0, of: day) ?? day
+        }
+
+        func end(from start: Date, minutes: Int) -> Date {
+            cal.date(byAdding: .minute, value: minutes, to: start) ?? start
+        }
+
+        func timeLabel(_ value: Date) -> String {
+            let comps = cal.dateComponents([.hour, .minute], from: value)
+            return String(format: "%02d:%02d", comps.hour ?? 0, comps.minute ?? 0)
+        }
+
+        func sleepTitle(minutes: Int) -> String {
+            let hours = minutes / 60
+            let remainder = minutes % 60
+            if hours == 0 { return "睡眠 \(remainder)分" }
+            if remainder == 0 { return "睡眠 \(hours)时" }
+            return "睡眠 \(hours)时 \(remainder)分"
+        }
+
+        func sleepEvent(id: String, dayOffset: Int, hour: Int, minute: Int, duration: Int) -> Event {
+            let start = at(dayOffset: dayOffset, hour: hour, minute: minute)
+            let finish = end(from: start, minutes: duration)
+            return Event(
+                id: id,
+                kind: .sleep,
+                at: start,
+                endAt: finish,
+                title: sleepTitle(minutes: duration),
+                sub: "\(timeLabel(start)) - \(timeLabel(finish))"
+            )
+        }
+
+        var events = screenshotTodayEvents(on: date, calendar: cal)
+        events.append(.init(
+            id: "\(simulatorSevenDayEventIDPrefix)d0_solid_1025",
+            kind: .solid,
+            at: at(dayOffset: 0, hour: 10, minute: 25),
+            title: "香蕉泥",
+            sub: "25g"
+        ))
+
+        let solids = ["米糊", "南瓜泥", "苹果泥", "胡萝卜泥", "豌豆泥", "菠菜泥"]
+        let diaperNotes = ["奶瓣", "稀便", "偏干", "墨绿色", "有黏液", "水样便"]
+
+        for dayOffset in 1...6 {
+            let prefix = "\(simulatorSevenDayEventIDPrefix)d\(dayOffset)"
+            let morningFeedStart = at(dayOffset: dayOffset, hour: 6, minute: 20 + dayOffset % 4)
+            let morningFeedMinutes = 12 + dayOffset % 4
+            let formulaStart = at(dayOffset: dayOffset, hour: 11, minute: 18 + dayOffset % 5)
+            let formulaMl = 180 + dayOffset * 10
+            let eveningFeedStart = at(dayOffset: dayOffset, hour: 20, minute: 8 + dayOffset % 6)
+            let eveningFeedMinutes = 10 + dayOffset % 5
+
+            events.append(contentsOf: [
+                sleepEvent(id: "\(prefix)_sleep_0010", dayOffset: dayOffset, hour: 0, minute: 10, duration: 140 + dayOffset % 3 * 10),
+                .init(
+                    id: "\(prefix)_feed_0620",
+                    kind: .feed,
+                    at: morningFeedStart,
+                    endAt: end(from: morningFeedStart, minutes: morningFeedMinutes),
+                    title: "母乳 · 双侧",
+                    sub: "左 \(morningFeedMinutes / 2)分 · 右 \(morningFeedMinutes - morningFeedMinutes / 2)分 · 共 \(morningFeedMinutes)分"
+                ),
+                .init(
+                    id: "\(prefix)_diaper_0805",
+                    kind: .diaper,
+                    at: at(dayOffset: dayOffset, hour: 8, minute: 5 + dayOffset % 5),
+                    title: "嘘嘘"
+                ),
+                sleepEvent(id: "\(prefix)_sleep_0910", dayOffset: dayOffset, hour: 9, minute: 10 + dayOffset % 5, duration: 80 + dayOffset % 4 * 5),
+                .init(
+                    id: "\(prefix)_feed_1120",
+                    kind: .feed,
+                    at: formulaStart,
+                    endAt: end(from: formulaStart, minutes: 8),
+                    title: "配方奶",
+                    sub: "\(formulaMl) ml · \(timeLabel(formulaStart)) - \(timeLabel(end(from: formulaStart, minutes: 8)))"
+                ),
+                .init(
+                    id: "\(prefix)_solid_1215",
+                    kind: .solid,
+                    at: at(dayOffset: dayOffset, hour: 12, minute: 15 + dayOffset % 5),
+                    title: solids[dayOffset - 1],
+                    sub: "\(20 + dayOffset * 5)g"
+                ),
+                .init(
+                    id: "\(prefix)_diaper_1505",
+                    kind: .diaper,
+                    at: at(dayOffset: dayOffset, hour: 15, minute: 5 + dayOffset % 5),
+                    title: dayOffset.isMultiple(of: 2) ? "嘘嘘+臭臭" : "臭臭",
+                    sub: diaperNotes[dayOffset - 1]
+                ),
+                sleepEvent(id: "\(prefix)_sleep_1540", dayOffset: dayOffset, hour: 15, minute: 40 + dayOffset % 5, duration: 85 + dayOffset % 3 * 10),
+                .init(
+                    id: "\(prefix)_feed_2015",
+                    kind: .feed,
+                    at: eveningFeedStart,
+                    endAt: end(from: eveningFeedStart, minutes: eveningFeedMinutes),
+                    title: dayOffset.isMultiple(of: 2) ? "母乳 · 左侧" : "母乳 · 右侧",
+                    sub: "\(eveningFeedMinutes)分"
+                ),
+            ])
+        }
+
+        return events.sorted { $0.at > $1.at }
+    }
+
     func addEvent(_ e: Event) {
         events.insert(e, at: 0)
         persist()
@@ -270,6 +383,45 @@ final class AppStore {
         feedDraft = draft
         persist()
         FeedLiveActivityController.update(draft: draft, babyName: baby.name)
+    }
+
+    @discardableResult
+    func startFeedFromShortcut(at date: Date = Date()) -> ShortcutStartStatus {
+        if let feedDraft, feedDraft.hasActiveState {
+            FeedLiveActivityController.update(draft: feedDraft, babyName: baby.name)
+            publishWidgetSnapshot()
+            return .alreadyActive
+        }
+
+        let side = shortcutBreastSide()
+        var draft = FeedDraft()
+        draft.mode = .breast
+        draft.breastSubMode = .timer
+        draft.breastPhase = .running
+        draft.breastActiveSide = side
+        draft.breastFirstSide = side
+        draft.breastSegmentStart = date
+        draft.breastSessionStart = date
+        draft.breastSessionEnd = nil
+        syncFeedDraft(draft)
+        return .started
+    }
+
+    @discardableResult
+    func startSleepFromShortcut(at date: Date = Date()) -> ShortcutStartStatus {
+        if let activeTimer, activeTimer.kind == .sleep {
+            SleepLiveActivityController.update(timer: activeTimer, babyName: baby.name)
+            publishWidgetSnapshot()
+            return .alreadyActive
+        }
+
+        startTimer(kind: .sleep, at: date)
+        return .started
+    }
+
+    private func shortcutBreastSide() -> FeedDraftSide {
+        guard let endingSide = mostRecentBreastFeedEvent()?.breastEndingSide else { return .left }
+        return endingSide == .right ? .right : .left
     }
 
     func restoreSleepLiveActivityIfNeeded() {
@@ -605,20 +757,13 @@ final class AppStore {
     private func seed() {
         let cal = Calendar.current
         let now = Date()
-        func at(_ hOff: Int, _ mOff: Int = 0) -> Date {
-            cal.date(byAdding: .minute, value: -(hOff * 60 + mOff), to: now)!
-        }
         func daysAgo(_ n: Int, _ h: Int, _ m: Int = 0) -> Date {
             var d = cal.date(byAdding: .day, value: -n, to: now)!
             d = cal.date(bySettingHour: h, minute: m, second: 0, of: d)!
             return d
         }
 
-        events = Self.screenshotTodayEvents(on: now, calendar: cal) + [
-            .init(id: "e_yesterday_1400", kind: .feed, at: daysAgo(1, 14), title: "母乳 · 右侧", sub: "22分"),
-            .init(id: "e_yesterday_1200", kind: .solid, at: daysAgo(1, 12), title: "米糊", sub: "30g"),
-            .init(id: "e_yesterday_0900", kind: .diaper, at: daysAgo(1, 9), title: "嘘嘘", sub: ""),
-        ]
+        events = Self.simulatorSevenDayTestEvents(on: now, calendar: cal)
 
         let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"
         let ipv3  = cal.date(byAdding: .month, value: 4, to: baby.birthDate) ?? now
@@ -639,7 +784,7 @@ final class AppStore {
 
         // Foods: 3 safe, 1 allergic, 3 observing (incl. 1 expired → shows confirm prompt)
         foods = [
-            .init(id: "fd1", name: "南瓜泥", firstUsedAt: at(5, 0),         status: .observing, timesEaten: 1, observationDays: 3),
+            .init(id: "fd1", name: "南瓜泥", firstUsedAt: daysAgo(1, 12, 20), status: .observing, timesEaten: 1, observationDays: 3),
             .init(id: "fd2", name: "胡萝卜", firstUsedAt: daysAgo(2, 9),    status: .observing, timesEaten: 2, observationDays: 3),
             .init(id: "fd3", name: "豌豆泥", firstUsedAt: daysAgo(4, 10),   status: .observing, timesEaten: 3, observationDays: 5),
             .init(id: "fd4", name: "米糊",   firstUsedAt: f.date(from: "2026-03-01")!, status: .safe,     timesEaten: 12, observationDays: 3),
@@ -649,7 +794,7 @@ final class AppStore {
         ]
 
         medications = [
-            .init(id: "md1", name: "维生素 D3", takenAt: at(3, 20), dose: "1 粒", reason: "每日补充", reaction: .none),
+            .init(id: "md1", name: "维生素 D3", takenAt: daysAgo(0, 16, 40), dose: "1 粒", reason: "每日补充", reaction: .none),
             .init(id: "md2", name: "对乙酰氨基酚", takenAt: daysAgo(5, 21), dose: "2.5 ml", reason: "发热", reaction: .none, note: "体温下降后停用"),
             .init(id: "md3", name: "头孢克洛", takenAt: f.date(from: "2026-03-18")!, dose: "半包", reason: "医生开具", reaction: .allergic, reactionNote: "服后出现皮疹，已停用"),
         ]
@@ -767,6 +912,11 @@ enum FeedDraftPhase: String, Equatable, Codable {
 
 enum FeedDraftSide: String, Equatable, Codable {
     case left, right
+}
+
+enum ShortcutStartStatus: Equatable {
+    case started
+    case alreadyActive
 }
 
 enum SubScreen: String, Identifiable {

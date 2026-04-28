@@ -107,7 +107,9 @@ extension AppStore {
         let s = AppStore()
         _ = s.loadFromDisk()
         s.clearPresetDataForPersonalUseIfNeeded()
-        s.mergeScreenshotTodayEventsIfNeeded()
+        #if targetEnvironment(simulator)
+        s.mergeSimulatorSevenDayTestData()
+        #endif
         s.publishWidgetSnapshot(reloadTimelines: false)
         s.restoreSleepLiveActivityIfNeeded()
         s.restoreFeedLiveActivityIfNeeded()
@@ -184,6 +186,25 @@ extension AppStore {
 
         UserDefaults.standard.set(true, forKey: Self.didImportScreenshotEventsKey)
         persist()
+    }
+
+    func mergeSimulatorSevenDayTestData(
+        now: Date = Date(),
+        calendar cal: Calendar = .current,
+        persistChanges: Bool = true
+    ) {
+        let testEvents = Self.simulatorSevenDayTestEvents(on: now, calendar: cal)
+        let testEventIDs = Set(testEvents.map(\.id))
+
+        events.removeAll { event in
+            testEventIDs.contains(event.id) || event.id.hasPrefix(Self.simulatorSevenDayEventIDPrefix)
+        }
+        events.append(contentsOf: testEvents)
+        events.sort { $0.at > $1.at }
+
+        if persistChanges {
+            persist()
+        }
     }
 
     private struct EventSlot: Hashable {
