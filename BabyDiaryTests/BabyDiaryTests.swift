@@ -194,6 +194,185 @@ struct BabyDiaryTests {
         #expect(due == cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 11, minute: 0))!)
     }
 
+    @Test func feedReminderQuietHoursMoveDueDateToQuietEnd() throws {
+        let cal = Calendar.current
+        let feedStart = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 18, minute: 10))!
+        let feedEnd = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 18, minute: 30))!
+        let now = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 19, minute: 0))!
+        let settings = FeedReminderSettings(
+            isEnabled: true,
+            intervalHours: 4,
+            anchorAt: nil,
+            quietHoursEnabled: true,
+            quietStartMinuteOfDay: 22 * 60,
+            quietEndMinuteOfDay: 7 * 60
+        )
+        let feed = Event(id: "feed", kind: .feed, at: feedStart, endAt: feedEnd, title: "母乳 · 左侧", sub: "20分")
+
+        let due = try #require(FeedReminderPlanner.dueDate(settings: settings, lastFeed: feed, now: now))
+
+        #expect(due == cal.date(from: DateComponents(year: 2026, month: 4, day: 23, hour: 7, minute: 0))!)
+    }
+
+    @Test func feedReminderQuietHoursAllowEndBoundary() throws {
+        let cal = Calendar.current
+        let feedAt = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 3, minute: 0))!
+        let now = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 4, minute: 0))!
+        let settings = FeedReminderSettings(
+            isEnabled: true,
+            intervalHours: 4,
+            anchorAt: nil,
+            quietHoursEnabled: true,
+            quietStartMinuteOfDay: 22 * 60,
+            quietEndMinuteOfDay: 7 * 60
+        )
+        let feed = Event(id: "feed", kind: .feed, at: feedAt, title: "奶粉", sub: "120 ml")
+
+        let due = try #require(FeedReminderPlanner.dueDate(settings: settings, lastFeed: feed, now: now))
+
+        #expect(due == cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 7, minute: 0))!)
+    }
+
+    @Test func feedReminderScheduledDatesAvoidQuietHours() {
+        let cal = Calendar.current
+        let anchor = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 18, minute: 30))!
+        let now = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 19, minute: 0))!
+        let settings = FeedReminderSettings(
+            isEnabled: true,
+            intervalHours: 4,
+            anchorAt: anchor,
+            quietHoursEnabled: true,
+            quietStartMinuteOfDay: 22 * 60,
+            quietEndMinuteOfDay: 7 * 60
+        )
+
+        let dates = FeedReminderPlanner.scheduledDates(settings: settings, lastFeed: nil, now: now, count: 3)
+
+        #expect(dates == [
+            cal.date(from: DateComponents(year: 2026, month: 4, day: 23, hour: 7, minute: 0))!,
+            cal.date(from: DateComponents(year: 2026, month: 4, day: 23, hour: 11, minute: 0))!,
+            cal.date(from: DateComponents(year: 2026, month: 4, day: 23, hour: 15, minute: 0))!,
+        ])
+    }
+
+    @Test func legacyFeedReminderSettingsDecodeWithQuietDefaults() throws {
+        let data = """
+        {
+          "isEnabled": true,
+          "intervalHours": 4,
+          "anchorAt": "2026-04-22T07:00:00Z"
+        }
+        """.data(using: .utf8)!
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+
+        let settings = try decoder.decode(FeedReminderSettings.self, from: data)
+
+        #expect(settings.isEnabled)
+        #expect(settings.normalizedIntervalHours == 4)
+        #expect(!settings.quietHoursEnabled)
+        #expect(settings.normalizedQuietStartMinuteOfDay == 22 * 60)
+        #expect(settings.normalizedQuietEndMinuteOfDay == 7 * 60)
+    }
+
+    @Test func sleepReminderDueDateUsesLastSleepEndTime() throws {
+        let cal = Calendar.current
+        let start = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 8, minute: 0))!
+        let end = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 9, minute: 20))!
+        let now = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 10, minute: 0))!
+        let settings = SleepReminderSettings(isEnabled: true, awakeIntervalMinutes: 120, anchorAt: nil)
+        let sleep = Event(id: "sleep", kind: .sleep, at: start, endAt: end, title: "睡眠 1时20分")
+
+        let due = try #require(SleepReminderPlanner.dueDate(
+            settings: settings,
+            lastSleep: sleep,
+            isSleeping: false,
+            now: now
+        ))
+
+        #expect(due == cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 11, minute: 20))!)
+    }
+
+    @Test func sleepReminderPlannerReturnsNilWhileSleeping() {
+        let settings = SleepReminderSettings(isEnabled: true, awakeIntervalMinutes: 120, anchorAt: Date())
+
+        let due = SleepReminderPlanner.dueDate(
+            settings: settings,
+            lastSleep: nil,
+            isSleeping: true,
+            now: Date()
+        )
+
+        #expect(due == nil)
+    }
+
+    @Test func sleepReminderQuietHoursMoveDueDateToQuietEnd() throws {
+        let cal = Calendar.current
+        let start = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 18, minute: 0))!
+        let end = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 20, minute: 30))!
+        let now = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 21, minute: 0))!
+        let settings = SleepReminderSettings(
+            isEnabled: true,
+            awakeIntervalMinutes: 120,
+            anchorAt: nil,
+            quietHoursEnabled: true,
+            quietStartMinuteOfDay: 22 * 60,
+            quietEndMinuteOfDay: 7 * 60
+        )
+        let sleep = Event(id: "sleep", kind: .sleep, at: start, endAt: end, title: "睡眠 2时30分")
+
+        let due = try #require(SleepReminderPlanner.dueDate(
+            settings: settings,
+            lastSleep: sleep,
+            isSleeping: false,
+            now: now
+        ))
+
+        #expect(due == cal.date(from: DateComponents(year: 2026, month: 4, day: 23, hour: 7, minute: 0))!)
+    }
+
+    @Test func sleepReminderScheduledDatesAvoidQuietHours() {
+        let cal = Calendar.current
+        let anchor = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 20, minute: 30))!
+        let now = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 21, minute: 0))!
+        let settings = SleepReminderSettings(
+            isEnabled: true,
+            awakeIntervalMinutes: 120,
+            anchorAt: anchor,
+            quietHoursEnabled: true,
+            quietStartMinuteOfDay: 22 * 60,
+            quietEndMinuteOfDay: 7 * 60
+        )
+
+        let dates = SleepReminderPlanner.scheduledDates(settings: settings, lastSleep: nil, isSleeping: false, now: now, count: 3)
+
+        #expect(dates == [
+            cal.date(from: DateComponents(year: 2026, month: 4, day: 23, hour: 7, minute: 0))!,
+            cal.date(from: DateComponents(year: 2026, month: 4, day: 23, hour: 9, minute: 0))!,
+            cal.date(from: DateComponents(year: 2026, month: 4, day: 23, hour: 11, minute: 0))!,
+        ])
+    }
+
+    @Test func legacySleepReminderSettingsDecodeWithQuietDefaults() throws {
+        let data = """
+        {
+          "isEnabled": true,
+          "awakeIntervalMinutes": 120,
+          "anchorAt": "2026-04-22T07:00:00Z"
+        }
+        """.data(using: .utf8)!
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+
+        let settings = try decoder.decode(SleepReminderSettings.self, from: data)
+
+        #expect(settings.isEnabled)
+        #expect(settings.normalizedAwakeIntervalMinutes == 120)
+        #expect(!settings.quietHoursEnabled)
+        #expect(settings.normalizedQuietStartMinuteOfDay == 22 * 60)
+        #expect(settings.normalizedQuietEndMinuteOfDay == 7 * 60)
+    }
+
     @Test func mostRecentBreastFeedIgnoresLaterFormulaEntry() throws {
         let store = AppStore()
         let cal = Calendar.current
@@ -393,12 +572,37 @@ struct BabyDiaryTests {
     @Test func snapshotIncludesFeedReminderSettings() throws {
         let store = AppStore()
         let anchor = Date()
-        store.feedReminder = FeedReminderSettings(isEnabled: true, intervalHours: 4, anchorAt: anchor)
+        store.feedReminder = FeedReminderSettings(
+            isEnabled: true,
+            intervalHours: 4,
+            anchorAt: anchor,
+            quietHoursEnabled: true,
+            quietStartMinuteOfDay: 22 * 60,
+            quietEndMinuteOfDay: 7 * 60
+        )
 
         let snapshot = store.snapshot()
         let reminder = try #require(snapshot.feedReminder)
 
         #expect(reminder == store.feedReminder)
+    }
+
+    @Test func snapshotIncludesSleepReminderSettings() throws {
+        let store = AppStore()
+        let anchor = Date()
+        store.sleepReminder = SleepReminderSettings(
+            isEnabled: true,
+            awakeIntervalMinutes: 150,
+            anchorAt: anchor,
+            quietHoursEnabled: true,
+            quietStartMinuteOfDay: 21 * 60 + 30,
+            quietEndMinuteOfDay: 6 * 60 + 45
+        )
+
+        let snapshot = store.snapshot()
+        let reminder = try #require(snapshot.sleepReminder)
+
+        #expect(reminder == store.sleepReminder)
     }
 
     @Test func pauseTimerBanksElapsedTimeAndResumeContinues() {
@@ -541,5 +745,6 @@ struct BabyDiaryTests {
         #expect(store.teeth.count == ToothPosition.all.count)
         #expect(store.teeth.allSatisfy { $0.eruptedAt == nil })
         #expect(store.medications.isEmpty)
+        #expect(store.sleepReminder == SleepReminderSettings())
     }
 }

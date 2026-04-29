@@ -15,6 +15,7 @@ final class AppStore {
     var activeTimer: RunningTimer? = nil
     var feedDraft: FeedDraft? = nil
     var feedReminder: FeedReminderSettings = .init()
+    var sleepReminder: SleepReminderSettings = .init()
 
     init(seedDemoData: Bool = false) {
         baby = seedDemoData ? Self.demoBaby() : Self.defaultBaby()
@@ -185,6 +186,9 @@ final class AppStore {
         if e.kind == .feed {
             refreshFeedReminderSchedule()
         }
+        if e.kind == .sleep {
+            refreshSleepReminderSchedule()
+        }
     }
 
     func recentEvents(kind: EventKind, limit: Int = 20) -> [Event] {
@@ -264,6 +268,9 @@ final class AppStore {
         if e.kind == .feed {
             refreshFeedReminderSchedule()
         }
+        if e.kind == .sleep {
+            refreshSleepReminderSchedule()
+        }
     }
 
     func updateEvent(_ e: Event) {
@@ -276,6 +283,9 @@ final class AppStore {
         persist()
         if original.kind == .feed || e.kind == .feed {
             refreshFeedReminderSchedule()
+        }
+        if original.kind == .sleep || e.kind == .sleep {
+            refreshSleepReminderSchedule()
         }
     }
 
@@ -313,6 +323,7 @@ final class AppStore {
             FeedLiveActivityController.update(draft: feedDraft, babyName: baby.name)
         }
         refreshFeedReminderSchedule()
+        refreshSleepReminderSchedule()
     }
 
     private func refreshBirthDateDerivedData(previousBirthDate: Date) {
@@ -342,6 +353,7 @@ final class AppStore {
         persist()
         if kind == .sleep {
             SleepLiveActivityController.start(timer: timer, babyName: baby.name)
+            refreshSleepReminderSchedule()
         }
     }
 
@@ -374,6 +386,7 @@ final class AppStore {
         persist()
         if t?.kind == .sleep {
             SleepLiveActivityController.end(timer: t, babyName: baby.name)
+            refreshSleepReminderSchedule()
         }
         return t
     }
@@ -452,10 +465,94 @@ final class AppStore {
         refreshFeedReminderSchedule()
     }
 
+    func setFeedReminderQuietHoursEnabled(_ isEnabled: Bool) {
+        guard feedReminder.quietHoursEnabled != isEnabled else { return }
+        feedReminder.quietHoursEnabled = isEnabled
+        persist()
+        refreshFeedReminderSchedule()
+    }
+
+    func updateFeedReminderQuietStartMinute(_ minute: Int) {
+        let clamped = FeedReminderSettings.clampedMinuteOfDay(minute)
+        guard feedReminder.quietStartMinuteOfDay != clamped else { return }
+        feedReminder.quietStartMinuteOfDay = clamped
+        persist()
+        refreshFeedReminderSchedule()
+    }
+
+    func updateFeedReminderQuietEndMinute(_ minute: Int) {
+        let clamped = FeedReminderSettings.clampedMinuteOfDay(minute)
+        guard feedReminder.quietEndMinuteOfDay != clamped else { return }
+        feedReminder.quietEndMinuteOfDay = clamped
+        persist()
+        refreshFeedReminderSchedule()
+    }
+
     func nextFeedReminderDueDate(now: Date = Date()) -> Date? {
         FeedReminderPlanner.dueDate(
             settings: feedReminder,
             lastFeed: mostRecentEvent(kind: .feed),
+            now: now
+        )
+    }
+
+    func setSleepReminderEnabled(_ isEnabled: Bool) {
+        guard sleepReminder.isEnabled != isEnabled else { return }
+        sleepReminder.isEnabled = isEnabled
+        sleepReminder.anchorAt = isEnabled ? Date() : nil
+        persist()
+        refreshSleepReminderSchedule()
+    }
+
+    func updateSleepReminderAwakeInterval(minutes: Int) {
+        let clamped = SleepReminderSettings.clampedAwakeIntervalMinutes(minutes)
+        guard sleepReminder.awakeIntervalMinutes != clamped else { return }
+        sleepReminder.awakeIntervalMinutes = clamped
+        if mostRecentEvent(kind: .sleep) == nil {
+            sleepReminder.anchorAt = Date()
+        }
+        persist()
+        refreshSleepReminderSchedule()
+    }
+
+    func setSleepReminderQuietHoursEnabled(_ isEnabled: Bool) {
+        guard sleepReminder.quietHoursEnabled != isEnabled else { return }
+        sleepReminder.quietHoursEnabled = isEnabled
+        persist()
+        refreshSleepReminderSchedule()
+    }
+
+    func updateSleepReminderQuietStartMinute(_ minute: Int) {
+        let clamped = SleepReminderSettings.clampedMinuteOfDay(minute)
+        guard sleepReminder.quietStartMinuteOfDay != clamped else { return }
+        sleepReminder.quietStartMinuteOfDay = clamped
+        persist()
+        refreshSleepReminderSchedule()
+    }
+
+    func updateSleepReminderQuietEndMinute(_ minute: Int) {
+        let clamped = SleepReminderSettings.clampedMinuteOfDay(minute)
+        guard sleepReminder.quietEndMinuteOfDay != clamped else { return }
+        sleepReminder.quietEndMinuteOfDay = clamped
+        persist()
+        refreshSleepReminderSchedule()
+    }
+
+    func nextSleepReminderDueDate(now: Date = Date()) -> Date? {
+        SleepReminderPlanner.dueDate(
+            settings: sleepReminder,
+            lastSleep: mostRecentEvent(kind: .sleep),
+            isSleeping: activeTimer?.kind == .sleep,
+            now: now
+        )
+    }
+
+    func refreshSleepReminderSchedule(now: Date = Date()) {
+        SleepReminderNotificationController.sync(
+            settings: sleepReminder,
+            lastSleep: mostRecentEvent(kind: .sleep),
+            isSleeping: activeTimer?.kind == .sleep,
+            babyName: baby.name,
             now: now
         )
     }
