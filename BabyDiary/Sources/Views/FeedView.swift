@@ -19,6 +19,7 @@ struct FeedScreen: View {
     @State private var bManualMinL: Int = 10
     @State private var bManualMinR: Int = 0
     @State private var bManualTime: Date = .now
+    @State private var bManualFirstSide: Side = .L
 
     // Breast timer state
     @State private var bPhase: Phase = .idle
@@ -94,11 +95,6 @@ struct FeedScreen: View {
     private func content(now: Date) -> some View {
         let isIdle = bPhase == .idle && fPhase == .idle
 
-        if let last = lastFeed, isIdle {
-            RepeatLastBar(last: last) { repeatLast(last) }
-                .padding(.bottom, 14)
-        }
-
         SegPill(selection: $mode, options: [(.breast, "母乳"), (.formula, "奶粉")])
             .frame(maxWidth: .infinity)
             .disabled(!isIdle)
@@ -109,8 +105,6 @@ struct FeedScreen: View {
         } else {
             formulaSection(now: now)
         }
-
-        historySection.padding(.top, 26)
     }
 
     // MARK: — Breast mode
@@ -146,6 +140,7 @@ struct FeedScreen: View {
                 FieldLabel(text: "右侧(分钟)")
                 StepperInput(value: $bManualMinR, step: 1, min: 0, max: 120, suffix: "分")
             }
+            breastManualOrderPicker
             InlineWheelTimePicker(time: $bManualTime, theme: store.theme)
             CTAButton(title: "保存记录",
                       variant: .primary,
@@ -155,23 +150,48 @@ struct FeedScreen: View {
         }
     }
 
+    private var breastManualOrderPicker: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            FieldLabel(text: "双侧顺序")
+            HStack(spacing: 8) {
+                manualOrderButton(side: .L, title: "先左后右")
+                manualOrderButton(side: .R, title: "先右后左")
+            }
+        }
+    }
+
+    private func manualOrderButton(side: Side, title: String) -> some View {
+        Button {
+            bManualFirstSide = side
+        } label: {
+            Text(title)
+                .font(.system(size: 13, weight: .heavy))
+                .lineLimit(1)
+                .minimumScaleFactor(0.84)
+                .foregroundStyle(bManualFirstSide == side ? .white : Palette.ink2)
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 10)
+                .background(bManualFirstSide == side ? store.theme.primary : Palette.bg2,
+                            in: Capsule())
+        }
+        .buttonStyle(PressableStyle())
+        .frame(maxWidth: .infinity)
+    }
+
     @ViewBuilder
     private func breastTimerBlock(liveL: TimeInterval, liveR: TimeInterval, total: TimeInterval) -> some View {
+        let lastEndedSide = lastBreastFeed?.breastEndingSide
         VStack(spacing: 14) {
-            if lastBreastFeed != nil, bPhase == .idle {
-                Text("💡 上次从\(bActive == .R ? "右" : "左")边结束")
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(Palette.ink2)
-                    .frame(maxWidth: .infinity)
-                    .padding(.horizontal, 14).padding(.vertical, 10)
-                    .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-            }
-
             HStack(spacing: 10) {
                 SideButton(side: .L, label: "左边", ms: liveL,
-                           active: bActive == .L && bPhase != .idle, phase: bPhase) { startOn(.L) }
+                           active: bActive == .L && bPhase != .idle,
+                           phase: bPhase,
+                           showsLastEndedHint: bPhase == .idle && lastEndedSide == .left) { startOn(.L) }
                 SideButton(side: .R, label: "右边", ms: liveR,
-                           active: bActive == .R && bPhase != .idle, phase: bPhase) { startOn(.R) }
+                           active: bActive == .R && bPhase != .idle,
+                           phase: bPhase,
+                           showsLastEndedHint: bPhase == .idle && lastEndedSide == .right) { startOn(.R) }
             }
 
             if bPhase == .idle {
@@ -204,45 +224,71 @@ struct FeedScreen: View {
         let ms: TimeInterval
         let active: Bool
         let phase: Phase
+        let showsLastEndedHint: Bool
         let action: () -> Void
 
         var body: some View {
             let isPaused = active && phase == .paused
-            let activeInk = isPaused ? Palette.yellowInk : Palette.pinkInk
-            let activeTint = isPaused ? Palette.yellow : Palette.pink
+            let sideInk = side == .L ? Palette.blueInk : Palette.pinkInk
+            let sideTint = side == .L ? Palette.blue : Palette.pink
+            let accent = isPaused ? Palette.yellowInk : sideInk
+            let background = isPaused ? Palette.yellow : active ? sideTint : sideTint.opacity(0.45)
+            let border = active ? accent.opacity(0.78) : sideInk.opacity(0.28)
             Button(action: action) {
-                VStack(spacing: 4) {
+                VStack(spacing: 8) {
                     Text(label)
-                        .font(.system(size: 13, weight: .heavy))
-                        .foregroundStyle(active ? activeInk : Palette.ink2)
+                        .font(.system(size: 14, weight: .heavy))
+                        .foregroundStyle(active ? accent : sideInk)
                     Text(formatMMSS(ms))
-                        .font(.system(size: 28, weight: .black))
-                        .tracking(-0.56)
+                        .font(.system(size: 34, weight: .black))
+                        .tracking(-0.68)
                         .monospacedDigit()
-                        .foregroundStyle(active ? activeInk : Palette.ink)
-                    if active, phase == .running {
-                        HStack(spacing: 5) {
-                            Circle().fill(Palette.pinkInk).frame(width: 6, height: 6)
-                            Text("计时中")
-                                .font(.system(size: 10, weight: .heavy))
-                                .tracking(0.6)
-                                .textCase(.uppercase)
-                        }
-                        .foregroundStyle(Palette.pinkInk)
-                    } else if active, phase == .paused {
-                        Text("已暂停")
-                            .font(.system(size: 10, weight: .heavy))
-                            .tracking(0.6)
-                            .textCase(.uppercase)
-                            .foregroundStyle(Palette.yellowInk)
-                    }
+                        .foregroundStyle(active ? accent : Palette.ink)
+                    statusLabel(accent: accent)
+                        .frame(height: 18)
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 20).padding(.horizontal, 12)
-                .background(active ? activeTint : Palette.bg2,
-                            in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .frame(maxWidth: .infinity, minHeight: 132)
+                .padding(.vertical, 24).padding(.horizontal, 14)
+                .background(background,
+                            in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .stroke(border, lineWidth: active ? 2.5 : 1.5)
+                )
+                .shadowCard()
             }
             .buttonStyle(PressableStyle())
+        }
+
+        @ViewBuilder
+        private func statusLabel(accent: Color) -> some View {
+            if active, phase == .running {
+                HStack(spacing: 5) {
+                    Circle().fill(accent).frame(width: 6, height: 6)
+                    Text("计时中")
+                        .font(.system(size: 10, weight: .heavy))
+                        .tracking(0.6)
+                        .textCase(.uppercase)
+                }
+                .foregroundStyle(accent)
+            } else if active, phase == .paused {
+                Text("已暂停")
+                    .font(.system(size: 10, weight: .heavy))
+                    .tracking(0.6)
+                    .textCase(.uppercase)
+                    .foregroundStyle(Palette.yellowInk)
+            } else if showsLastEndedHint {
+                Text("上次从\(side == .L ? "左" : "右")边结束")
+                    .font(.system(size: 10, weight: .heavy))
+                    .tracking(0.2)
+                    .foregroundStyle(accent.opacity(0.78))
+            } else {
+                Text("计时中")
+                    .font(.system(size: 10, weight: .heavy))
+                    .tracking(0.6)
+                    .textCase(.uppercase)
+                    .foregroundStyle(.clear)
+            }
         }
     }
 
@@ -393,43 +439,7 @@ struct FeedScreen: View {
         }
     }
 
-    // MARK: — History
-
-    private var historySection: some View {
-        let history = store.recentEvents(kind: .feed)
-        return VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("最近记录")
-                    .font(.system(size: 15, weight: .heavy))
-                    .tracking(-0.15)
-                Spacer()
-                Text("共 \(history.count) 条")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(Palette.ink3)
-            }
-            Card(padding: 0) {
-                VStack(spacing: 0) {
-                    if history.isEmpty {
-                        EmptyStateView(title: "还没有喂奶记录",
-                                       subtitle: "\(store.baby.name)喝奶的每一口都会记录在这里")
-                    } else {
-                        ForEach(Array(history.enumerated()), id: \.element.id) { i, e in
-                            EventRow(event: e, last: i == history.count - 1, onDelete: { store.deleteEvent($0) })
-                                .padding(.horizontal, 16)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
     // MARK: — Actions
-
-    private func repeatLast(_ last: Event) {
-        let now = Date()
-        store.addEvent(.init(kind: .feed, at: now, title: last.title, sub: last.sub))
-        onBack()
-    }
 
     private func startOn(_ side: Side) {
         let now = Date()
@@ -502,7 +512,8 @@ struct FeedScreen: View {
         } else {
             title = "母乳 · 右侧"; sub = "\(tot)分"
         }
-        store.addEvent(.init(kind: .feed, at: start, endAt: end, title: title, sub: sub))
+        let correctedEnd = correctedBreastTimerEnd(start: start, end: end, activeDuration: l + r)
+        store.addEvent(.init(kind: .feed, at: start, endAt: correctedEnd, title: title, sub: sub))
         resetBreast()
         onBack()
     }
@@ -513,7 +524,9 @@ struct FeedScreen: View {
         let tot = l + r
         let title: String; let sub: String
         if l > 0 && r > 0 {
-            title = "母乳 · 双侧"; sub = "左 \(l)分 · 右 \(r)分 · 共 \(tot)分"
+            let firstSide: BreastFeedSide = bManualFirstSide == .L ? .left : .right
+            title = "母乳 · 双侧"
+            sub = orderedBreastFeedSummary(leftMinutes: l, rightMinutes: r, firstSide: firstSide)
         } else if l > 0 {
             title = "母乳 · 左侧"; sub = "\(tot)分"
         } else {
@@ -542,7 +555,8 @@ struct FeedScreen: View {
     }
     private func saveFormulaTimer() {
         guard fPhase == .stopped, let s = fSessionStart, let e = fSessionEnd else { return }
-        store.addEvent(.init(kind: .feed, at: e,
+        store.addEvent(.init(kind: .feed, at: s,
+                             endAt: e,
                              title: "奶粉",
                              sub: "\(ml) ml · \(hhmm(s)) - \(hhmm(e))"))
         resetFormula()
@@ -588,7 +602,9 @@ struct FeedScreen: View {
             bManualTime = draft.breastManualTime
             bPhase = phase(from: draft.breastPhase)
             bActive = draft.breastActiveSide == .left ? .L : .R
-            bFirstSide = restoredFirstSide(from: draft)
+            let restoredSide = restoredFirstSide(from: draft)
+            bFirstSide = restoredSide
+            bManualFirstSide = restoredSide ?? bActive
             bLeftMs = draft.breastLeftDuration
             bRightMs = draft.breastRightDuration
             bSegStart = draft.breastSegmentStart
@@ -610,6 +626,7 @@ struct FeedScreen: View {
             mode = last.isFormulaFeed ? .formula : .breast
         }
         bActive = recommendedBreastSide
+        bManualFirstSide = recommendedBreastSide
     }
 
     private func syncDraftToStore() {
@@ -633,9 +650,15 @@ struct FeedScreen: View {
         case .stopped: return .stopped
         }
     }
+
+    private func correctedBreastTimerEnd(start: Date, end: Date, activeDuration: TimeInterval) -> Date {
+        let measuredEnd = start.addingTimeInterval(max(0, activeDuration))
+        guard end.timeIntervalSince(measuredEnd) > Event.staleFeedTimerTolerance else { return end }
+        return measuredEnd
+    }
 }
 
-// MARK: — Reusable stepper input + Repeat-last bar
+// MARK: — Reusable stepper input
 
 struct StepperInput: View {
     @Binding var value: Int
@@ -680,38 +703,6 @@ struct StepperInput: View {
             }
             .buttonStyle(PressableStyle())
         }
-    }
-}
-
-private struct RepeatLastBar: View {
-    let last: Event
-    let onTap: () -> Void
-    var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 10) {
-                Text("↻")
-                    .font(.system(size: 16, weight: .black))
-                    .foregroundStyle(Palette.mint600)
-                    .frame(width: 28, height: 28)
-                    .background(.white, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("一键重复上次")
-                        .font(.system(size: 11, weight: .heavy))
-                        .tracking(0.66)
-                        .textCase(.uppercase)
-                        .opacity(0.75)
-                    Text("\(last.title)\(last.sub.map { " · \($0)" } ?? "")")
-                        .font(.system(size: 14, weight: .heavy))
-                        .tracking(-0.14)
-                }
-                .foregroundStyle(Palette.mint600)
-                Spacer(minLength: 0)
-                AppIcon.Plus(size: 16, color: Palette.mint600)
-            }
-            .padding(.horizontal, 16).padding(.vertical, 12)
-            .background(Palette.mintTint, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        }
-        .buttonStyle(PressableStyle())
     }
 }
 

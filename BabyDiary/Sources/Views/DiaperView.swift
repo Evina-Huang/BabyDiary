@@ -46,8 +46,6 @@ struct DiaperScreen: View {
                 timePicker.padding(.top, 22)
 
                 saveButton.padding(.top, 22)
-
-                historySection.padding(.top, 26)
             }
         }
         .background(Palette.bg)
@@ -169,34 +167,6 @@ struct DiaperScreen: View {
         }
         .buttonStyle(PressableStyle())
         .disabled(!enabled)
-    }
-
-    private var historySection: some View {
-        let history = store.recentEvents(kind: .diaper)
-        return VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("最近记录")
-                    .font(.system(size: 15, weight: .heavy))
-                    .tracking(-0.15)
-                Spacer()
-                Text("共 \(history.count) 条")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(Palette.ink3)
-            }
-            Card(padding: 0) {
-                VStack(spacing: 0) {
-                    if history.isEmpty {
-                        EmptyStateView(title: "还没有尿布记录",
-                                       subtitle: "跟踪换尿布的频率能帮你了解宝宝健康")
-                    } else {
-                        ForEach(Array(history.enumerated()), id: \.element.id) { i, e in
-                            EventRow(event: e, last: i == history.count - 1, onDelete: { store.deleteEvent($0) })
-                                .padding(.horizontal, 16)
-                        }
-                    }
-                }
-            }
-        }
     }
 
     private var selectedTypeAllowsNote: Bool {

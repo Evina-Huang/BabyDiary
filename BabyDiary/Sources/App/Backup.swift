@@ -180,11 +180,15 @@ extension AppStore {
     }
 
     func mergeScreenshotTodayEventsIfNeeded() {
-        guard !UserDefaults.standard.bool(forKey: Self.didImportScreenshotEventsKey) else { return }
-
         let cal = Calendar.current
         let screenshotEvents = Self.screenshotTodayEvents(calendar: cal)
         let screenshotIDs = Set(screenshotEvents.map(\.id))
+        let existingIDs = Set(events.map(\.id))
+        guard !UserDefaults.standard.bool(forKey: Self.didImportScreenshotEventsKey)
+                || !screenshotIDs.isSubset(of: existingIDs) else {
+            return
+        }
+
         let screenshotSlots = Set(screenshotEvents.map { EventSlot($0, calendar: cal) })
 
         events.removeAll { event in
@@ -326,7 +330,7 @@ extension AppStore {
             BabyDiaryWidgetEvent(
                 kind: BabyDiaryWidgetEventKind(rawValue: event.kind.rawValue) ?? .feed,
                 occurredAt: event.occurredAt,
-                startedAt: event.at,
+                startedAt: event.startedAtForDisplay,
                 endedAt: event.endAt,
                 title: event.title,
                 subtitle: event.sub

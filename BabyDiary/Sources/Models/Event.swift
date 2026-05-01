@@ -109,7 +109,20 @@ struct Event: Identifiable, Hashable, Codable {
     }
 
     var occurredAt: Date {
-        endAt ?? at
+        if kind == .feed,
+           let endAt,
+           let correctedEndAt = correctedBreastFeedEndAt(endAt: endAt) {
+            return correctedEndAt
+        }
+        return endAt ?? at
+    }
+
+    var startedAtForDisplay: Date {
+        guard kind == .feed,
+              let start = Self.timeRangeStart(in: sub, relativeTo: occurredAt) else {
+            return at
+        }
+        return start
     }
 
     var isFormulaFeed: Bool {
@@ -145,6 +158,82 @@ struct Event: Identifiable, Hashable, Codable {
             return .left
         }
         return nil
+    }
+
+    static let staleFeedTimerTolerance: TimeInterval = 60 * 60
+
+    private func correctedBreastFeedEndAt(endAt: Date) -> Date? {
+        guard let activeDuration = breastFeedDurationFromText, activeDuration > 0 else { return nil }
+        let wallDuration = endAt.timeIntervalSince(at)
+        guard wallDuration > activeDuration + Self.staleFeedTimerTolerance else { return endAt }
+        return at.addingTimeInterval(activeDuration)
+    }
+
+    private var breastFeedDurationFromText: TimeInterval? {
+        guard isBreastFeed else { return nil }
+        if let totalMinutes = Self.firstCapturedInt(in: sub, pattern: #"共\s*(\d+)\s*分"#) {
+            return TimeInterval(totalMinutes * 60)
+        }
+        if title.contains("双") {
+            let left = Self.minutesAfter("左", in: sub) ?? 0
+            let right = Self.minutesAfter("右", in: sub) ?? 0
+            if left + right > 0 {
+                return TimeInterval((left + right) * 60)
+            }
+        }
+        if let minutes = Self.firstCapturedInt(in: sub, pattern: #"(\d+)\s*分"#) {
+            return TimeInterval(minutes * 60)
+        }
+        return nil
+    }
+
+    private static func minutesAfter(_ marker: Character, in text: String?) -> Int? {
+        guard let text, let idx = text.firstIndex(of: marker) else { return nil }
+        let tail = text[text.index(after: idx)...]
+        guard let match = tail.range(of: #"^\s*(\d+)\s*分"#, options: .regularExpression) else { return nil }
+        let value = tail[match].filter { $0.isNumber }
+        return Int(String(value))
+    }
+
+    private static func firstCapturedInt(in text: String?, pattern: String) -> Int? {
+        guard let text else { return nil }
+        let range = NSRange(text.startIndex..., in: text)
+        guard let regex = try? NSRegularExpression(pattern: pattern),
+              let match = regex.firstMatch(in: text, range: range),
+              match.numberOfRanges > 1,
+              let valueRange = Range(match.range(at: 1), in: text) else {
+            return nil
+        }
+        return Int(text[valueRange])
+    }
+
+    private static func timeRangeStart(in text: String?, relativeTo referenceDate: Date) -> Date? {
+        guard let text else { return nil }
+        let pattern = #"(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})"#
+        let range = NSRange(text.startIndex..., in: text)
+        guard let regex = try? NSRegularExpression(pattern: pattern),
+              let match = regex.firstMatch(in: text, range: range),
+              match.numberOfRanges == 5,
+              let hourRange = Range(match.range(at: 1), in: text),
+              let minuteRange = Range(match.range(at: 2), in: text),
+              let hour = Int(text[hourRange]),
+              let minute = Int(text[minuteRange]),
+              (0...23).contains(hour),
+              (0...59).contains(minute) else {
+            return nil
+        }
+
+        let cal = Calendar.current
+        var components = cal.dateComponents([.year, .month, .day], from: referenceDate)
+        components.hour = hour
+        components.minute = minute
+        components.second = 0
+        guard var start = cal.date(from: components) else { return nil }
+        if start > referenceDate.addingTimeInterval(60),
+           let previousDay = cal.date(byAdding: .day, value: -1, to: start) {
+            start = previousDay
+        }
+        return start
     }
 }
 

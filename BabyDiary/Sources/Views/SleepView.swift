@@ -6,9 +6,13 @@ struct SleepScreen: View {
 
     @State private var draftStart: Date = .now
     @State private var draftEnd: Date = .now
+    @State private var entryMode: SleepEntryMode = .timer
     @State private var activePicker: SleepPicker?
 
-    private var timer: RunningTimer? { store.activeTimer }
+    private var timer: RunningTimer? {
+        guard let timer = store.activeTimer, timer.kind == .sleep else { return nil }
+        return timer
+    }
     private var isRunning: Bool { timer?.isRunning ?? false }
     private func displayDuration(at now: Date) -> TimeInterval {
         guard let timer else { return 0 }
@@ -34,6 +38,11 @@ struct SleepScreen: View {
         }
         .background(Palette.bg)
         .onAppear(perform: syncDraftFromTimer)
+        .onChange(of: entryMode) { _, newValue in
+            if newValue == .manual {
+                prepareManualDraftIfNeeded()
+            }
+        }
         .onDisappear(perform: handleScreenDisappear)
         .sheet(item: $activePicker) { picker in
             SleepPickerSheet(picker: picker,
@@ -45,13 +54,22 @@ struct SleepScreen: View {
 
     @ViewBuilder
     private func content(now: Date) -> some View {
-        heroCard(now: now)
-        if timer != nil {
-            editorCard()
-                .padding(.top, 14)
+        if timer == nil {
+            SegPill(selection: $entryMode, options: [(.timer, "计时"), (.manual, "手动输入")])
+                .frame(maxWidth: .infinity)
+                .padding(.bottom, 14)
+        }
+
+        if entryMode == .manual && timer == nil {
+            manualSleepCard()
+        } else {
+            heroCard(now: now)
+            if timer != nil {
+                editorCard()
+                    .padding(.top, 14)
+            }
         }
         lastNightCard
-        historySection.padding(.top, 26)
     }
 
     private func heroCard(now: Date) -> some View {
@@ -114,6 +132,18 @@ struct SleepScreen: View {
                         }
                     }
                     .padding(.top, 22)
+
+                    Button(action: discardDraftSleep) {
+                        Text("清空本次")
+                            .font(.system(size: 14, weight: .heavy))
+                            .foregroundStyle(Palette.ink2)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 11)
+                            .background(Color.white.opacity(0.55),
+                                        in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    }
+                    .buttonStyle(PressableStyle())
+                    .padding(.top, 10)
                 } else {
                     CTAButton(title: "😴 开始睡觉", theme: store.theme) {
                         startSleep()
@@ -125,6 +155,59 @@ struct SleepScreen: View {
         }
         .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
         .shadowSurface()
+    }
+
+    private func manualSleepCard() -> some View {
+        let duration = max(0, draftEnd.timeIntervalSince(draftStart))
+        return Card {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("手动输入睡眠")
+                    .font(.system(size: 15, weight: .heavy))
+                    .tracking(-0.15)
+
+                CompactDateTimeField(time: $draftStart,
+                                     theme: store.theme,
+                                     label: "开始时间",
+                                     onPickDate: { activePicker = .startDate },
+                                     onPickTime: { activePicker = .startTime })
+                    .onChange(of: draftStart) { _, newValue in
+                        if draftEnd < newValue {
+                            draftEnd = newValue
+                        }
+                    }
+
+                CompactDateTimeField(time: $draftEnd,
+                                     theme: store.theme,
+                                     label: "结束时间",
+                                     onPickDate: { activePicker = .endDate },
+                                     onPickTime: { activePicker = .endTime })
+                    .onChange(of: draftEnd) { _, newValue in
+                        if newValue < draftStart {
+                            draftEnd = draftStart
+                        }
+                    }
+
+                HStack {
+                    FieldLabel(text: "合计")
+                    Text(formatDurShort(duration))
+                        .font(.system(size: 18, weight: .black))
+                        .monospacedDigit()
+                        .foregroundStyle(Palette.lavenderInk)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .background(Palette.lavender.opacity(0.7),
+                            in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+
+                CTAButton(title: "保存记录",
+                          variant: .primary,
+                          theme: store.theme,
+                          action: saveManualSleep)
+                    .disabled(duration <= 0)
+                    .opacity(duration > 0 ? 1 : 0.55)
+                    .padding(.top, 4)
+            }
+        }
     }
 
     private func editorCard() -> some View {
@@ -143,6 +226,7 @@ struct SleepScreen: View {
                         if !isRunning {
                             draftEnd = max(draftEnd, newValue)
                         }
+                        syncActiveTimerFromDraft()
                     }
 
                 CompactDateTimeField(time: $draftEnd,
@@ -152,6 +236,14 @@ struct SleepScreen: View {
                                      onPickTime: { activePicker = .endTime })
                     .disabled(isRunning)
                     .opacity(isRunning ? 0.65 : 1)
+                    .onChange(of: draftEnd) { _, newValue in
+                        guard !isRunning else { return }
+                        if newValue < draftStart {
+                            draftEnd = draftStart
+                            return
+                        }
+                        syncActiveTimerFromDraft()
+                    }
             }
         }
     }
@@ -189,33 +281,6 @@ struct SleepScreen: View {
         }
     }
 
-    private var historySection: some View {
-        let history = store.recentEvents(kind: .sleep)
-        return VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("最近记录")
-                    .font(.system(size: 15, weight: .heavy))
-                    .tracking(-0.15)
-                Spacer()
-                Text("共 \(history.count) 条")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(Palette.ink3)
-            }
-            Card(padding: 0) {
-                VStack(spacing: 0) {
-                    if history.isEmpty {
-                        EmptyStateView(title: "还没有睡眠记录",
-                                       subtitle: "\(store.baby.name)的每一次小憩都会记录在这里")
-                    } else {
-                        ForEach(Array(history.enumerated()), id: \.element.id) { i, e in
-                            SleepRow(event: e, last: i == history.count - 1) { store.deleteEvent($0) }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
     private func syncDraftFromTimer() {
         guard let timer = store.activeTimer else {
             draftStart = .now
@@ -227,6 +292,7 @@ struct SleepScreen: View {
     }
 
     private func startSleep(at now: Date = Date()) {
+        entryMode = .timer
         draftStart = now
         draftEnd = now
         store.startTimer(kind: .sleep, at: now)
@@ -242,6 +308,22 @@ struct SleepScreen: View {
             draftEnd = now
         }
         store.resumeTimer(at: now)
+    }
+
+    private func syncActiveTimerFromDraft(now: Date = Date()) {
+        guard store.activeTimer?.kind == .sleep else { return }
+        store.adjustActiveSleepTimer(
+            startedAt: draftStart,
+            endedAt: isRunning ? nil : draftEnd,
+            now: now
+        )
+    }
+
+    private func prepareManualDraftIfNeeded(now: Date = Date()) {
+        guard timer == nil, draftEnd <= draftStart else { return }
+        draftEnd = now
+        draftStart = Calendar.current.date(byAdding: .hour, value: -1, to: now)
+            ?? now.addingTimeInterval(-3600)
     }
 
     private func saveSleep(now: Date = Date()) {
@@ -264,6 +346,21 @@ struct SleepScreen: View {
         onBack()
     }
 
+    private func saveManualSleep() {
+        let end = max(draftEnd, draftStart)
+        let dur = end.timeIntervalSince(draftStart)
+        guard dur > 0 else { return }
+
+        store.addEvent(.init(
+            kind: .sleep,
+            at: draftStart,
+            endAt: end,
+            title: "睡眠 \(formatDurShort(dur))",
+            sub: "\(formatTime(draftStart)) - \(formatTime(end))"
+        ))
+        onBack()
+    }
+
     private func handleBack() {
         activePicker = nil
         onBack()
@@ -281,6 +378,7 @@ struct SleepScreen: View {
         if store.activeTimer != nil {
             store.stopTimer()
         }
+        entryMode = .timer
         draftStart = .now
         draftEnd = .now
         activePicker = nil
@@ -376,6 +474,10 @@ private struct CompactDateTimeField: View {
             }
         }
     }
+}
+
+private enum SleepEntryMode: String, Hashable {
+    case timer, manual
 }
 
 private enum SleepPicker: String, Identifiable {

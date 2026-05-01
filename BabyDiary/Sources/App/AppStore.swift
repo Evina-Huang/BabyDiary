@@ -378,6 +378,38 @@ final class AppStore {
         }
     }
 
+    func adjustActiveSleepTimer(startedAt: Date, endedAt: Date? = nil, now: Date = Date()) {
+        guard let timer = activeTimer, timer.kind == .sleep else { return }
+
+        let updated: RunningTimer
+        if timer.isRunning {
+            let targetElapsed = max(0, timer.elapsed(at: now) + timer.startedAt.timeIntervalSince(startedAt))
+            let carriedElapsed = min(timer.accumulated, targetElapsed)
+            let liveElapsed = max(0, targetElapsed - carriedElapsed)
+            updated = RunningTimer(
+                kind: timer.kind,
+                startedAt: startedAt,
+                accumulated: carriedElapsed,
+                resumedAt: now.addingTimeInterval(-liveElapsed)
+            )
+        } else {
+            let fallbackEnd = timer.startedAt.addingTimeInterval(timer.accumulated)
+            let normalizedEnd = max(endedAt ?? fallbackEnd, startedAt)
+            updated = RunningTimer(
+                kind: timer.kind,
+                startedAt: startedAt,
+                accumulated: normalizedEnd.timeIntervalSince(startedAt),
+                resumedAt: nil
+            )
+        }
+
+        guard updated != timer else { return }
+        activeTimer = updated
+        persist()
+        SleepLiveActivityController.update(timer: updated, babyName: baby.name)
+        refreshSleepReminderSchedule()
+    }
+
     @discardableResult
     func stopTimer() -> RunningTimer? {
         guard activeTimer != nil else { return nil }

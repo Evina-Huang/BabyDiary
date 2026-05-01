@@ -50,6 +50,10 @@ struct BabyDiaryWidgetEvent: Codable, Hashable {
     var endedAt: Date?
     var title: String
     var subtitle: String?
+
+    var relativeReferenceAt: Date {
+        kind == .feed ? startedAt : occurredAt
+    }
 }
 
 struct BabyDiaryWidgetSleepTimer: Codable, Hashable {
@@ -146,4 +150,32 @@ struct BabyDiaryFeedAttributes: ActivityAttributes {
     }
 
     var babyName: String
+}
+
+enum BabyDiaryRelativeTime {
+    static func fullText(since date: Date?, now: Date, empty: String = "暂无记录") -> String {
+        guard let date else { return empty }
+        let seconds = max(0, Int(now.timeIntervalSince(date)))
+        if seconds < 60 { return "刚刚" }
+
+        let hours = seconds / 3600
+        let minutes = (seconds % 3600) / 60
+        if hours > 0 {
+            return "\(hours)时\(minutes)分前"
+        }
+        return "\(minutes)分前"
+    }
+
+    static func compactText(since date: Date?, now: Date, empty: String = "--") -> String {
+        guard let date else { return empty }
+        let seconds = max(0, Int(now.timeIntervalSince(date)))
+        if seconds < 60 { return "刚刚" }
+
+        let hours = seconds / 3600
+        let minutes = (seconds % 3600) / 60
+        if hours > 0 {
+            return "\(hours)时\(minutes)分"
+        }
+        return "\(minutes)分"
+    }
 }

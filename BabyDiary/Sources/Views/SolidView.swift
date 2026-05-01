@@ -26,7 +26,6 @@ struct SolidScreen: View {
                 timePicker.padding(.top, 22)
                 notesBlock.padding(.top, 22)
                 saveButton.padding(.top, 22)
-                historySection.padding(.top, 26)
             }
         }
         .background(Palette.bg)
@@ -242,34 +241,6 @@ struct SolidScreen: View {
         }
         .buttonStyle(PressableStyle())
         .disabled(!enabled)
-    }
-
-    private var historySection: some View {
-        let history = store.recentEvents(kind: .solid)
-        return VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("最近记录")
-                    .font(.system(size: 15, weight: .heavy))
-                    .tracking(-0.15)
-                Spacer()
-                Text("共 \(history.count) 条")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(Palette.ink3)
-            }
-            Card(padding: 0) {
-                VStack(spacing: 0) {
-                    if history.isEmpty {
-                        EmptyStateView(title: "还没有辅食记录",
-                                       subtitle: "记录第一次尝试的新食物，留住成长的小里程碑")
-                    } else {
-                        ForEach(Array(history.enumerated()), id: \.element.id) { i, e in
-                            EventRow(event: e, last: i == history.count - 1, onDelete: { store.deleteEvent($0) })
-                                .padding(.horizontal, 16)
-                        }
-                    }
-                }
-            }
-        }
     }
 
     private func addCustom() {

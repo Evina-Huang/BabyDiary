@@ -167,6 +167,99 @@ struct BabyDiaryTests {
         #expect(event.occurredAt == earlyEnd)
     }
 
+    @Test func staleBreastFeedEndUsesRecordedDuration() {
+        let cal = Calendar.current
+        let start = cal.date(from: DateComponents(year: 2026, month: 4, day: 30, hour: 22, minute: 5))!
+        let savedEnd = cal.date(from: DateComponents(year: 2026, month: 5, day: 1, hour: 3, minute: 35))!
+        let now = savedEnd
+        let event = Event(
+            id: "stale_feed",
+            kind: .feed,
+            at: start,
+            endAt: savedEnd,
+            title: "母乳 · 双侧",
+            sub: "右 7分 · 左 6分 · 共 13分"
+        )
+
+        let expectedEnd = start.addingTimeInterval(13 * 60)
+        #expect(event.occurredAt == expectedEnd)
+        #expect(BabyDiaryRelativeTime.compactText(since: event.occurredAt, now: now) == "5时17分")
+    }
+
+    @Test func manualBreastFeedKeepsChosenRecordTime() {
+        let cal = Calendar.current
+        let chosenTime = cal.date(from: DateComponents(year: 2026, month: 4, day: 30, hour: 22, minute: 5))!
+        let event = Event(
+            id: "manual_feed",
+            kind: .feed,
+            at: chosenTime,
+            endAt: chosenTime,
+            title: "母乳 · 左侧",
+            sub: "13分"
+        )
+
+        #expect(event.occurredAt == chosenTime)
+    }
+
+    @Test func mostRecentFeedIgnoresStaleSavedEndTime() throws {
+        let store = AppStore()
+        let cal = Calendar.current
+        let staleStart = cal.date(from: DateComponents(year: 2026, month: 4, day: 30, hour: 20, minute: 0))!
+        let staleSavedEnd = cal.date(from: DateComponents(year: 2026, month: 5, day: 1, hour: 3, minute: 35))!
+        let laterStart = cal.date(from: DateComponents(year: 2026, month: 4, day: 30, hour: 22, minute: 0))!
+        let laterEnd = cal.date(from: DateComponents(year: 2026, month: 4, day: 30, hour: 22, minute: 5))!
+
+        store.events = [
+            Event(id: "stale", kind: .feed, at: staleStart, endAt: staleSavedEnd, title: "母乳 · 左侧", sub: "10分"),
+            Event(id: "later", kind: .feed, at: laterStart, endAt: laterEnd, title: "母乳 · 左侧", sub: "5分"),
+        ]
+
+        let event = try #require(store.mostRecentEvent(kind: .feed))
+        #expect(event.id == "later")
+    }
+
+    @Test func relativeTimeTextKeepsMinutePrecision() {
+        let cal = Calendar.current
+        let last = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 8, minute: 0))!
+        let now = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 11, minute: 5))!
+
+        #expect(BabyDiaryRelativeTime.fullText(since: last, now: now) == "3时5分前")
+        #expect(BabyDiaryRelativeTime.compactText(since: last, now: now) == "3时5分")
+    }
+
+    @Test func widgetFeedRelativeTimeUsesFeedStartTime() {
+        let cal = Calendar.current
+        let start = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 8, minute: 0))!
+        let end = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 8, minute: 20))!
+        let now = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 8, minute: 20))!
+
+        let event = BabyDiaryWidgetEvent(
+            kind: .feed,
+            occurredAt: end,
+            startedAt: start,
+            endedAt: end,
+            title: "奶粉",
+            subtitle: "120 ml · 08:00 - 08:20"
+        )
+
+        #expect(event.relativeReferenceAt == start)
+        #expect(BabyDiaryRelativeTime.compactText(since: event.relativeReferenceAt, now: now) == "20分")
+    }
+
+    @Test func widgetFeedCanRecoverFormulaTimerStartTime() {
+        let cal = Calendar.current
+        let end = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 8, minute: 20))!
+        let event = Event(
+            kind: .feed,
+            at: end,
+            title: "奶粉",
+            sub: "120 ml · 08:00 - 08:20"
+        )
+
+        let expectedStart = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 8, minute: 0))!
+        #expect(event.startedAtForDisplay == expectedStart)
+    }
+
     @Test func feedReminderDueDateUsesLastFeedEndTime() throws {
         let store = AppStore()
         let cal = Calendar.current
@@ -627,6 +720,40 @@ struct BabyDiaryTests {
         let resumed = try! #require(store.activeTimer)
         #expect(resumed.resumedAt == resumedAt)
         #expect(resumed.elapsed(at: end) == 65 * 60)
+    }
+
+    @Test func adjustingRunningSleepStartUpdatesActiveTimer() throws {
+        let store = AppStore()
+        let cal = Calendar.current
+        let start = cal.date(from: DateComponents(year: 2026, month: 5, day: 1, hour: 0, minute: 11))!
+        let now = cal.date(from: DateComponents(year: 2026, month: 5, day: 1, hour: 0, minute: 12))!
+        let manualStart = cal.date(from: DateComponents(year: 2026, month: 4, day: 30, hour: 22, minute: 36))!
+
+        store.startTimer(kind: .sleep, at: start)
+        store.adjustActiveSleepTimer(startedAt: manualStart, now: now)
+
+        let timer = try #require(store.activeTimer)
+        #expect(timer.startedAt == manualStart)
+        #expect(timer.elapsed(at: now) == 96 * 60)
+        #expect(store.sleepDuration(on: now, now: now) == 12 * 60)
+    }
+
+    @Test func adjustingPausedSleepTimesUpdatesActiveTimer() throws {
+        let store = AppStore()
+        let cal = Calendar.current
+        let start = cal.date(from: DateComponents(year: 2026, month: 5, day: 1, hour: 10, minute: 0))!
+        let pausedAt = cal.date(from: DateComponents(year: 2026, month: 5, day: 1, hour: 10, minute: 15))!
+        let manualStart = cal.date(from: DateComponents(year: 2026, month: 5, day: 1, hour: 9, minute: 30))!
+        let manualEnd = cal.date(from: DateComponents(year: 2026, month: 5, day: 1, hour: 10, minute: 20))!
+
+        store.startTimer(kind: .sleep, at: start)
+        store.pauseTimer(at: pausedAt)
+        store.adjustActiveSleepTimer(startedAt: manualStart, endedAt: manualEnd)
+
+        let timer = try #require(store.activeTimer)
+        #expect(timer.startedAt == manualStart)
+        #expect(timer.resumedAt == nil)
+        #expect(timer.accumulated == 50 * 60)
     }
 
     @Test func sleepDurationCountsOnlyTodayPortionForCrossDayRecords() {

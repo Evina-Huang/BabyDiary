@@ -125,9 +125,16 @@ struct LastFeedProvider: AppIntentTimelineProvider {
         in context: Context
     ) async -> Timeline<LastFeedEntry> {
         let now = Date()
-        let entry = LastFeedEntry(date: now, snapshot: BabyDiaryShared.loadSnapshot(), configuration: configuration)
-        let next = Calendar.current.date(byAdding: .minute, value: 15, to: now) ?? now.addingTimeInterval(900)
-        return Timeline(entries: [entry], policy: .after(next))
+        let snapshot = BabyDiaryShared.loadSnapshot()
+        let entries = (0..<60).map { offset in
+            let date = Calendar.current.date(byAdding: .minute, value: offset, to: now)
+                ?? now.addingTimeInterval(TimeInterval(offset * 60))
+            return LastFeedEntry(date: date, snapshot: snapshot, configuration: configuration)
+        }
+        let lastEntryDate = entries.last?.date ?? now
+        let next = Calendar.current.date(byAdding: .minute, value: 1, to: lastEntryDate)
+            ?? lastEntryDate.addingTimeInterval(60)
+        return Timeline(entries: entries, policy: .after(next))
     }
 }
 
@@ -447,7 +454,7 @@ struct LastFeedWidgetView: View {
         if item.title.contains("计时"), let first = item.value.split(separator: ":").first {
             return String(first)
         }
-        return item.value
+        return item.compactValue ?? item.value
     }
 
     private func moduleContent(for module: BabyDiaryWidgetModule) -> WidgetModuleContent {
@@ -478,6 +485,7 @@ struct LastFeedWidgetView: View {
                     tint: module.tint,
                     value: "暂无计时",
                     rowValue: "暂无计时",
+                    compactValue: nil,
                     detail: "没有进行中的睡眠",
                     timerReferenceDate: nil,
                     date: nil
@@ -489,6 +497,7 @@ struct LastFeedWidgetView: View {
                 tint: module.tint,
                 value: formatDuration(activeSleep.elapsed(at: entry.date)),
                 rowValue: nil,
+                compactValue: nil,
                 detail: activeSleep.isRunning ? "正在睡觉" : "睡眠已暂停",
                 timerReferenceDate: activeSleep.timerReferenceDate,
                 date: "开始 \(timeText(activeSleep.startedAt))"
@@ -501,6 +510,7 @@ struct LastFeedWidgetView: View {
                     tint: module.tint,
                     value: "暂无计时",
                     rowValue: "暂无计时",
+                    compactValue: nil,
                     detail: "没有进行中的喂奶",
                     timerReferenceDate: nil,
                     date: nil
@@ -512,6 +522,7 @@ struct LastFeedWidgetView: View {
                 tint: module.tint,
                 value: formatDuration(activeFeed.elapsed(at: entry.date)),
                 rowValue: nil,
+                compactValue: nil,
                 detail: feedTitle(activeFeed),
                 timerReferenceDate: activeFeed.timerReferenceDate,
                 date: "开始 \(timeText(activeFeed.startedAt))"
@@ -524,15 +535,17 @@ struct LastFeedWidgetView: View {
         event: BabyDiaryWidgetEvent?,
         empty: String
     ) -> WidgetModuleContent {
-        WidgetModuleContent(
+        let referenceAt = event?.relativeReferenceAt
+        return WidgetModuleContent(
             title: module.title,
             systemImage: module.systemImage,
             tint: module.tint,
-            value: relativeText(since: event?.occurredAt, now: entry.date),
-            rowValue: condensedRelativeText(since: event?.occurredAt, now: entry.date),
+            value: BabyDiaryRelativeTime.fullText(since: referenceAt, now: entry.date),
+            rowValue: BabyDiaryRelativeTime.fullText(since: referenceAt, now: entry.date),
+            compactValue: BabyDiaryRelativeTime.compactText(since: referenceAt, now: entry.date),
             detail: event.map(eventDetail) ?? empty,
             timerReferenceDate: nil,
-            date: event.map { dateLine($0.occurredAt) }
+            date: referenceAt.map(dateLine)
         )
     }
 
@@ -825,6 +838,7 @@ private struct WidgetModuleContent {
     let tint: Color
     let value: String
     let rowValue: String?
+    let compactValue: String?
     let detail: String
     let timerReferenceDate: Date?
     let date: String?

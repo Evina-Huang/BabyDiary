@@ -2,56 +2,11 @@ import SwiftUI
 import PhotosUI
 
 struct HomeView: View {
-    @Environment(AppStore.self) private var store
     var onOpen: (SubScreen) -> Void
 
     var body: some View {
         VStack(spacing: 0) {
-            // Greeting block
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(dateLine())
-                        .font(.system(size: 12, weight: .bold))
-                        .tracking(0.72)
-                        .textCase(.uppercase)
-                        .foregroundStyle(Palette.ink3)
-                    let g = greeting(for: store.baby)
-                    Text(g.text)
-                        .font(.system(size: 18, weight: .heavy))
-                        .tracking(-0.36)
-                        .foregroundStyle(Palette.ink)
-                    if let sub = g.sub {
-                        Text(sub)
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundStyle(g.isSpecial ? store.theme.primary600 : Palette.ink3)
-                            .padding(.top, 2)
-                    }
-                }
-                Spacer()
-                HStack(spacing: 10) {
-                    Button { onOpen(.settings) } label: {
-                        Image(systemName: "gearshape")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(store.theme.primary600)
-                            .frame(width: 40, height: 40)
-                            .background(store.theme.primaryTint, in: Circle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("设置")
-
-                    Button { onOpen(.backup) } label: {
-                        Image(systemName: "square.and.arrow.up.on.square")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(store.theme.primary600)
-                            .frame(width: 40, height: 40)
-                            .background(store.theme.primaryTint, in: Circle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("数据备份")
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 20).padding(.top, 10).padding(.bottom, 2)
+            HomeHeader(onOpen: onOpen)
 
             ScreenBody {
                 BabyBadge()
@@ -79,12 +34,93 @@ struct HomeView: View {
         }
         .background(Palette.bg)
     }
+}
+
+private struct HomeHeader: View {
+    @Environment(AppStore.self) private var store
+    var onOpen: (SubScreen) -> Void
+
+    var body: some View {
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(dateLine())
+                    .font(.system(size: 12, weight: .bold))
+                    .tracking(0.72)
+                    .textCase(.uppercase)
+                    .foregroundStyle(Palette.ink3)
+                let g = greeting(for: store.baby)
+                Text(g.text)
+                    .font(.system(size: 18, weight: .heavy))
+                    .tracking(-0.36)
+                    .foregroundStyle(Palette.ink)
+                if let sub = g.sub {
+                    Text(sub)
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(g.isSpecial ? store.theme.primary600 : Palette.ink3)
+                        .padding(.top, 2)
+                }
+            }
+            Spacer()
+            HStack(spacing: 10) {
+                Button { onOpen(.settings) } label: {
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(store.theme.primary600)
+                        .frame(width: 40, height: 40)
+                        .background(store.theme.primaryTint, in: Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("设置")
+
+                Button { onOpen(.backup) } label: {
+                    Image(systemName: "square.and.arrow.up.on.square")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(store.theme.primary600)
+                        .frame(width: 40, height: 40)
+                        .background(store.theme.primaryTint, in: Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("数据备份")
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 20)
+        .padding(.top, 10)
+        .padding(.bottom, 2)
+        .background {
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .overlay(Palette.bg.opacity(0.68))
+                .allowsHitTesting(false)
+        }
+        .overlay(alignment: .bottom) {
+            HeaderBottomFade()
+                .offset(y: 34)
+        }
+        .zIndex(1)
+    }
 
     private func dateLine() -> String {
         let f = DateFormatter()
         f.locale = Locale(identifier: "zh_CN")
         f.dateFormat = "M月d日 EEEE"
         return f.string(from: Date())
+    }
+}
+
+private struct HeaderBottomFade: View {
+    var body: some View {
+        LinearGradient(
+            colors: [
+                Palette.bg.opacity(0.78),
+                Palette.bg.opacity(0.32),
+                Palette.bg.opacity(0)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        .frame(height: 34)
+        .allowsHitTesting(false)
     }
 }
 
