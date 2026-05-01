@@ -5,6 +5,7 @@ fileprivate enum FloatingDockMetrics {
     static let horizontalInset: CGFloat = 18
     static let topInset: CGFloat = 12
     static let bottomInset: CGFloat = 92
+    static let estimatedHeight: CGFloat = 56
 }
 
 struct ContentView: View {
@@ -12,11 +13,6 @@ struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var tab: MainTab = .home
     @State private var sub: SubScreen? = nil
-    @State private var dockSide: FloatingDockSide = .right
-    @State private var dockY: CGFloat? = nil
-    @State private var dockSize: CGSize = .zero
-    @State private var suppressDockOpen = false
-    @GestureState private var dockDragTranslation: CGSize = .zero
 
     var body: some View {
         Group {
@@ -31,70 +27,11 @@ struct ContentView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Palette.bg.ignoresSafeArea())
         .onAppear(perform: registerShortcutHandling)
-        .overlay {
-            GeometryReader { proxy in
-                if hasFloatingDock {
-                    let displayedOrigin = displayedDockOrigin(in: proxy.size)
-                    VStack(alignment: .trailing, spacing: 10) {
-                        if let feedDraft = store.feedDraft,
-                           feedDraft.hasActiveState,
-                           sub != .feed {
-                            ActiveFeedDock(draft: feedDraft,
-                                           theme: store.theme,
-                                           onOpen: {
-                                               guard !suppressDockOpen else { return }
-                                               sub = .feed
-                                           },
-                                           onClose: { store.syncFeedDraft(nil) })
-                                .transition(.move(edge: .trailing).combined(with: .opacity))
-                        }
-
-                        if let timer = store.activeTimer,
-                           timer.kind == .sleep,
-                           sub != .sleep {
-                            ActiveSleepDock(timer: timer,
-                                            theme: store.theme,
-                                            onOpen: {
-                                                guard !suppressDockOpen else { return }
-                                                sub = .sleep
-                                            },
-                                            onClose: { store.stopTimer() })
-                                .transition(.move(edge: .trailing).combined(with: .opacity))
-                        }
-                    }
-                    .background(
-                        GeometryReader { geo in
-                            Color.clear
-                                .preference(key: FloatingDockSizeKey.self, value: geo.size)
-                        }
-                    )
-                    .onPreferenceChange(FloatingDockSizeKey.self) { newSize in
-                        dockSize = newSize
-                        dockY = clampedDockOrigin(
-                            CGPoint(x: 0, y: dockY ?? defaultDockOrigin(in: proxy.size).y),
-                            in: proxy.size
-                        ).y
-                    }
-                    .offset(x: displayedOrigin.x, y: displayedOrigin.y)
-                    .highPriorityGesture(dockDragGesture(in: proxy.size))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    .onAppear {
-                        dockY = clampedDockOrigin(
-                            CGPoint(x: 0, y: dockY ?? defaultDockOrigin(in: proxy.size).y),
-                            in: proxy.size
-                        ).y
-                    }
-                    .onChange(of: proxy.size) { _, newSize in
-                        dockY = clampedDockOrigin(
-                            CGPoint(x: 0, y: dockY ?? defaultDockOrigin(in: newSize).y),
-                            in: newSize
-                        ).y
-                    }
-                }
-            }
-        }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             AppTabBar(tab: $tab)
+        }
+        .overlay {
+            FloatingDockLayer(sub: $sub)
         }
         .ignoresSafeArea(.keyboard, edges: .bottom)
         .sheet(item: $sub) { s in
@@ -173,6 +110,80 @@ struct ContentView: View {
             sub = nil
         }
     }
+}
+
+private struct FloatingDockLayer: View {
+    @Environment(AppStore.self) private var store
+    @Binding var sub: SubScreen?
+    @State private var dockSide: FloatingDockSide = .right
+    @State private var dockY: CGFloat? = nil
+    @State private var dockSize: CGSize = .zero
+    @State private var suppressDockOpen = false
+    @State private var dragStartOrigin: CGPoint? = nil
+    @State private var dragOrigin: CGPoint? = nil
+
+    var body: some View {
+        GeometryReader { proxy in
+            if hasFloatingDock {
+                let displayedOrigin = displayedDockOrigin(in: proxy.size)
+                let placementSize = effectiveDockSize
+                dockContent
+                    .background(
+                        GeometryReader { geo in
+                            Color.clear
+                                .preference(key: FloatingDockSizeKey.self, value: geo.size)
+                        }
+                    )
+                    .onPreferenceChange(FloatingDockSizeKey.self) { newSize in
+                        syncDockSize(newSize, in: proxy.size)
+                    }
+                    .contentShape(Rectangle())
+                    .position(
+                        x: displayedOrigin.x + placementSize.width / 2,
+                        y: displayedOrigin.y + placementSize.height / 2
+                    )
+                    .highPriorityGesture(dockDragGesture(in: proxy.size))
+                    .onAppear {
+                        clampDockY(in: proxy.size)
+                    }
+                    .onChange(of: proxy.size) { _, newSize in
+                        clampDockY(in: newSize)
+                    }
+            }
+        }
+        .allowsHitTesting(hasFloatingDock)
+    }
+
+    @ViewBuilder
+    private var dockContent: some View {
+        VStack(alignment: .trailing, spacing: 10) {
+            if let feedDraft = store.feedDraft,
+               feedDraft.hasActiveState,
+               sub != .feed {
+                ActiveFeedDock(draft: feedDraft,
+                               theme: store.theme,
+                               onOpen: {
+                                   guard !suppressDockOpen else { return }
+                                   sub = .feed
+                               },
+                               onClose: { store.syncFeedDraft(nil) })
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
+            }
+
+            if let timer = store.activeTimer,
+               timer.kind == .sleep,
+               sub != .sleep {
+                ActiveSleepDock(timer: timer,
+                                theme: store.theme,
+                                onOpen: {
+                                    guard !suppressDockOpen else { return }
+                                    sub = .sleep
+                                },
+                                onClose: { store.stopTimer() })
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
+            }
+        }
+    }
 
     private var hasFloatingDock: Bool {
         (store.feedDraft?.hasActiveState == true && sub != .feed) ||
@@ -180,49 +191,63 @@ struct ContentView: View {
     }
 
     private func displayedDockOrigin(in containerSize: CGSize) -> CGPoint {
-        let base = clampedDockOrigin(
+        clampedDockOrigin(dragOrigin ?? dockOrigin(in: containerSize), in: containerSize)
+    }
+
+    private func dockOrigin(in containerSize: CGSize) -> CGPoint {
+        clampedDockOrigin(
             CGPoint(
                 x: dockSide == .left ? horizontalLimits(in: containerSize).lowerBound : horizontalLimits(in: containerSize).upperBound,
                 y: dockY ?? defaultDockOrigin(in: containerSize).y
             ),
             in: containerSize
         )
-        return clampedDockOrigin(
-            CGPoint(x: base.x + dockDragTranslation.width,
-                    y: base.y + dockDragTranslation.height),
-            in: containerSize
-        )
     }
 
     private func dockDragGesture(in containerSize: CGSize) -> some Gesture {
         DragGesture(minimumDistance: 6)
-            .updating($dockDragTranslation) { value, state, _ in
-                state = value.translation
-            }
             .onChanged { value in
-                if isDockDrag(value.translation) {
+                let start = dragStartOrigin ?? dockOrigin(in: containerSize)
+                if dragStartOrigin == nil {
+                    dragStartOrigin = start
+                }
+                let nextOrigin = clampedDockOrigin(
+                    CGPoint(
+                        x: start.x + value.translation.width,
+                        y: start.y + value.translation.height
+                    ),
+                    in: containerSize
+                )
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    dragOrigin = nextOrigin
+                }
+
+                if isDockDrag(value.translation), !suppressDockOpen {
                     suppressDockOpen = true
                 }
             }
             .onEnded { value in
-                let base = clampedDockOrigin(
-                    CGPoint(
-                        x: dockSide == .left ? horizontalLimits(in: containerSize).lowerBound : horizontalLimits(in: containerSize).upperBound,
-                        y: dockY ?? defaultDockOrigin(in: containerSize).y
-                    ),
-                    in: containerSize
-                )
-                let clamped = clampedDockOrigin(
-                    CGPoint(
-                        x: base.x + value.translation.width,
-                        y: base.y + value.translation.height
-                    ),
-                    in: containerSize
-                )
-                withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
-                    dockSide = snappedDockSide(in: containerSize, origin: clamped)
-                    dockY = clamped.y
+                let currentOrigin = dragOrigin ?? {
+                    let start = dragStartOrigin ?? dockOrigin(in: containerSize)
+                    return clampedDockOrigin(
+                        CGPoint(
+                            x: start.x + value.translation.width,
+                            y: start.y + value.translation.height
+                        ),
+                        in: containerSize
+                    )
+                }()
+                let snappedSide = snappedDockSide(in: containerSize, origin: currentOrigin)
+
+                dragStartOrigin = nil
+                withAnimation(.spring(response: 0.24, dampingFraction: 0.88)) {
+                    dockSide = snappedSide
+                    dockY = currentOrigin.y
+                    dragOrigin = nil
                 }
+
                 if isDockDrag(value.translation) {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                         suppressDockOpen = false
@@ -230,11 +255,36 @@ struct ContentView: View {
                 } else {
                     suppressDockOpen = false
                 }
-            }
+        }
+    }
+
+    private var effectiveDockSize: CGSize {
+        CGSize(
+            width: dockSize.width > 0 ? dockSize.width : FloatingDockMetrics.width,
+            height: dockSize.height > 0 ? dockSize.height : FloatingDockMetrics.estimatedHeight
+        )
     }
 
     private func isDockDrag(_ translation: CGSize) -> Bool {
         max(abs(translation.width), abs(translation.height)) > 8
+    }
+
+    private func syncDockSize(_ newSize: CGSize, in containerSize: CGSize) {
+        guard newSize != .zero else { return }
+        if dockSize != newSize {
+            dockSize = newSize
+        }
+        guard dragStartOrigin == nil else { return }
+        clampDockY(in: containerSize)
+    }
+
+    private func clampDockY(in containerSize: CGSize) {
+        let nextY = clampedDockOrigin(
+            CGPoint(x: 0, y: dockY ?? defaultDockOrigin(in: containerSize).y),
+            in: containerSize
+        ).y
+        guard dockY.map({ abs($0 - nextY) > 0.5 }) ?? true else { return }
+        dockY = nextY
     }
 
     private func defaultDockOrigin(in containerSize: CGSize) -> CGPoint {
@@ -264,7 +314,7 @@ struct ContentView: View {
 
     private func verticalLimits(in containerSize: CGSize) -> ClosedRange<CGFloat> {
         let minY = FloatingDockMetrics.topInset
-        let maxY = max(minY, containerSize.height - dockSize.height - FloatingDockMetrics.bottomInset)
+        let maxY = max(minY, containerSize.height - effectiveDockSize.height - FloatingDockMetrics.bottomInset)
         return minY...maxY
     }
 }
@@ -282,73 +332,76 @@ private struct ActiveSleepDock: View {
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { ctx in
-            let accent = timer.isRunning ? Palette.lavenderInk : Palette.ink2
-            let title = timer.isRunning ? "睡觉中" : "已暂停"
-            let duration = timer.isRunning ? timer.elapsed(at: ctx.date) : timer.accumulated
-
-            ZStack(alignment: .topTrailing) {
-                Button(action: onOpen) {
-                    HStack(spacing: 10) {
-                        ZStack {
-                            Circle()
-                                .fill(Color.white.opacity(0.65))
-                            AppIcon.Moon(size: 18, color: accent)
-                        }
-                        .frame(width: 36, height: 36)
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            HStack(spacing: 6) {
-                                if timer.isRunning {
-                                    DockPulseDot(color: accent)
-                                }
-                                Text(title)
-                                    .font(.system(size: 11, weight: .heavy))
-                                    .tracking(0.66)
-                                    .textCase(.uppercase)
-                            }
-                            .foregroundStyle(accent)
-
-                            Text(formatDur(duration))
-                                .font(.system(size: 16, weight: .black))
-                                .tracking(-0.32)
-                                .monospacedDigit()
-                                .foregroundStyle(Palette.ink)
-                        }
-
-                        Spacer(minLength: 14)
-                            .frame(width: 14)
-                    }
-                    .padding(.leading, 10)
-                    .padding(.trailing, 36)
-                    .padding(.vertical, 8)
-                    .background(
-                        LinearGradient(colors: [Color(hex: 0xE8DCF7), Color(hex: 0xF7F1FC)],
-                                       startPoint: .topLeading,
-                                       endPoint: .bottomTrailing),
-                        in: Capsule()
-                    )
-                    .overlay(
-                        Capsule()
-                            .stroke(Color.white.opacity(0.5), lineWidth: 1)
-                    )
-                    .shadow(color: theme.primary.opacity(0.12), radius: 18, x: 0, y: 10)
-                    .frame(width: FloatingDockMetrics.width, alignment: .leading)
-                }
-                .buttonStyle(.plain)
-
-                Button(action: onClose) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(Palette.ink3)
-                        .frame(width: 24, height: 24)
-                        .background(Color.white.opacity(0.78), in: Circle())
-                }
-                .buttonStyle(.plain)
-                .padding(.top, 7)
-                .padding(.trailing, 7)
-            }
-            .frame(width: FloatingDockMetrics.width, alignment: .leading)
+            content(at: ctx.date)
         }
+    }
+
+    private func content(at date: Date) -> some View {
+        let accent = timer.isRunning ? Palette.lavenderInk : Palette.ink2
+        let title = timer.isRunning ? "睡觉中" : "已暂停"
+        let duration = timer.isRunning ? timer.elapsed(at: date) : timer.accumulated
+
+        return ZStack(alignment: .topTrailing) {
+            HStack(spacing: 10) {
+                ZStack {
+                    Circle()
+                        .fill(Color.white.opacity(0.65))
+                    AppIcon.Moon(size: 18, color: accent)
+                }
+                .frame(width: 36, height: 36)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        if timer.isRunning {
+                            DockPulseDot(color: accent)
+                        }
+                        Text(title)
+                            .font(.system(size: 11, weight: .heavy))
+                            .tracking(0.66)
+                            .textCase(.uppercase)
+                    }
+                    .foregroundStyle(accent)
+
+                    Text(formatDur(duration))
+                        .font(.system(size: 16, weight: .black))
+                        .tracking(-0.32)
+                        .monospacedDigit()
+                        .foregroundStyle(Palette.ink)
+                }
+
+                Spacer(minLength: 14)
+                    .frame(width: 14)
+            }
+            .padding(.leading, 10)
+            .padding(.trailing, 36)
+            .padding(.vertical, 8)
+            .background(
+                LinearGradient(colors: [Color(hex: 0xE8DCF7), Color(hex: 0xF7F1FC)],
+                               startPoint: .topLeading,
+                               endPoint: .bottomTrailing),
+                in: Capsule()
+            )
+            .overlay(
+                Capsule()
+                    .stroke(Color.white.opacity(0.5), lineWidth: 1)
+            )
+            .shadow(color: theme.primary.opacity(0.12), radius: 18, x: 0, y: 10)
+            .frame(width: FloatingDockMetrics.width, alignment: .leading)
+            .contentShape(Capsule())
+            .onTapGesture(perform: onOpen)
+
+            Button(action: onClose) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(Palette.ink3)
+                    .frame(width: 24, height: 24)
+                    .background(Color.white.opacity(0.78), in: Circle())
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 7)
+            .padding(.trailing, 7)
+        }
+        .frame(width: FloatingDockMetrics.width, alignment: .leading)
     }
 }
 
@@ -360,71 +413,74 @@ private struct ActiveFeedDock: View {
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { ctx in
-            let status = feedDockStatus(at: ctx.date)
-
-            ZStack(alignment: .topTrailing) {
-                Button(action: onOpen) {
-                    HStack(spacing: 10) {
-                        ZStack {
-                            Circle()
-                                .fill(Color.white.opacity(0.65))
-                            AppIcon.Bottle(size: 18, color: status.ink)
-                        }
-                        .frame(width: 36, height: 36)
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            HStack(spacing: 6) {
-                                if status.running {
-                                    DockPulseDot(color: status.ink)
-                                }
-                                Text(status.title)
-                                    .font(.system(size: 11, weight: .heavy))
-                                    .tracking(0.66)
-                                    .textCase(.uppercase)
-                            }
-                            .foregroundStyle(status.ink)
-
-                            Text(formatDur(status.duration))
-                                .font(.system(size: 16, weight: .black))
-                                .tracking(-0.32)
-                                .monospacedDigit()
-                                .foregroundStyle(Palette.ink)
-                        }
-
-                        Spacer(minLength: 14)
-                            .frame(width: 14)
-                    }
-                    .padding(.leading, 10)
-                    .padding(.trailing, 36)
-                    .padding(.vertical, 8)
-                    .background(
-                        LinearGradient(colors: [Color(hex: 0xFDE0EA), Color(hex: 0xFFF4F8)],
-                                       startPoint: .topLeading,
-                                       endPoint: .bottomTrailing),
-                        in: Capsule()
-                    )
-                    .overlay(
-                        Capsule()
-                            .stroke(Color.white.opacity(0.5), lineWidth: 1)
-                    )
-                    .shadow(color: theme.primary.opacity(0.12), radius: 18, x: 0, y: 10)
-                    .frame(width: FloatingDockMetrics.width, alignment: .leading)
-                }
-                .buttonStyle(.plain)
-
-                Button(action: onClose) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(Palette.ink3)
-                        .frame(width: 24, height: 24)
-                        .background(Color.white.opacity(0.78), in: Circle())
-                }
-                .buttonStyle(.plain)
-                .padding(.top, 7)
-                .padding(.trailing, 7)
-            }
-            .frame(width: FloatingDockMetrics.width, alignment: .leading)
+            content(at: ctx.date)
         }
+    }
+
+    private func content(at date: Date) -> some View {
+        let status = feedDockStatus(at: date)
+
+        return ZStack(alignment: .topTrailing) {
+            HStack(spacing: 10) {
+                ZStack {
+                    Circle()
+                        .fill(Color.white.opacity(0.65))
+                    AppIcon.Bottle(size: 18, color: status.ink)
+                }
+                .frame(width: 36, height: 36)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        if status.running {
+                            DockPulseDot(color: status.ink)
+                        }
+                        Text(status.title)
+                            .font(.system(size: 11, weight: .heavy))
+                            .tracking(0.66)
+                            .textCase(.uppercase)
+                    }
+                    .foregroundStyle(status.ink)
+
+                    Text(formatDur(status.duration))
+                        .font(.system(size: 16, weight: .black))
+                        .tracking(-0.32)
+                        .monospacedDigit()
+                        .foregroundStyle(Palette.ink)
+                }
+
+                Spacer(minLength: 14)
+                    .frame(width: 14)
+            }
+            .padding(.leading, 10)
+            .padding(.trailing, 36)
+            .padding(.vertical, 8)
+            .background(
+                LinearGradient(colors: [Color(hex: 0xFDE0EA), Color(hex: 0xFFF4F8)],
+                               startPoint: .topLeading,
+                               endPoint: .bottomTrailing),
+                in: Capsule()
+            )
+            .overlay(
+                Capsule()
+                    .stroke(Color.white.opacity(0.5), lineWidth: 1)
+            )
+            .shadow(color: theme.primary.opacity(0.12), radius: 18, x: 0, y: 10)
+            .frame(width: FloatingDockMetrics.width, alignment: .leading)
+            .contentShape(Capsule())
+            .onTapGesture(perform: onOpen)
+
+            Button(action: onClose) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(Palette.ink3)
+                    .frame(width: 24, height: 24)
+                    .background(Color.white.opacity(0.78), in: Circle())
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 7)
+            .padding(.trailing, 7)
+        }
+        .frame(width: FloatingDockMetrics.width, alignment: .leading)
     }
 
     private func feedDockStatus(at now: Date) -> (title: String, duration: TimeInterval, running: Bool, ink: Color) {
