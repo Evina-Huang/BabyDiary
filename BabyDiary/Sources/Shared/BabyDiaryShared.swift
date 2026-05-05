@@ -52,7 +52,7 @@ struct BabyDiaryWidgetEvent: Codable, Hashable {
     var subtitle: String?
 
     var relativeReferenceAt: Date {
-        kind == .feed ? startedAt : occurredAt
+        occurredAt
     }
 }
 

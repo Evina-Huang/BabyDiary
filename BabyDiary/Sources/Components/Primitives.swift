@@ -105,19 +105,27 @@ struct EventRow: View {
     var onEdit: ((Event) -> Void)? = nil
 
     var body: some View {
+        let display = recordDisplayText(for: event)
         let row = HStack(spacing: 14) {
             CategoryIcon(kind: event.kind, size: 44)
             VStack(alignment: .leading, spacing: 2) {
-                Text(event.title)
+                Text(display.title)
                     .font(.system(size: 15, weight: .bold))
                     .tracking(-0.15)
                     .foregroundStyle(Palette.ink)
-                if let s = event.sub, !s.isEmpty {
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+                    .allowsTightening(true)
+                if let s = display.subtitle, !s.isEmpty {
                     Text(s)
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(Palette.ink3)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.84)
+                        .allowsTightening(true)
                 }
             }
+            .layoutPriority(1)
             Spacer(minLength: 0)
             Text(formatTime(event.at))
                 .font(.system(size: 13, weight: .bold))
@@ -157,6 +165,106 @@ struct EventRow: View {
                     onDelete(event)
                 } label: { Label("删除", systemImage: "trash") }
             }
+        }
+    }
+}
+
+struct RecordEventDisplayText: Equatable {
+    let title: String
+    let subtitle: String?
+}
+
+func recordDisplayText(for event: Event) -> RecordEventDisplayText {
+    guard event.isBreastFeed else {
+        return RecordEventDisplayText(title: event.title, subtitle: event.sub)
+    }
+
+    return RecordEventDisplayText(
+        title: breastFeedRecordTitle(for: event),
+        subtitle: event.endAt.map { _ in "\(formatTime(event.at))-\(formatTime(event.occurredAt))" }
+    )
+}
+
+private func breastFeedRecordTitle(for event: Event) -> String {
+    let parts = breastSideMinuteParts(in: event.sub)
+    if !parts.isEmpty {
+        return "母乳 · " + parts
+            .map { "\($0.side.recordLabel)\($0.minutes)分" }
+            .joined(separator: " ")
+    }
+
+    if let side = breastSide(from: event.title),
+       let minutes = firstMinute(in: event.sub) {
+        return "母乳 · \(side.recordLabel)\(minutes)分"
+    }
+
+    return "母乳"
+}
+
+private func breastSideMinuteParts(in text: String?) -> [(side: BreastFeedSide, minutes: Int)] {
+    guard let text else { return [] }
+
+    return [
+        sideMinutePart(marker: "左", side: .left, in: text),
+        sideMinutePart(marker: "右", side: .right, in: text)
+    ]
+    .compactMap { $0 }
+    .sorted { $0.index < $1.index }
+    .map { (side: $0.side, minutes: $0.minutes) }
+}
+
+private func sideMinutePart(
+    marker: Character,
+    side: BreastFeedSide,
+    in text: String
+) -> (index: String.Index, side: BreastFeedSide, minutes: Int)? {
+    guard let markerIndex = text.firstIndex(of: marker) else { return nil }
+
+    var cursor = text.index(after: markerIndex)
+    while cursor < text.endIndex, !text[cursor].isNumber {
+        cursor = text.index(after: cursor)
+    }
+
+    let digitStart = cursor
+    while cursor < text.endIndex, text[cursor].isNumber {
+        cursor = text.index(after: cursor)
+    }
+
+    guard digitStart < cursor,
+          let minutes = Int(text[digitStart..<cursor]) else {
+        return nil
+    }
+
+    return (markerIndex, side, minutes)
+}
+
+private func breastSide(from title: String) -> BreastFeedSide? {
+    if title.contains("左侧") { return .left }
+    if title.contains("右侧") { return .right }
+    return nil
+}
+
+private func firstMinute(in text: String?) -> Int? {
+    guard let text else { return nil }
+    var cursor = text.startIndex
+    while cursor < text.endIndex, !text[cursor].isNumber {
+        cursor = text.index(after: cursor)
+    }
+
+    let digitStart = cursor
+    while cursor < text.endIndex, text[cursor].isNumber {
+        cursor = text.index(after: cursor)
+    }
+
+    guard digitStart < cursor else { return nil }
+    return Int(text[digitStart..<cursor])
+}
+
+private extension BreastFeedSide {
+    var recordLabel: String {
+        switch self {
+        case .left: return "左"
+        case .right: return "右"
         }
     }
 }

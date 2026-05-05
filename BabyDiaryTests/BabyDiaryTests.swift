@@ -227,7 +227,7 @@ struct BabyDiaryTests {
         #expect(BabyDiaryRelativeTime.compactText(since: last, now: now) == "3时5分")
     }
 
-    @Test func widgetFeedRelativeTimeUsesFeedStartTime() {
+    @Test func widgetFeedRelativeTimeUsesFeedEndTime() {
         let cal = Calendar.current
         let start = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 8, minute: 0))!
         let end = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 8, minute: 20))!
@@ -242,8 +242,8 @@ struct BabyDiaryTests {
             subtitle: "120 ml · 08:00 - 08:20"
         )
 
-        #expect(event.relativeReferenceAt == start)
-        #expect(BabyDiaryRelativeTime.compactText(since: event.relativeReferenceAt, now: now) == "20分")
+        #expect(event.relativeReferenceAt == end)
+        #expect(BabyDiaryRelativeTime.compactText(since: event.relativeReferenceAt, now: now) == "刚刚")
     }
 
     @Test func widgetFeedCanRecoverFormulaTimerStartTime() {
@@ -485,6 +485,24 @@ struct BabyDiaryTests {
     @Test func breastFeedSummaryKeepsFirstSideOrder() {
         #expect(orderedBreastFeedSummary(leftMinutes: 7, rightMinutes: 3, firstSide: .left) == "左 7分 · 右 3分 · 共 10分")
         #expect(orderedBreastFeedSummary(leftMinutes: 7, rightMinutes: 3, firstSide: .right) == "右 3分 · 左 7分 · 共 10分")
+    }
+
+    @Test func recordDisplayShowsBreastSidesAndTimeRange() {
+        let cal = Calendar.current
+        let start = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 19, minute: 4))!
+        let end = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 19, minute: 26))!
+        let event = Event(
+            id: "breast",
+            kind: .feed,
+            at: start,
+            endAt: end,
+            title: "母乳 · 双侧",
+            sub: "右 12分 · 左 10分 · 共 22分"
+        )
+
+        let display = recordDisplayText(for: event)
+        #expect(display.title == "母乳 · 右12分 左10分")
+        #expect(display.subtitle == "19:04-19:26")
     }
 
     @Test func dailySummarySeparatesBreastAndFormulaTotals() {
