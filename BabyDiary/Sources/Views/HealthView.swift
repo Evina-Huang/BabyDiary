@@ -34,6 +34,13 @@ struct HealthView: View {
                         icon: { AppIcon.Bowl(size: 24, color: Palette.yellowInk) },
                         onTap: { onOpen(.foodList) }
                     )
+                    EntryCard(
+                        title: "我的食谱",
+                        subtitle: recipeSubtitle,
+                        iconBg: Palette.pink,
+                        icon: { AppIcon.Bowl(size: 24, color: Palette.pinkInk) },
+                        onTap: { onOpen(.recipeList) }
+                    )
                 }
                 .padding(.top, 14)
             }
@@ -106,6 +113,11 @@ struct HealthView: View {
         if allergic  > 0 { parts.append("过敏 \(allergic)") }
         if observing > 0 { parts.append("观察中 \(observing)") }
         return parts.isEmpty ? "暂无记录" : parts.joined(separator: " · ")
+    }
+
+    private var recipeSubtitle: String {
+        let count = store.recipes.count
+        return count == 0 ? "组合常用食材，记录辅食一键带出" : "\(count) 个食谱"
     }
 
     private var medicationSubtitle: String {

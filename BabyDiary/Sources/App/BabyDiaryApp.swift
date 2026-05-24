@@ -75,6 +75,54 @@ struct StartSleepingIntent: AppIntent {
     }
 }
 
+enum ShortcutDiaperType: String, AppEnum {
+    case wet
+    case dirty
+    case both
+
+    static var typeDisplayRepresentation = TypeDisplayRepresentation(
+        name: "尿布类型",
+        synonyms: ["尿布", "换尿布"]
+    )
+
+    static var caseDisplayRepresentations: [ShortcutDiaperType: DisplayRepresentation] = [
+        .wet: .init(title: "嘘嘘", synonyms: ["尿尿", "小便", "湿尿布"]),
+        .dirty: .init(title: "臭臭", synonyms: ["便便", "大便", "拉臭臭"]),
+        .both: .init(title: "嘘嘘和臭臭", synonyms: ["都有", "尿尿和臭臭", "大小便"])
+    ]
+
+    var diaperEventType: DiaperEventType {
+        switch self {
+        case .wet: return .wet
+        case .dirty: return .dirty
+        case .both: return .both
+        }
+    }
+}
+
+struct LogDiaperIntent: AppIntent {
+    static var title: LocalizedStringResource = "记录换尿布"
+    static var description = IntentDescription("直接记录一次换尿布。")
+    static var openAppWhenRun = false
+
+    @Parameter(title: "类型", default: .wet)
+    var type: ShortcutDiaperType
+
+    init() {
+        self.type = .wet
+    }
+
+    init(type: ShortcutDiaperType) {
+        self.type = type
+    }
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        let event = BabyDiaryShortcutCoordinator.recordDiaper(type: type.diaperEventType)
+        return .result(dialog: "已记录\(event.title)")
+    }
+}
+
 struct BabyDiaryAppShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
@@ -100,6 +148,20 @@ struct BabyDiaryAppShortcuts: AppShortcutsProvider {
             shortTitle: "开始睡觉",
             systemImageName: "moon.fill"
         )
+
+        AppShortcut(
+            intent: LogDiaperIntent(),
+            phrases: [
+                "用 \(.applicationName) 帮我记一个换尿布",
+                "用 \(.applicationName) 记录换尿布",
+                "用 \(.applicationName) 宝宝换尿布了",
+                "在 \(.applicationName) 记录换尿布",
+                "\(.applicationName) 帮我记一个换尿布",
+                "\(.applicationName) 记录 \(\.$type)"
+            ],
+            shortTitle: "记录换尿布",
+            systemImageName: "drop.triangle.fill"
+        )
     }
 }
 
@@ -124,6 +186,11 @@ enum BabyDiaryShortcutCoordinator {
         let status = target.startSleepFromShortcut(at: date)
         requestOpen(.sleep)
         return status
+    }
+
+    static func recordDiaper(type: DiaperEventType = .wet, at date: Date = Date()) -> Event {
+        let target = activeStore ?? AppStore.loadedOrSeeded()
+        return target.recordDiaperFromShortcut(type: type, at: date)
     }
 
     static func consumePendingDestination() -> BabyDiaryDestination? {

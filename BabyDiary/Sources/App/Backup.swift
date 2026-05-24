@@ -14,6 +14,7 @@ struct DataSnapshot: Codable {
     var vaccines: [Vaccine]
     var growth: [GrowthPoint]
     var foods: [FoodItem]
+    var recipes: [Recipe]? = nil
     var medications: [MedicationRecord]? = nil
     var teeth: [ToothRecord]? = nil
     var milestones: [Milestone]? = nil
@@ -21,6 +22,7 @@ struct DataSnapshot: Codable {
     var feedDraft: FeedDraft? = nil
     var feedReminder: FeedReminderSettings? = nil
     var sleepReminder: SleepReminderSettings? = nil
+    var formulaMlHistory: [Int]? = nil
 
     init(
         version: Int = 5,
@@ -30,13 +32,15 @@ struct DataSnapshot: Codable {
         vaccines: [Vaccine],
         growth: [GrowthPoint],
         foods: [FoodItem],
+        recipes: [Recipe]? = nil,
         medications: [MedicationRecord]? = nil,
         teeth: [ToothRecord]? = nil,
         milestones: [Milestone]? = nil,
         activeTimer: RunningTimer? = nil,
         feedDraft: FeedDraft? = nil,
         feedReminder: FeedReminderSettings? = nil,
-        sleepReminder: SleepReminderSettings? = nil
+        sleepReminder: SleepReminderSettings? = nil,
+        formulaMlHistory: [Int]? = nil
     ) {
         self.version = version
         self.exportedAt = exportedAt
@@ -45,6 +49,7 @@ struct DataSnapshot: Codable {
         self.vaccines = vaccines
         self.growth = growth
         self.foods = foods
+        self.recipes = recipes
         self.medications = medications
         self.teeth = teeth
         self.milestones = milestones
@@ -52,6 +57,7 @@ struct DataSnapshot: Codable {
         self.feedDraft = feedDraft
         self.feedReminder = feedReminder
         self.sleepReminder = sleepReminder
+        self.formulaMlHistory = formulaMlHistory
     }
 
     init(
@@ -73,13 +79,15 @@ struct DataSnapshot: Codable {
             vaccines: vaccines,
             growth: growth,
             foods: foods,
+            recipes: nil,
             medications: nil,
             teeth: teeth,
             milestones: milestones,
             activeTimer: nil,
             feedDraft: nil,
             feedReminder: nil,
-            sleepReminder: nil
+            sleepReminder: nil,
+            formulaMlHistory: nil
         )
     }
 }
@@ -124,11 +132,13 @@ extension AppStore {
 
     func snapshot() -> DataSnapshot {
         DataSnapshot(baby: baby, events: events, vaccines: vaccines,
-                     growth: growth, foods: foods, medications: medications,
+                     growth: growth, foods: foods, recipes: recipes,
+                     medications: medications,
                      teeth: teeth,
                      milestones: milestones, activeTimer: activeTimer,
                      feedDraft: feedDraft, feedReminder: feedReminder,
-                     sleepReminder: sleepReminder)
+                     sleepReminder: sleepReminder,
+                     formulaMlHistory: formulaMlHistory)
     }
 
     func apply(_ snap: DataSnapshot) {
@@ -137,6 +147,7 @@ extension AppStore {
         vaccines = snap.vaccines
         growth = snap.growth
         foods = snap.foods
+        recipes = snap.recipes ?? []
         medications = snap.medications ?? []
         // 按位置合并,保证 20 颗位置齐全;老备份无 teeth 字段时回退为空记录
         milestones = snap.milestones ?? []
@@ -152,6 +163,7 @@ extension AppStore {
         feedDraft = snap.feedDraft
         feedReminder = snap.feedReminder ?? .init()
         sleepReminder = snap.sleepReminder ?? .init()
+        formulaMlHistory = snap.formulaMlHistory ?? formulaMlHistory
     }
 
     func clearPresetDataForPersonalUseIfNeeded() {
@@ -162,6 +174,7 @@ extension AppStore {
         vaccines = []
         growth = []
         foods = []
+        recipes = []
         medications = []
         milestones = []
         teeth = ToothPosition.all.map(ToothRecord.empty(for:))
@@ -169,6 +182,7 @@ extension AppStore {
         feedDraft = nil
         feedReminder = .init()
         sleepReminder = .init()
+        formulaMlHistory = []
 
         SleepLiveActivityController.end(timer: nil, babyName: baby.name)
         FeedLiveActivityController.end(babyName: baby.name)

@@ -8,6 +8,7 @@ final class AppStore {
     var vaccines: [Vaccine] = []
     var growth: [GrowthPoint] = []
     var foods: [FoodItem] = []
+    var recipes: [Recipe] = []
     var medications: [MedicationRecord] = []
     var teeth: [ToothRecord] = ToothPosition.all.map(ToothRecord.empty(for:))
     var milestones: [Milestone] = []
@@ -16,6 +17,9 @@ final class AppStore {
     var feedDraft: FeedDraft? = nil
     var feedReminder: FeedReminderSettings = .init()
     var sleepReminder: SleepReminderSettings = .init()
+    var formulaMlHistory: [Int] = []
+
+    static let formulaMlHistoryLimit = 6
 
     init(seedDemoData: Bool = false) {
         baby = seedDemoData ? Self.demoBaby() : Self.defaultBaby()
@@ -430,6 +434,19 @@ final class AppStore {
         FeedLiveActivityController.update(draft: draft, babyName: baby.name)
     }
 
+    func recordFormulaMilliliters(_ value: Int) {
+        let clamped = max(10, min(300, value))
+        var history = formulaMlHistory
+        history.removeAll { $0 == clamped }
+        history.insert(clamped, at: 0)
+        if history.count > Self.formulaMlHistoryLimit {
+            history = Array(history.prefix(Self.formulaMlHistoryLimit))
+        }
+        guard formulaMlHistory != history else { return }
+        formulaMlHistory = history
+        persist()
+    }
+
     @discardableResult
     func startFeedFromShortcut(at date: Date = Date()) -> ShortcutStartStatus {
         if let feedDraft, feedDraft.hasActiveState {
@@ -462,6 +479,13 @@ final class AppStore {
 
         startTimer(kind: .sleep, at: date)
         return .started
+    }
+
+    @discardableResult
+    func recordDiaperFromShortcut(type: DiaperEventType = .wet, at date: Date = Date()) -> Event {
+        let event = Event(kind: .diaper, at: date, title: type.label)
+        addEvent(event)
+        return event
     }
 
     private func shortcutBreastSide() -> FeedDraftSide {
@@ -840,6 +864,24 @@ final class AppStore {
         persist()
     }
 
+    // MARK: — Recipes
+
+    func addRecipe(_ recipe: Recipe) {
+        recipes.append(recipe)
+        persist()
+    }
+
+    func updateRecipe(_ recipe: Recipe) {
+        guard let idx = recipes.firstIndex(where: { $0.id == recipe.id }) else { return }
+        recipes[idx] = recipe
+        persist()
+    }
+
+    func deleteRecipe(_ id: String) {
+        recipes.removeAll { $0.id == id }
+        persist()
+    }
+
     private func solidFoodNames(in event: Event) -> [String] {
         guard event.kind == .solid else { return [] }
         let parts = event.title
@@ -1049,7 +1091,7 @@ enum ShortcutStartStatus: Equatable {
 }
 
 enum SubScreen: String, Identifiable {
-    case sleep, feed, diaper, solid, vaccine, medication, foodList, teeth, settings, backup
+    case sleep, feed, diaper, solid, vaccine, medication, foodList, recipeList, teeth, settings, backup
     var id: String { rawValue }
 }
 

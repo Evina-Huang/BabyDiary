@@ -853,6 +853,35 @@ struct BabyDiaryTests {
         #expect(store.activeTimer == firstTimer)
     }
 
+    @Test func shortcutRecordsDefaultDiaperAsWet() throws {
+        let store = AppStore()
+        let cal = Calendar.current
+        let date = cal.date(from: DateComponents(year: 2026, month: 4, day: 28, hour: 10, minute: 8))!
+
+        let event = store.recordDiaperFromShortcut(at: date)
+        let saved = try #require(store.events.first)
+
+        #expect(event.kind == .diaper)
+        #expect(event.at == date)
+        #expect(event.title == "嘘嘘")
+        #expect(event.sub == nil)
+        #expect(saved == event)
+    }
+
+    @Test func shortcutRecordsDiaperType() throws {
+        let store = AppStore()
+        let cal = Calendar.current
+        let dirtyDate = cal.date(from: DateComponents(year: 2026, month: 4, day: 28, hour: 10, minute: 8))!
+        let bothDate = cal.date(from: DateComponents(year: 2026, month: 4, day: 28, hour: 12, minute: 20))!
+
+        let dirty = store.recordDiaperFromShortcut(type: .dirty, at: dirtyDate)
+        let both = store.recordDiaperFromShortcut(type: .both, at: bothDate)
+
+        #expect(dirty.title == "臭臭")
+        #expect(both.title == "嘘嘘+臭臭")
+        #expect(store.events.map(\.title) == ["嘘嘘+臭臭", "臭臭"])
+    }
+
     @Test func sleepEventTitleUsesDurationFromManualTimes() {
         let cal = Calendar.current
         let start = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 10, minute: 5))!

@@ -6,8 +6,6 @@ struct SolidScreen: View {
 
     enum Unit: String, Hashable { case g, ml }
 
-    private let quick = ["米糊", "南瓜泥", "苹果泥", "胡萝卜", "香蕉", "鸡蛋黄"]
-
     @State private var selectedNames: [String] = []
     @State private var observationDaysMap: [String: Int] = [:]
     @State private var customInput: String = ""
@@ -25,7 +23,8 @@ struct SolidScreen: View {
                 amountBlock.padding(.top, 22)
                 timePicker.padding(.top, 22)
                 notesBlock.padding(.top, 22)
-                saveButton.padding(.top, 22)
+                selectionNotice.padding(.top, 18)
+                saveButton.padding(.top, 12)
             }
         }
         .background(Palette.bg)
@@ -83,7 +82,97 @@ struct SolidScreen: View {
             }
             .padding(.horizontal, 16).padding(.vertical, 14)
             .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            quickChips
+            if !store.recipes.isEmpty {
+                recipeRow
+            }
+        }
+    }
+
+    private var recipeRow: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("我的食谱")
+                .font(.system(size: 11, weight: .heavy))
+                .tracking(0.66)
+                .textCase(.uppercase)
+                .foregroundStyle(Palette.ink3)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(store.recipes) { recipe in
+                        recipeChip(recipe)
+                    }
+                }
+            }
+        }
+    }
+
+    private func recipeChip(_ recipe: Recipe) -> some View {
+        let on = selectedNames.contains(allOf: recipe.foodNames)
+        return Button {
+            withAnimation(.easeOut(duration: 0.16)) {
+                applyRecipe(recipe)
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Text(recipe.name)
+                    .font(.system(size: 13, weight: .heavy))
+                    .tracking(-0.13)
+                    .foregroundStyle(on ? .white : Palette.ink2)
+                Text("· \(recipe.foodNames.count)")
+                    .font(.system(size: 11, weight: .bold))
+                    .monospacedDigit()
+                    .foregroundStyle(on ? .white.opacity(0.78) : Palette.ink3)
+            }
+            .padding(.horizontal, 14).padding(.vertical, 8)
+            .background(on ? store.theme.primary : Palette.bg2, in: Capsule())
+        }
+        .buttonStyle(PressableStyle())
+    }
+
+    private func applyRecipe(_ recipe: Recipe) {
+        let allSelected = selectedNames.contains(allOf: recipe.foodNames)
+        if allSelected {
+            for name in recipe.foodNames {
+                selectedNames.removeAll { $0 == name }
+                observationDaysMap.removeValue(forKey: name)
+            }
+        } else {
+            for name in recipe.foodNames where !selectedNames.contains(name) {
+                selectedNames.append(name)
+                observationDaysMap[name] = 3
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var selectionNotice: some View {
+        let needsObservation = selectedNames.filter { name in
+            if let f = store.foods.first(where: { $0.name == name }) {
+                return f.status == .observing
+            }
+            return true
+        }
+        let allergic = selectedNames.filter { name in
+            store.foods.first(where: { $0.name == name })?.status == .allergic
+        }
+        if !needsObservation.isEmpty || !allergic.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                if !needsObservation.isEmpty {
+                    Label("包含 \(needsObservation.count) 项未排敏食材：\(needsObservation.joined(separator: "、"))",
+                          systemImage: "exclamationmark.circle.fill")
+                        .font(.system(size: 12, weight: .heavy))
+                        .foregroundStyle(Palette.yellowInk)
+                }
+                if !allergic.isEmpty {
+                    Label("含已过敏食材：\(allergic.joined(separator: "、"))",
+                          systemImage: "exclamationmark.triangle.fill")
+                        .font(.system(size: 12, weight: .heavy))
+                        .foregroundStyle(Color(hex: 0xD44E3A))
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 14).padding(.vertical, 10)
+            .background(Palette.yellow.opacity(0.45),
+                        in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
     }
 
@@ -157,34 +246,6 @@ struct SolidScreen: View {
             get: { observationDaysMap[name] ?? 3 },
             set: { observationDaysMap[name] = $0 }
         )
-    }
-
-    private var quickChips: some View {
-        let columns = [GridItem(.adaptive(minimum: 84), spacing: 8)]
-        return LazyVGrid(columns: columns, alignment: .leading, spacing: 8) {
-            ForEach(quick, id: \.self) { q in
-                let on = selectedNames.contains(q)
-                Button {
-                    withAnimation(.easeOut(duration: 0.16)) {
-                        if on {
-                            selectedNames.removeAll { $0 == q }
-                            observationDaysMap.removeValue(forKey: q)
-                        } else {
-                            selectedNames.append(q)
-                            observationDaysMap[q] = 3
-                        }
-                    }
-                } label: {
-                    Text(q)
-                        .font(.system(size: 13, weight: .heavy))
-                        .tracking(-0.13)
-                        .foregroundStyle(on ? Palette.yellowInk : Palette.ink2)
-                        .padding(.horizontal, 14).padding(.vertical, 8)
-                        .background(on ? Palette.yellow : Palette.bg2, in: Capsule())
-                }
-                .buttonStyle(PressableStyle())
-            }
-        }
     }
 
     private var amountBlock: some View {
@@ -268,6 +329,13 @@ struct SolidScreen: View {
             store.recordSolidFood(foodName, at: time, observationDays: observationDaysMap[foodName] ?? 3)
         }
         onBack()
+    }
+}
+
+private extension Array where Element: Equatable {
+    func contains(allOf others: [Element]) -> Bool {
+        guard !others.isEmpty else { return false }
+        return others.allSatisfy { contains($0) }
     }
 }
 

@@ -41,7 +41,7 @@ struct FeedScreen: View {
     @State private var ml: Int = 210
     @State private var time: Date = .now
 
-    private let formulaPresetValues = [120, 150, 180, 210, 240]
+    private var formulaPresetValues: [Int] { store.formulaMlHistory }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -391,23 +391,25 @@ struct FeedScreen: View {
         VStack(alignment: .leading, spacing: 12) {
             FieldLabel(text: "奶量 (ml)")
             StepperInput(value: $ml, step: 10, min: 10, max: 300, suffix: "ml")
-            HStack(spacing: 8) {
-                ForEach(formulaPresetValues, id: \.self) { v in
-                    Button {
-                        ml = v
-                    } label: {
-                        Text("\(v) ml")
-                            .font(.system(size: 13, weight: .bold))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.84)
-                            .foregroundStyle(ml == v ? .white : Palette.ink2)
-                            .frame(maxWidth: .infinity)
-                            .padding(.horizontal, 6).padding(.vertical, 10)
-                            .background(ml == v ? store.theme.primary : Palette.bg2,
-                                        in: Capsule())
+            if !formulaPresetValues.isEmpty {
+                let columns = [GridItem(.adaptive(minimum: 72), spacing: 8)]
+                LazyVGrid(columns: columns, alignment: .leading, spacing: 8) {
+                    ForEach(formulaPresetValues, id: \.self) { v in
+                        Button {
+                            ml = v
+                        } label: {
+                            Text("\(v) ml")
+                                .font(.system(size: 13, weight: .bold))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.84)
+                                .foregroundStyle(ml == v ? .white : Palette.ink2)
+                                .frame(maxWidth: .infinity)
+                                .padding(.horizontal, 6).padding(.vertical, 10)
+                                .background(ml == v ? store.theme.primary : Palette.bg2,
+                                            in: Capsule())
+                        }
+                        .buttonStyle(PressableStyle())
                     }
-                    .buttonStyle(PressableStyle())
-                    .frame(maxWidth: .infinity)
                 }
             }
         }
@@ -559,11 +561,13 @@ struct FeedScreen: View {
                              endAt: e,
                              title: "奶粉",
                              sub: "\(ml) ml · \(hhmm(s)) - \(hhmm(e))"))
+        store.recordFormulaMilliliters(ml)
         resetFormula()
         onBack()
     }
     private func saveFormulaManual() {
         store.addEvent(.init(kind: .feed, at: time, title: "奶粉", sub: "\(ml) ml"))
+        store.recordFormulaMilliliters(ml)
         onBack()
     }
 
@@ -627,6 +631,7 @@ struct FeedScreen: View {
         }
         bActive = recommendedBreastSide
         bManualFirstSide = recommendedBreastSide
+        if let lastMl = store.formulaMlHistory.first { ml = lastMl }
     }
 
     private func syncDraftToStore() {

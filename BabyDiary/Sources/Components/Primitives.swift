@@ -510,20 +510,22 @@ func formatDurShort(_ seconds: TimeInterval) -> String {
 struct InlineWheelTimePicker: View {
     @Binding var time: Date
     let theme: AppTheme
-    var components: DatePickerComponents = .hourAndMinute
+    var components: DatePickerComponents = [.date, .hourAndMinute]
     var label: String = "时间"
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             FieldLabel(text: label)
-            DatePicker("", selection: $time, displayedComponents: components)
-                .labelsHidden()
-                .datePickerStyle(.wheel)
-                .tint(theme.primary600)
-                .environment(\.locale, Locale(identifier: "zh_CN"))
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, 8).padding(.vertical, 4)
-                .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            HStack(spacing: 8) {
+                DatePicker("", selection: $time, displayedComponents: components)
+                    .labelsHidden()
+                    .datePickerStyle(.compact)
+                    .tint(theme.primary600)
+                    .environment(\.locale, Locale(identifier: "zh_CN"))
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 12).padding(.vertical, 10)
+            .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
     }
 }

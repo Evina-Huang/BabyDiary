@@ -62,6 +62,7 @@ struct ContentView: View {
         case .vaccine:  VaccineScreen(onBack:  { sub = nil })
         case .medication: MedicationScreen(onBack: { sub = nil })
         case .foodList: FoodListScreen(onBack: { sub = nil })
+        case .recipeList: RecipeListScreen(onBack: { sub = nil })
         case .teeth:    TeethScreen(onBack:    { sub = nil })
         case .settings: SettingsScreen(onBack: { sub = nil })
         case .backup:   BackupScreen(onBack:   { sub = nil })
