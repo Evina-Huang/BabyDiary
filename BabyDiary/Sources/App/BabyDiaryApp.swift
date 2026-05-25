@@ -62,6 +62,29 @@ struct StartFeedingIntent: AppIntent {
     }
 }
 
+struct LogFormulaIntent: AppIntent {
+    static var title: LocalizedStringResource = "记录奶粉"
+    static var description = IntentDescription("直接记录一次奶粉喂奶，不开始计时。")
+    static var openAppWhenRun = false
+
+    @Parameter(title: "奶量（ml）")
+    var milliliters: Int?
+
+    init() {
+        self.milliliters = nil
+    }
+
+    init(milliliters: Int?) {
+        self.milliliters = milliliters
+    }
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        let event = BabyDiaryShortcutCoordinator.recordFormula(milliliters: milliliters)
+        return .result(dialog: "已记录\(event.title) \(event.sub ?? "")")
+    }
+}
+
 struct StartSleepingIntent: AppIntent {
     static var title: LocalizedStringResource = "开始睡觉"
     static var description = IntentDescription("开始一次睡眠计时。")
@@ -138,6 +161,19 @@ struct BabyDiaryAppShortcuts: AppShortcutsProvider {
         )
 
         AppShortcut(
+            intent: LogFormulaIntent(),
+            phrases: [
+                "用 \(.applicationName) 记录奶粉",
+                "用 \(.applicationName) 直接记录奶粉",
+                "用 \(.applicationName) 宝宝喝奶粉了",
+                "在 \(.applicationName) 记录奶粉",
+                "\(.applicationName) 记录奶粉"
+            ],
+            shortTitle: "记录奶粉",
+            systemImageName: "waterbottle.fill"
+        )
+
+        AppShortcut(
             intent: StartSleepingIntent(),
             phrases: [
                 "用 \(.applicationName) 开始睡觉",
@@ -179,6 +215,11 @@ enum BabyDiaryShortcutCoordinator {
         let status = target.startFeedFromShortcut(at: date)
         requestOpen(.feed)
         return status
+    }
+
+    static func recordFormula(milliliters: Int? = nil, at date: Date = Date()) -> Event {
+        let target = activeStore ?? AppStore.loadedOrSeeded()
+        return target.recordFormulaFromShortcut(milliliters: milliliters, at: date)
     }
 
     static func startSleeping(at date: Date = Date()) -> ShortcutStartStatus {

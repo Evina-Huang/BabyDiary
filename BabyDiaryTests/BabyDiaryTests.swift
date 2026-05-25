@@ -832,6 +832,46 @@ struct BabyDiaryTests {
         #expect(store.feedDraft == firstDraft)
     }
 
+    @Test func shortcutRecordsFormulaWithoutStartingTimer() throws {
+        let store = AppStore()
+        let cal = Calendar.current
+        let date = cal.date(from: DateComponents(year: 2026, month: 4, day: 28, hour: 9, minute: 30))!
+
+        let event = store.recordFormulaFromShortcut(milliliters: 180, at: date)
+        let saved = try #require(store.events.first)
+
+        #expect(event.kind == .feed)
+        #expect(event.at == date)
+        #expect(event.endAt == nil)
+        #expect(event.title == "奶粉")
+        #expect(event.sub == "180 ml")
+        #expect(saved == event)
+        #expect(store.feedDraft == nil)
+        #expect(store.activeTimer == nil)
+        #expect(store.formulaMlHistory == [180])
+    }
+
+    @Test func shortcutFormulaUsesRecentMillilitersByDefault() {
+        let store = AppStore()
+        let cal = Calendar.current
+        let date = cal.date(from: DateComponents(year: 2026, month: 4, day: 28, hour: 9, minute: 30))!
+        store.formulaMlHistory = [150]
+
+        let event = store.recordFormulaFromShortcut(at: date)
+
+        #expect(event.sub == "150 ml")
+        #expect(store.formulaMlHistory == [150])
+    }
+
+    @Test func shortcutFormulaUsesDefaultMillilitersWithoutHistory() {
+        let store = AppStore()
+
+        let event = store.recordFormulaFromShortcut()
+
+        #expect(event.sub == "270 ml")
+        #expect(store.formulaMlHistory == [270])
+    }
+
     @Test func shortcutStartsSleepTimerWithoutDuplicating() throws {
         let store = AppStore()
         let cal = Calendar.current

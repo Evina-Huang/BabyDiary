@@ -20,6 +20,7 @@ final class AppStore {
     var formulaMlHistory: [Int] = []
 
     static let formulaMlHistoryLimit = 6
+    static let defaultFormulaMilliliters = 270
 
     init(seedDemoData: Bool = false) {
         baby = seedDemoData ? Self.demoBaby() : Self.defaultBaby()
@@ -435,7 +436,7 @@ final class AppStore {
     }
 
     func recordFormulaMilliliters(_ value: Int) {
-        let clamped = max(10, min(300, value))
+        let clamped = Self.clampedFormulaMilliliters(value)
         var history = formulaMlHistory
         history.removeAll { $0 == clamped }
         history.insert(clamped, at: 0)
@@ -470,6 +471,17 @@ final class AppStore {
     }
 
     @discardableResult
+    func recordFormulaFromShortcut(milliliters value: Int? = nil, at date: Date = Date()) -> Event {
+        let milliliters = Self.clampedFormulaMilliliters(
+            value ?? formulaMlHistory.first ?? Self.defaultFormulaMilliliters
+        )
+        let event = Event(kind: .feed, at: date, title: "奶粉", sub: "\(milliliters) ml")
+        addEvent(event)
+        recordFormulaMilliliters(milliliters)
+        return event
+    }
+
+    @discardableResult
     func startSleepFromShortcut(at date: Date = Date()) -> ShortcutStartStatus {
         if let activeTimer, activeTimer.kind == .sleep {
             SleepLiveActivityController.update(timer: activeTimer, babyName: baby.name)
@@ -491,6 +503,10 @@ final class AppStore {
     private func shortcutBreastSide() -> FeedDraftSide {
         guard let endingSide = mostRecentBreastFeedEvent()?.breastEndingSide else { return .left }
         return endingSide == .right ? .right : .left
+    }
+
+    private static func clampedFormulaMilliliters(_ value: Int) -> Int {
+        max(10, min(300, value))
     }
 
     func restoreSleepLiveActivityIfNeeded() {
