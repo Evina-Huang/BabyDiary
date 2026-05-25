@@ -45,6 +45,7 @@
 		BE937337B54F44B51D0E139F /* BackupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEEA5B6B67F89989A1EB85EF /* BackupView.swift */; };
 		C7A8C9434D4FEF2395E4EF49 /* Tooth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 207C1F685155DB510F75BDDD /* Tooth.swift */; };
 		C8ABA57A566961EC9833ABF7 /* FoodItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0181DA81854724D428DE31A5 /* FoodItem.swift */; };
+		C8BFE2EED802D0DF1FF6F29B /* bubble.caf in Resources */ = {isa = PBXBuildFile; fileRef = 8015368DB6D10BC24248119B /* bubble.caf */; };
 		C9EE5DEC31801EB78F0521B2 /* AppStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA9831391FD58F873506339A /* AppStore.swift */; };
 		CFBF0688621A3FFAD71179A2 /* RecipeEditSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 216C7AB960D62FDF9AA2239D /* RecipeEditSheet.swift */; };
 		DC77C5471B6A77860BA20FA9 /* Event.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2183741F6B070696BCE37F88 /* Event.swift */; };
@@ -105,6 +106,7 @@
 		72D7D108F4BB04D6737EF131 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		75A3C34D1CA00285FB7EA36C /* BabyDiary.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = BabyDiary.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		7DBA50674F4531D448005E6D /* BabyDiaryShared.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BabyDiaryShared.swift; sourceTree = "<group>"; };
+		8015368DB6D10BC24248119B /* bubble.caf */ = {isa = PBXFileReference; path = bubble.caf; sourceTree = "<group>"; };
 		830C9F260903778BB8A2B286 /* BabyDiaryWidgets.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = BabyDiaryWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		8361B81937103CAB6ED865C7 /* Milestone.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Milestone.swift; sourceTree = "<group>"; };
 		846242867B8E637561712FE3 /* RecordsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordsView.swift; sourceTree = "<group>"; };
@@ -178,6 +180,7 @@
 			isa = PBXGroup;
 			children = (
 				72D7D108F4BB04D6737EF131 /* Assets.xcassets */,
+				8015368DB6D10BC24248119B /* bubble.caf */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -392,6 +395,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				84197A7FE9DC14CB3DD0AB47 /* Assets.xcassets in Resources */,
+				C8BFE2EED802D0DF1FF6F29B /* bubble.caf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

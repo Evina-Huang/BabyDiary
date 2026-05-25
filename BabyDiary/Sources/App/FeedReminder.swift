@@ -347,7 +347,7 @@ enum FeedReminderNotificationController {
             let content = UNMutableNotificationContent()
             content.title = "该喂奶了"
             content.body = bodyText(settings: settings, babyName: babyName)
-            content.sound = .default
+            content.sound = UNNotificationSound(named: UNNotificationSoundName("bubble.caf"))
             content.userInfo = [
                 "destination": BabyDiaryDestination.feed.rawValue
             ]
@@ -435,7 +435,7 @@ enum SleepReminderNotificationController {
             let content = UNMutableNotificationContent()
             content.title = "该哄睡了"
             content.body = bodyText(settings: settings, babyName: babyName)
-            content.sound = .default
+            content.sound = UNNotificationSound(named: UNNotificationSoundName("bubble.caf"))
             content.userInfo = [
                 "destination": BabyDiaryDestination.sleep.rawValue
             ]
