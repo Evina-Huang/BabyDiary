@@ -43,7 +43,7 @@ private struct FeedReminderSettingsCard: View {
                         .frame(width: 42, height: 42)
 
                         VStack(alignment: .leading, spacing: 3) {
-                            Text("喂奶提醒")
+                            Text("喂养提醒")
                                 .font(.system(size: 15, weight: .heavy))
                                 .tracking(-0.15)
                                 .foregroundStyle(Palette.ink)
@@ -65,30 +65,20 @@ private struct FeedReminderSettingsCard: View {
 
                     if settings.isEnabled {
                         VStack(alignment: .leading, spacing: 10) {
-                            HStack {
-                                FieldLabel(text: "提醒间隔")
-                                Spacer()
-                                Text("\(settings.normalizedIntervalHours) 小时")
-                                    .font(.system(size: 13, weight: .heavy))
-                                    .monospacedDigit()
-                                    .foregroundStyle(Palette.pinkInk)
-                            }
-
-                            StepperInput(
-                                value: Binding(
-                                    get: { store.feedReminder.normalizedIntervalHours },
-                                    set: { store.updateFeedReminderInterval(hours: $0) }
+                            FieldLabel(text: "提醒模式")
+                            SegPill(
+                                selection: Binding(
+                                    get: { store.feedReminder.mode },
+                                    set: { store.updateFeedReminderMode($0) }
                                 ),
-                                step: 1,
-                                min: FeedReminderSettings.minIntervalHours,
-                                max: FeedReminderSettings.maxIntervalHours,
-                                suffix: "小时"
+                                options: FeedReminderMode.allCases.map { ($0, $0.label) }
                             )
 
-                            HStack(spacing: 8) {
-                                ForEach([2, 3, 4], id: \.self) { hours in
-                                    intervalPreset(hours)
-                                }
+                            switch settings.mode {
+                            case .interval:
+                                intervalSettings(settings: settings)
+                            case .schedule:
+                                scheduleSettings(settings: settings)
                             }
 
                             Rectangle()
@@ -159,6 +149,212 @@ private struct FeedReminderSettingsCard: View {
         .buttonStyle(PressableStyle())
     }
 
+    @ViewBuilder
+    private func intervalSettings(settings: FeedReminderSettings) -> some View {
+        HStack {
+            FieldLabel(text: "提醒间隔")
+            Spacer()
+            Text("\(settings.normalizedIntervalHours) 小时")
+                .font(.system(size: 13, weight: .heavy))
+                .monospacedDigit()
+                .foregroundStyle(Palette.pinkInk)
+        }
+
+        StepperInput(
+            value: Binding(
+                get: { store.feedReminder.normalizedIntervalHours },
+                set: { store.updateFeedReminderInterval(hours: $0) }
+            ),
+            step: 1,
+            min: FeedReminderSettings.minIntervalHours,
+            max: FeedReminderSettings.maxIntervalHours,
+            suffix: "小时"
+        )
+
+        HStack(spacing: 8) {
+            ForEach([2, 3, 4], id: \.self) { hours in
+                intervalPreset(hours)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func scheduleSettings(settings: FeedReminderSettings) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    FieldLabel(text: "当天作息")
+                    Text("以识别范围内第一顿奶为起点")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Palette.ink3)
+                }
+                Spacer()
+                Text("三奶两辅")
+                    .font(.system(size: 12, weight: .heavy))
+                    .foregroundStyle(Palette.pinkInk)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Palette.pink, in: Capsule())
+            }
+
+            VStack(spacing: 8) {
+                ForEach(settings.normalizedScheduleEntries) { entry in
+                    scheduleEntryRow(entry, settings: settings)
+                }
+            }
+
+            if settings.normalizedScheduleEntries.count < FeedReminderSettings.maxScheduleEntries {
+                Button {
+                    store.addFeedReminderScheduleEntry()
+                } label: {
+                    HStack(spacing: 7) {
+                        Text("+")
+                            .font(.system(size: 16, weight: .black))
+                        Text("添加一餐")
+                            .font(.system(size: 12, weight: .heavy))
+                    }
+                    .foregroundStyle(Palette.ink2)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                }
+                .buttonStyle(PressableStyle())
+            }
+
+            HStack(spacing: 10) {
+                scheduleTimePicker(
+                    title: "默认首奶",
+                    minute: settings.normalizedDefaultFirstFeedMinuteOfDay,
+                    setMinute: store.updateFeedReminderDefaultFirstFeedMinute
+                )
+                scheduleTimePicker(
+                    title: "最晚提醒",
+                    minute: settings.normalizedLatestReminderMinuteOfDay,
+                    setMinute: store.updateFeedReminderLatestMinute
+                )
+            }
+
+            HStack(spacing: 10) {
+                scheduleTimePicker(
+                    title: "识别开始",
+                    minute: settings.normalizedFirstFeedWindowStartMinuteOfDay,
+                    setMinute: store.updateFeedReminderFirstFeedWindowStartMinute
+                )
+                scheduleTimePicker(
+                    title: "识别结束",
+                    minute: settings.normalizedFirstFeedWindowEndMinuteOfDay,
+                    setMinute: store.updateFeedReminderFirstFeedWindowEndMinute
+                )
+            }
+        }
+    }
+
+    private func scheduleEntryRow(
+        _ entry: FeedReminderScheduleEntry,
+        settings: FeedReminderSettings
+    ) -> some View {
+        HStack(spacing: 9) {
+            Menu {
+                ForEach(FeedReminderScheduleKind.allCases, id: \.self) { kind in
+                    Button(kind.label) {
+                        store.updateFeedReminderScheduleEntry(id: entry.id, kind: kind)
+                    }
+                }
+            } label: {
+                Text(entry.kind.label)
+                    .font(.system(size: 12, weight: .heavy))
+                    .foregroundStyle(entry.kind == .feed ? Palette.pinkInk : Palette.yellowInk)
+                    .frame(width: 46)
+                    .padding(.vertical, 8)
+                    .background(
+                        entry.kind == .feed ? Palette.pink : Palette.yellow,
+                        in: Capsule()
+                    )
+            }
+
+            Button {
+                store.updateFeedReminderScheduleEntry(
+                    id: entry.id,
+                    offsetMinutes: entry.offsetMinutes - FeedReminderSettings.scheduleOffsetStepMinutes
+                )
+            } label: {
+                Text("−")
+                    .font(.system(size: 16, weight: .black))
+                    .foregroundStyle(Palette.ink)
+                    .frame(width: 34, height: 34)
+                    .background(.white, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+                    .shadow(color: .black.opacity(0.05), radius: 1, x: 0, y: 1)
+            }
+            .buttonStyle(PressableStyle())
+
+            VStack(spacing: 1) {
+                Text(offsetText(entry.offsetMinutes))
+                    .font(.system(size: 18, weight: .black))
+                    .tracking(-0.25)
+                    .monospacedDigit()
+                    .foregroundStyle(Palette.ink)
+                Text(projectedTimeText(for: entry, settings: settings))
+                    .font(.system(size: 11, weight: .semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(Palette.ink3)
+            }
+            .frame(maxWidth: .infinity)
+
+            Button {
+                store.updateFeedReminderScheduleEntry(
+                    id: entry.id,
+                    offsetMinutes: entry.offsetMinutes + FeedReminderSettings.scheduleOffsetStepMinutes
+                )
+            } label: {
+                Text("+")
+                    .font(.system(size: 16, weight: .black))
+                    .foregroundStyle(Palette.ink)
+                    .frame(width: 34, height: 34)
+                    .background(.white, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+                    .shadow(color: .black.opacity(0.05), radius: 1, x: 0, y: 1)
+            }
+            .buttonStyle(PressableStyle())
+
+            Button {
+                store.deleteFeedReminderScheduleEntry(id: entry.id)
+            } label: {
+                Text("×")
+                    .font(.system(size: 15, weight: .black))
+                    .foregroundStyle(Palette.ink3)
+                    .frame(width: 34, height: 34)
+            }
+            .buttonStyle(PressableStyle())
+            .disabled(settings.normalizedScheduleEntries.count <= FeedReminderSettings.minScheduleEntries)
+            .opacity(settings.normalizedScheduleEntries.count <= FeedReminderSettings.minScheduleEntries ? 0.35 : 1)
+        }
+        .padding(8)
+        .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private func scheduleTimePicker(
+        title: String,
+        minute: Int,
+        setMinute: @escaping (Int) -> Void
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            FieldLabel(text: title)
+            DatePicker(
+                "",
+                selection: Binding(
+                    get: { dateForMinute(minute) },
+                    set: { setMinute(minuteOfDay($0)) }
+                ),
+                displayedComponents: .hourAndMinute
+            )
+            .labelsHidden()
+            .datePickerStyle(.compact)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
     private func quietTimePicker(
         title: String,
         minute: Int,
@@ -221,26 +417,28 @@ private struct FeedReminderSettingsCard: View {
         guard settings.isEnabled else {
             return "未开启"
         }
-        guard let due = store.nextFeedReminderDueDate(now: now) else {
+        guard let item = store.nextFeedReminderItem(now: now) else {
             return "未开启"
         }
+        let due = item.date
         if due <= now {
             if settings.quietHoursEnabled,
                FeedReminderPlanner.isInQuietHours(now, settings: settings),
-               let next = FeedReminderPlanner.scheduledDates(
+               let next = FeedReminderPlanner.scheduledItems(
                    settings: settings,
                    lastFeed: store.mostRecentEvent(kind: .feed),
+                   events: store.events,
                    now: now,
                    count: 1
                ).first {
-                return "\(dateLabel(next, now: now)) 再提醒"
+                return "\(dateLabel(next.date, now: now)) 再提醒"
             }
-            return "已经到喂奶时间"
+            return item.kind == .solid ? "已经到辅食时间" : "已经到喝奶时间"
         }
         if settings.quietHoursEnabled, FeedReminderPlanner.isInQuietHours(now, settings: settings) {
             return "\(dateLabel(due, now: now)) 再提醒"
         }
-        return "下次 \(dateLabel(due, now: now))"
+        return "下次\(item.kind.label) \(dateLabel(due, now: now))"
     }
 
     private func statusColor(settings: FeedReminderSettings, now: Date) -> Color {
@@ -262,6 +460,20 @@ private struct FeedReminderSettingsCard: View {
 
     private func timeText(_ minute: Int) -> String {
         String(format: "%02d:%02d", minute / 60, minute % 60)
+    }
+
+    private func offsetText(_ minute: Int) -> String {
+        let clamped = FeedReminderSettings.clampedScheduleOffsetMinutes(minute)
+        return String(format: "+%d:%02d", clamped / 60, clamped % 60)
+    }
+
+    private func projectedTimeText(
+        for entry: FeedReminderScheduleEntry,
+        settings: FeedReminderSettings
+    ) -> String {
+        let total = settings.normalizedDefaultFirstFeedMinuteOfDay + entry.offsetMinutes
+        let capped = min(total, settings.normalizedLatestReminderMinuteOfDay)
+        return timeText(capped)
     }
 
     private func dateForMinute(_ minute: Int) -> Date {

@@ -348,6 +348,53 @@ struct BabyDiaryTests {
         ])
     }
 
+    @Test func feedReminderScheduleAnchorsToFirstMorningFeed() throws {
+        let cal = Calendar.current
+        let firstFeed = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 6, minute: 30))!
+        let now = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 8, minute: 0))!
+        let settings = FeedReminderSettings(isEnabled: true, mode: .schedule)
+        let events = [
+            Event(id: "first", kind: .feed, at: firstFeed, title: "奶粉", sub: "180 ml")
+        ]
+
+        let item = try #require(FeedReminderPlanner.nextReminderItem(
+            settings: settings,
+            lastFeed: events.first,
+            events: events,
+            now: now
+        ))
+
+        #expect(item.kind == .solid)
+        #expect(item.date == cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 9, minute: 30))!)
+    }
+
+    @Test func feedReminderScheduleSkipsCompletedEntries() {
+        let cal = Calendar.current
+        let firstFeed = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 7, minute: 0))!
+        let firstSolid = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 10, minute: 5))!
+        let now = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 10, minute: 30))!
+        let settings = FeedReminderSettings(isEnabled: true, mode: .schedule)
+        let events = [
+            Event(id: "solid", kind: .solid, at: firstSolid, title: "米糊", sub: "30g"),
+            Event(id: "feed", kind: .feed, at: firstFeed, title: "奶粉", sub: "180 ml"),
+        ]
+
+        let items = FeedReminderPlanner.scheduledItems(
+            settings: settings,
+            lastFeed: events.last,
+            events: events,
+            now: now,
+            count: 3
+        )
+
+        #expect(items.map(\.kind) == [.feed, .solid, .feed])
+        #expect(items.map(\.date) == [
+            cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 13, minute: 0))!,
+            cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 16, minute: 0))!,
+            cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 20, minute: 0))!,
+        ])
+    }
+
     @Test func legacyFeedReminderSettingsDecodeWithQuietDefaults() throws {
         let data = """
         {
@@ -366,6 +413,8 @@ struct BabyDiaryTests {
         #expect(!settings.quietHoursEnabled)
         #expect(settings.normalizedQuietStartMinuteOfDay == 22 * 60)
         #expect(settings.normalizedQuietEndMinuteOfDay == 7 * 60)
+        #expect(settings.mode == .interval)
+        #expect(settings.normalizedScheduleEntries == FeedReminderSettings.defaultScheduleEntries)
     }
 
     @Test func sleepReminderDueDateUsesLastSleepEndTime() throws {

@@ -188,7 +188,7 @@ final class AppStore {
     func addEvent(_ e: Event) {
         events.insert(e, at: 0)
         persist()
-        if e.kind == .feed {
+        if e.kind == .feed || e.kind == .solid {
             refreshFeedReminderSchedule()
         }
         if e.kind == .sleep {
@@ -270,7 +270,7 @@ final class AppStore {
             syncSolidFoods(named: Set(solidFoodNames(in: e)))
         }
         persist()
-        if e.kind == .feed {
+        if e.kind == .feed || e.kind == .solid {
             refreshFeedReminderSchedule()
         }
         if e.kind == .sleep {
@@ -286,7 +286,7 @@ final class AppStore {
             syncSolidFoods(named: Set(solidFoodNames(in: original) + solidFoodNames(in: e)))
         }
         persist()
-        if original.kind == .feed || e.kind == .feed {
+        if original.kind == .feed || e.kind == .feed || original.kind == .solid || e.kind == .solid {
             refreshFeedReminderSchedule()
         }
         if original.kind == .sleep || e.kind == .sleep {
@@ -537,6 +537,87 @@ final class AppStore {
         refreshFeedReminderSchedule()
     }
 
+    func updateFeedReminderMode(_ mode: FeedReminderMode) {
+        guard feedReminder.mode != mode else { return }
+        feedReminder.mode = mode
+        if mode == .interval, mostRecentEvent(kind: .feed) == nil {
+            feedReminder.anchorAt = Date()
+        }
+        persist()
+        refreshFeedReminderSchedule()
+    }
+
+    func updateFeedReminderDefaultFirstFeedMinute(_ minute: Int) {
+        let clamped = FeedReminderSettings.clampedMinuteOfDay(minute)
+        guard feedReminder.defaultFirstFeedMinuteOfDay != clamped else { return }
+        feedReminder.defaultFirstFeedMinuteOfDay = clamped
+        persist()
+        refreshFeedReminderSchedule()
+    }
+
+    func updateFeedReminderFirstFeedWindowStartMinute(_ minute: Int) {
+        let clamped = FeedReminderSettings.clampedMinuteOfDay(minute)
+        guard feedReminder.firstFeedWindowStartMinuteOfDay != clamped else { return }
+        feedReminder.firstFeedWindowStartMinuteOfDay = clamped
+        persist()
+        refreshFeedReminderSchedule()
+    }
+
+    func updateFeedReminderFirstFeedWindowEndMinute(_ minute: Int) {
+        let clamped = FeedReminderSettings.clampedMinuteOfDay(minute)
+        guard feedReminder.firstFeedWindowEndMinuteOfDay != clamped else { return }
+        feedReminder.firstFeedWindowEndMinuteOfDay = clamped
+        persist()
+        refreshFeedReminderSchedule()
+    }
+
+    func updateFeedReminderLatestMinute(_ minute: Int) {
+        let clamped = FeedReminderSettings.clampedMinuteOfDay(minute)
+        guard feedReminder.latestReminderMinuteOfDay != clamped else { return }
+        feedReminder.latestReminderMinuteOfDay = clamped
+        persist()
+        refreshFeedReminderSchedule()
+    }
+
+    func updateFeedReminderScheduleEntry(
+        id: String,
+        kind: FeedReminderScheduleKind? = nil,
+        offsetMinutes: Int? = nil
+    ) {
+        guard let index = feedReminder.scheduleEntries.firstIndex(where: { $0.id == id }) else { return }
+        var entry = feedReminder.scheduleEntries[index]
+        if let kind {
+            entry.kind = kind
+        }
+        if let offsetMinutes {
+            entry.offsetMinutes = FeedReminderSettings.clampedScheduleOffsetMinutes(offsetMinutes)
+        }
+        guard feedReminder.scheduleEntries[index] != entry else { return }
+        feedReminder.scheduleEntries[index] = entry
+        persist()
+        refreshFeedReminderSchedule()
+    }
+
+    func addFeedReminderScheduleEntry() {
+        guard feedReminder.normalizedScheduleEntries.count < FeedReminderSettings.maxScheduleEntries else { return }
+        var entries = feedReminder.normalizedScheduleEntries
+        let nextOffset = FeedReminderSettings.clampedScheduleOffsetMinutes((entries.last?.offsetMinutes ?? 0) + 3 * 60)
+        entries.append(.init(kind: .feed, offsetMinutes: nextOffset))
+        feedReminder.scheduleEntries = entries
+        persist()
+        refreshFeedReminderSchedule()
+    }
+
+    func deleteFeedReminderScheduleEntry(id: String) {
+        let entries = feedReminder.normalizedScheduleEntries
+        guard entries.count > FeedReminderSettings.minScheduleEntries else { return }
+        let updated = entries.filter { $0.id != id }
+        guard updated.count != entries.count else { return }
+        feedReminder.scheduleEntries = updated
+        persist()
+        refreshFeedReminderSchedule()
+    }
+
     func setFeedReminderQuietHoursEnabled(_ isEnabled: Bool) {
         guard feedReminder.quietHoursEnabled != isEnabled else { return }
         feedReminder.quietHoursEnabled = isEnabled
@@ -564,6 +645,16 @@ final class AppStore {
         FeedReminderPlanner.dueDate(
             settings: feedReminder,
             lastFeed: mostRecentEvent(kind: .feed),
+            events: events,
+            now: now
+        )
+    }
+
+    func nextFeedReminderItem(now: Date = Date()) -> FeedReminderPlanItem? {
+        FeedReminderPlanner.nextReminderItem(
+            settings: feedReminder,
+            lastFeed: mostRecentEvent(kind: .feed),
+            events: events,
             now: now
         )
     }
@@ -633,6 +724,7 @@ final class AppStore {
         FeedReminderNotificationController.sync(
             settings: feedReminder,
             lastFeed: mostRecentEvent(kind: .feed),
+            events: events,
             babyName: baby.name,
             now: now
         )

@@ -101,6 +101,8 @@ struct ContentView: View {
             sub = .sleep
         case BabyDiaryDestination.feed.rawValue:
             sub = .feed
+        case BabyDiaryDestination.solid.rawValue:
+            sub = .solid
         case BabyDiaryDestination.diaper.rawValue:
             sub = .diaper
         case BabyDiaryDestination.records.rawValue:

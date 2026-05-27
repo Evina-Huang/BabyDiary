@@ -5,6 +5,7 @@ enum BabyDiaryDestination: String {
     case home
     case sleep
     case feed
+    case solid
     case diaper
     case records
 }
