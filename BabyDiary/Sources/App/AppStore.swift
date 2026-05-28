@@ -584,6 +584,9 @@ final class AppStore {
         kind: FeedReminderScheduleKind? = nil,
         offsetMinutes: Int? = nil
     ) {
+        if feedReminder.scheduleEntries.firstIndex(where: { $0.id == id }) == nil {
+            feedReminder.scheduleEntries = feedReminder.normalizedScheduleEntries
+        }
         guard let index = feedReminder.scheduleEntries.firstIndex(where: { $0.id == id }) else { return }
         var entry = feedReminder.scheduleEntries[index]
         if let kind {

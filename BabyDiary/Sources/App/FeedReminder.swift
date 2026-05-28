@@ -8,7 +8,7 @@ enum FeedReminderMode: String, Codable, CaseIterable, Hashable {
     var label: String {
         switch self {
         case .interval: return "固定间隔"
-        case .schedule: return "当天作息"
+        case .schedule: return "作息表"
         }
     }
 }
@@ -72,7 +72,7 @@ struct FeedReminderSettings: Equatable, Codable {
     static let minIntervalHours = 1
     static let maxIntervalHours = 8
     static let minScheduleOffsetMinutes = 0
-    static let maxScheduleOffsetMinutes = 18 * 60
+    static let maxScheduleOffsetMinutes = 23 * 60 + 59
     static let scheduleOffsetStepMinutes = 15
     static let minScheduleEntries = 1
     static let maxScheduleEntries = 8
@@ -80,13 +80,14 @@ struct FeedReminderSettings: Equatable, Codable {
     static let defaultFirstFeedWindowStartMinuteOfDay = 5 * 60
     static let defaultFirstFeedWindowEndMinuteOfDay = 10 * 60
     static let defaultLatestReminderMinuteOfDay = 21 * 60
+    static let maxScheduleDriftMinutes = 30
 
     static let defaultScheduleEntries: [FeedReminderScheduleEntry] = [
-        .init(id: "feed_0", kind: .feed, offsetMinutes: 0),
-        .init(id: "solid_180", kind: .solid, offsetMinutes: 3 * 60),
-        .init(id: "feed_360", kind: .feed, offsetMinutes: 6 * 60),
-        .init(id: "solid_540", kind: .solid, offsetMinutes: 9 * 60),
-        .init(id: "feed_780", kind: .feed, offsetMinutes: 13 * 60),
+        .init(id: "feed_0700", kind: .feed, offsetMinutes: 7 * 60),
+        .init(id: "solid_1000", kind: .solid, offsetMinutes: 10 * 60),
+        .init(id: "feed_1300", kind: .feed, offsetMinutes: 13 * 60),
+        .init(id: "solid_1600", kind: .solid, offsetMinutes: 16 * 60),
+        .init(id: "feed_2000", kind: .feed, offsetMinutes: 20 * 60),
     ]
 
     var isEnabled: Bool = false
@@ -101,6 +102,7 @@ struct FeedReminderSettings: Equatable, Codable {
     var firstFeedWindowEndMinuteOfDay: Int = Self.defaultFirstFeedWindowEndMinuteOfDay
     var latestReminderMinuteOfDay: Int = Self.defaultLatestReminderMinuteOfDay
     var scheduleEntries: [FeedReminderScheduleEntry] = Self.defaultScheduleEntries
+    var scheduleUsesClockTimes: Bool = true
 
     init(
         isEnabled: Bool = false,
@@ -128,6 +130,7 @@ struct FeedReminderSettings: Equatable, Codable {
         self.firstFeedWindowEndMinuteOfDay = firstFeedWindowEndMinuteOfDay
         self.latestReminderMinuteOfDay = latestReminderMinuteOfDay
         self.scheduleEntries = scheduleEntries
+        self.scheduleUsesClockTimes = true
     }
 
     init(from decoder: Decoder) throws {
@@ -155,10 +158,25 @@ struct FeedReminderSettings: Equatable, Codable {
             Int.self,
             forKey: .latestReminderMinuteOfDay
         ) ?? Self.defaultLatestReminderMinuteOfDay
-        scheduleEntries = try values.decodeIfPresent(
+        let decodedScheduleEntries = try values.decodeIfPresent(
             [FeedReminderScheduleEntry].self,
             forKey: .scheduleEntries
-        ) ?? Self.defaultScheduleEntries
+        )
+        let decodedScheduleUsesClockTimes = try values.decodeIfPresent(
+            Bool.self,
+            forKey: .scheduleUsesClockTimes
+        )
+        scheduleUsesClockTimes = true
+        if let decodedScheduleEntries {
+            scheduleEntries = decodedScheduleUsesClockTimes == true
+                ? decodedScheduleEntries
+                : Self.migratedScheduleEntriesFromLegacyOffsets(
+                    decodedScheduleEntries,
+                    firstFeedMinuteOfDay: defaultFirstFeedMinuteOfDay
+                )
+        } else {
+            scheduleEntries = Self.defaultScheduleEntries
+        }
     }
 
     var normalizedIntervalHours: Int {
@@ -225,6 +243,18 @@ struct FeedReminderSettings: Equatable, Codable {
         min(maxScheduleOffsetMinutes, max(minScheduleOffsetMinutes, minute))
     }
 
+    private static func migratedScheduleEntriesFromLegacyOffsets(
+        _ entries: [FeedReminderScheduleEntry],
+        firstFeedMinuteOfDay: Int
+    ) -> [FeedReminderScheduleEntry] {
+        let firstFeedMinute = clampedMinuteOfDay(firstFeedMinuteOfDay)
+        return entries.map { entry in
+            var migrated = entry
+            migrated.offsetMinutes = clampedMinuteOfDay(firstFeedMinute + entry.offsetMinutes)
+            return migrated
+        }
+    }
+
     private enum CodingKeys: String, CodingKey {
         case isEnabled
         case intervalHours
@@ -238,6 +268,7 @@ struct FeedReminderSettings: Equatable, Codable {
         case firstFeedWindowEndMinuteOfDay
         case latestReminderMinuteOfDay
         case scheduleEntries
+        case scheduleUsesClockTimes
     }
 }
 
@@ -380,6 +411,7 @@ enum FeedReminderPlanner {
         now: Date,
         count: Int
     ) -> [FeedReminderPlanItem] {
+        let calendar = Calendar.current
         let candidates = scheduleCandidates(settings: settings, events: events, now: now, dayCount: count + 3)
         var items: [FeedReminderPlanItem] = []
         var addedOverdue = false
@@ -387,8 +419,11 @@ enum FeedReminderPlanner {
         for candidate in candidates {
             var date = nextAllowedDate(candidate.date, settings: settings)
             if date <= now {
-                guard !addedOverdue else { continue }
-                date = nextAllowedDate(now.addingTimeInterval(fallbackDelay), settings: settings)
+                guard !addedOverdue,
+                      let fallback = overdueFallbackDate(settings: settings, now: now, calendar: calendar) else {
+                    continue
+                }
+                date = fallback
                 addedOverdue = true
             }
             guard date > now, items.last?.date != date else { continue }
@@ -403,6 +438,7 @@ enum FeedReminderPlanner {
         var date: Date
         var kind: FeedReminderScheduleKind
         var entryID: String
+        var plannedDate: Date
     }
 
     private static func scheduleCandidates(
@@ -420,6 +456,14 @@ enum FeedReminderPlanner {
             guard let day = calendar.date(byAdding: .day, value: dayOffset, to: startOfToday) else { continue }
             let dayCandidates = rawScheduleCandidates(on: day, settings: settings, events: events, calendar: calendar)
             for (index, candidate) in dayCandidates.enumerated() {
+                guard !shouldSkipExpiredScheduleCandidate(
+                    candidate,
+                    settings: settings,
+                    now: now,
+                    calendar: calendar
+                ) else {
+                    continue
+                }
                 guard !isCompleted(candidate, at: index, in: dayCandidates, events: events, calendar: calendar) else {
                     continue
                 }
@@ -439,57 +483,59 @@ enum FeedReminderPlanner {
         events: [Event],
         calendar: Calendar
     ) -> [ScheduleCandidate] {
-        let anchor = scheduleAnchor(on: day, settings: settings, events: events, calendar: calendar)
         let dayStart = calendar.startOfDay(for: day)
-        let latest = calendar.date(
-            byAdding: .minute,
-            value: settings.normalizedLatestReminderMinuteOfDay,
-            to: dayStart
-        ) ?? dayStart
+        let latest = latestReminderDate(on: day, settings: settings, calendar: calendar)
 
-        return settings.normalizedScheduleEntries.map { entry in
-            let raw = calendar.date(byAdding: .minute, value: entry.offsetMinutes, to: anchor) ?? anchor
-            let capped = raw > latest ? latest : raw
-            return .init(date: capped, kind: entry.kind, entryID: entry.id)
-        }
-    }
-
-    private static func scheduleAnchor(
-        on day: Date,
-        settings: FeedReminderSettings,
-        events: [Event],
-        calendar: Calendar
-    ) -> Date {
-        if let firstFeed = firstFeedEvent(on: day, settings: settings, events: events, calendar: calendar) {
-            return firstFeed.startedAtForDisplay
+        let candidates = settings.normalizedScheduleEntries.compactMap { entry -> ScheduleCandidate? in
+            let raw = calendar.date(byAdding: .minute, value: entry.offsetMinutes, to: dayStart) ?? dayStart
+            guard raw <= latest else { return nil }
+            return ScheduleCandidate(date: raw, kind: entry.kind, entryID: entry.id, plannedDate: raw)
         }
 
-        let dayStart = calendar.startOfDay(for: day)
-        return calendar.date(
-            byAdding: .minute,
-            value: settings.normalizedDefaultFirstFeedMinuteOfDay,
-            to: dayStart
-        ) ?? dayStart
+        return scheduleCandidatesByCarryingFeedDrift(
+            candidates,
+            events: events,
+            latest: latest,
+            calendar: calendar
+        )
     }
 
-    private static func firstFeedEvent(
-        on day: Date,
-        settings: FeedReminderSettings,
+    private static func scheduleCandidatesByCarryingFeedDrift(
+        _ candidates: [ScheduleCandidate],
         events: [Event],
+        latest: Date,
         calendar: Calendar
-    ) -> Event? {
-        events
-            .filter { event in
-                guard event.kind == .feed else { return false }
-                return isDate(
-                    event.startedAtForDisplay,
-                    inWindowOn: day,
-                    startMinute: settings.normalizedFirstFeedWindowStartMinuteOfDay,
-                    endMinute: settings.normalizedFirstFeedWindowEndMinuteOfDay,
-                    calendar: calendar
-                )
+    ) -> [ScheduleCandidate] {
+        let maxDrift = TimeInterval(FeedReminderSettings.maxScheduleDriftMinutes * 60)
+        guard maxDrift > 0 else { return candidates }
+
+        let plannedCandidates = candidates
+        var adjustedCandidates = candidates
+
+        for index in adjustedCandidates.indices {
+            guard adjustedCandidates[index].kind == .feed else { continue }
+            guard let previousFeedIndex = plannedCandidates[..<index].lastIndex(where: { $0.kind == .feed }),
+                  let previousFeed = latestFeedEvent(
+                    after: plannedCandidates[previousFeedIndex].plannedDate,
+                    before: plannedCandidates[index].plannedDate,
+                    events: events
+                  ) else {
+                continue
             }
-            .min { $0.startedAtForDisplay < $1.startedAtForDisplay }
+
+            let drift = previousFeed.startedAtForDisplay
+                .timeIntervalSince(plannedCandidates[previousFeedIndex].plannedDate)
+            if drift > 0 {
+                let carriedDrift = min(drift, maxDrift)
+                let adjustedDate = adjustedCandidates[index].plannedDate.addingTimeInterval(carriedDrift)
+                adjustedCandidates[index].date = adjustedDate > latest ? latest : adjustedDate
+            }
+        }
+
+        return adjustedCandidates.sorted { lhs, rhs in
+            if lhs.date != rhs.date { return lhs.date < rhs.date }
+            return lhs.entryID < rhs.entryID
+        }
     }
 
     private static func isCompleted(
@@ -499,39 +545,97 @@ enum FeedReminderPlanner {
         events: [Event],
         calendar: Calendar
     ) -> Bool {
+        completedEvent(for: candidate, at: index, in: candidates, events: events, calendar: calendar) != nil
+    }
+
+    private static func completedEvent(
+        for candidate: ScheduleCandidate,
+        at index: Int,
+        in candidates: [ScheduleCandidate],
+        events: [Event],
+        calendar: Calendar
+    ) -> Event? {
         let dayStart = calendar.startOfDay(for: candidate.date)
         let dayEnd = calendar.date(byAdding: .day, value: 1, to: dayStart) ?? candidate.date
         let start = index > 0 ? midpoint(candidates[index - 1].date, candidate.date) : dayStart
         let end = index + 1 < candidates.count ? midpoint(candidate.date, candidates[index + 1].date) : dayEnd
 
-        return events.contains { event in
-            guard event.kind == candidate.kind.eventKind else { return false }
-            let eventDate = event.kind == .feed ? event.startedAtForDisplay : event.at
-            return eventDate >= start && eventDate < end
+        return events
+            .filter { event in
+                guard event.kind == candidate.kind.eventKind else { return false }
+                let eventDate = event.kind == .feed ? event.startedAtForDisplay : event.at
+                return eventDate >= start && eventDate < end
+            }
+            .max { lhs, rhs in
+                let lhsDate = lhs.kind == .feed ? lhs.startedAtForDisplay : lhs.at
+                let rhsDate = rhs.kind == .feed ? rhs.startedAtForDisplay : rhs.at
+                return lhsDate < rhsDate
+            }
+    }
+
+    private static func latestFeedEvent(after start: Date, before end: Date, events: [Event]) -> Event? {
+        events
+            .filter { event in
+                guard event.kind == .feed else { return false }
+                let eventDate = event.startedAtForDisplay
+                return eventDate >= start && eventDate < end
+            }
+            .max { $0.startedAtForDisplay < $1.startedAtForDisplay }
+    }
+
+    private static func shouldSkipExpiredScheduleCandidate(
+        _ candidate: ScheduleCandidate,
+        settings: FeedReminderSettings,
+        now: Date,
+        calendar: Calendar
+    ) -> Bool {
+        guard candidate.date <= now else { return false }
+        return now > latestReminderDate(on: candidate.date, settings: settings, calendar: calendar)
+    }
+
+    private static func overdueFallbackDate(
+        settings: FeedReminderSettings,
+        now: Date,
+        calendar: Calendar
+    ) -> Date? {
+        let latest = latestReminderDate(on: now, settings: settings, calendar: calendar)
+        guard now < latest else { return nil }
+
+        let rawFallback = now.addingTimeInterval(fallbackDelay)
+        let cappedFallback = rawFallback > latest ? latest : rawFallback
+        let allowedFallback = nextAllowedDate(cappedFallback, settings: settings)
+        guard allowedFallback > now,
+              !isPastLatestReminder(allowedFallback, settings: settings, calendar: calendar) else {
+            return nil
         }
+        return allowedFallback
+    }
+
+    private static func isPastLatestReminder(
+        _ date: Date,
+        settings: FeedReminderSettings,
+        calendar: Calendar
+    ) -> Bool {
+        date > latestReminderDate(on: date, settings: settings, calendar: calendar)
+    }
+
+    private static func latestReminderDate(
+        on day: Date,
+        settings: FeedReminderSettings,
+        calendar: Calendar
+    ) -> Date {
+        let dayStart = calendar.startOfDay(for: day)
+        return calendar.date(
+            byAdding: .minute,
+            value: settings.normalizedLatestReminderMinuteOfDay,
+            to: dayStart
+        ) ?? dayStart
     }
 
     private static func midpoint(_ lhs: Date, _ rhs: Date) -> Date {
         lhs.addingTimeInterval(rhs.timeIntervalSince(lhs) / 2)
     }
 
-    private static func isDate(
-        _ date: Date,
-        inWindowOn day: Date,
-        startMinute: Int,
-        endMinute: Int,
-        calendar: Calendar
-    ) -> Bool {
-        let dayStart = calendar.startOfDay(for: day)
-        let start = calendar.date(byAdding: .minute, value: startMinute, to: dayStart) ?? dayStart
-        let end = calendar.date(byAdding: .minute, value: endMinute, to: dayStart) ?? dayStart
-        if start <= end {
-            return date >= start && date <= end
-        }
-
-        let nextDayEnd = calendar.date(byAdding: .day, value: 1, to: end) ?? end
-        return (date >= start && date < nextDayEnd) || (date >= dayStart && date <= end)
-    }
 }
 
 struct SleepReminderSettings: Equatable, Codable {

@@ -348,7 +348,7 @@ struct BabyDiaryTests {
         ])
     }
 
-    @Test func feedReminderScheduleAnchorsToFirstMorningFeed() throws {
+    @Test func feedReminderScheduleUsesClockTimesAfterEarlyMorningFeed() throws {
         let cal = Calendar.current
         let firstFeed = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 6, minute: 30))!
         let now = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 8, minute: 0))!
@@ -365,7 +365,7 @@ struct BabyDiaryTests {
         ))
 
         #expect(item.kind == .solid)
-        #expect(item.date == cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 9, minute: 30))!)
+        #expect(item.date == cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 10, minute: 0))!)
     }
 
     @Test func feedReminderScheduleSkipsCompletedEntries() {
@@ -395,6 +395,63 @@ struct BabyDiaryTests {
         ])
     }
 
+    @Test func feedReminderScheduleCarriesLateFeedByLimitedDrift() throws {
+        let cal = Calendar.current
+        let firstFeed = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 7, minute: 0))!
+        let secondFeed = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 10, minute: 30))!
+        let now = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 10, minute: 40))!
+        let settings = FeedReminderSettings(
+            isEnabled: true,
+            mode: .schedule,
+            scheduleEntries: [
+                .init(id: "feed_0700", kind: .feed, offsetMinutes: 7 * 60),
+                .init(id: "feed_1000", kind: .feed, offsetMinutes: 10 * 60),
+                .init(id: "feed_1300", kind: .feed, offsetMinutes: 13 * 60),
+                .init(id: "feed_1600", kind: .feed, offsetMinutes: 16 * 60),
+            ]
+        )
+        let events = [
+            Event(id: "first", kind: .feed, at: firstFeed, title: "奶粉", sub: "180 ml"),
+            Event(id: "second", kind: .feed, at: secondFeed, title: "奶粉", sub: "180 ml"),
+        ]
+
+        let item = try #require(FeedReminderPlanner.nextReminderItem(
+            settings: settings,
+            lastFeed: events.last,
+            events: events,
+            now: now
+        ))
+
+        #expect(item.date == cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 13, minute: 30))!)
+    }
+
+    @Test func feedReminderScheduleDoesNotFallbackAfterLatestReminderTime() {
+        let cal = Calendar.current
+        let firstFeed = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 6, minute: 30))!
+        let now = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 22, minute: 0))!
+        let settings = FeedReminderSettings(
+            isEnabled: true,
+            mode: .schedule,
+            latestReminderMinuteOfDay: 21 * 60
+        )
+        let events = [
+            Event(id: "first", kind: .feed, at: firstFeed, title: "奶粉", sub: "180 ml")
+        ]
+
+        let items = FeedReminderPlanner.scheduledItems(
+            settings: settings,
+            lastFeed: events.first,
+            events: events,
+            now: now,
+            count: 2
+        )
+
+        #expect(items.map(\.date) == [
+            cal.date(from: DateComponents(year: 2026, month: 4, day: 23, hour: 7, minute: 0))!,
+            cal.date(from: DateComponents(year: 2026, month: 4, day: 23, hour: 10, minute: 0))!,
+        ])
+    }
+
     @Test func legacyFeedReminderSettingsDecodeWithQuietDefaults() throws {
         let data = """
         {
@@ -415,6 +472,25 @@ struct BabyDiaryTests {
         #expect(settings.normalizedQuietEndMinuteOfDay == 7 * 60)
         #expect(settings.mode == .interval)
         #expect(settings.normalizedScheduleEntries == FeedReminderSettings.defaultScheduleEntries)
+    }
+
+    @Test func legacyFeedReminderScheduleOffsetsDecodeAsClockTimes() throws {
+        let data = """
+        {
+          "isEnabled": true,
+          "mode": "schedule",
+          "defaultFirstFeedMinuteOfDay": 420,
+          "scheduleEntries": [
+            { "id": "feed_0", "kind": "feed", "offsetMinutes": 0 },
+            { "id": "solid_180", "kind": "solid", "offsetMinutes": 180 },
+            { "id": "feed_360", "kind": "feed", "offsetMinutes": 360 }
+          ]
+        }
+        """.data(using: .utf8)!
+
+        let settings = try JSONDecoder().decode(FeedReminderSettings.self, from: data)
+
+        #expect(settings.normalizedScheduleEntries.map(\.offsetMinutes) == [7 * 60, 10 * 60, 13 * 60])
     }
 
     @Test func sleepReminderDueDateUsesLastSleepEndTime() throws {
