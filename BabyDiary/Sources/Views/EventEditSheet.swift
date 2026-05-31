@@ -361,7 +361,13 @@ struct EventEditSheet: View {
             } else {
                 VStack(alignment: .leading, spacing: 8) {
                     FieldLabel(text: "奶量 (ml)")
-                    StepperInput(value: $ml, step: 10, min: 10, max: 300, suffix: "ml")
+                    StepperInput(
+                        value: $ml,
+                        step: 10,
+                        min: AppStore.minFormulaMilliliters,
+                        max: AppStore.maxFormulaMilliliters,
+                        suffix: "ml"
+                    )
                 }
             }
         }
