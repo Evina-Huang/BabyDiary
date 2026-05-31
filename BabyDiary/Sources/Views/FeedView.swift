@@ -390,7 +390,13 @@ struct FeedScreen: View {
     private var mlInput: some View {
         VStack(alignment: .leading, spacing: 12) {
             FieldLabel(text: "奶量 (ml)")
-            StepperInput(value: $ml, step: 10, min: 10, max: 300, suffix: "ml")
+            StepperInput(
+                value: $ml,
+                step: 10,
+                min: AppStore.minFormulaMilliliters,
+                max: AppStore.maxFormulaMilliliters,
+                suffix: "ml"
+            )
             if !formulaPresetValues.isEmpty {
                 let columns = [GridItem(.adaptive(minimum: 72), spacing: 8)]
                 LazyVGrid(columns: columns, alignment: .leading, spacing: 8) {

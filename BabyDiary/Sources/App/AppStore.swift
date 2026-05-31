@@ -20,6 +20,8 @@ final class AppStore {
     var formulaMlHistory: [Int] = []
 
     static let formulaMlHistoryLimit = 6
+    static let minFormulaMilliliters = 10
+    static let maxFormulaMilliliters = 500
     static let defaultFormulaMilliliters = 270
 
     init(seedDemoData: Bool = false) {
@@ -506,7 +508,7 @@ final class AppStore {
     }
 
     private static func clampedFormulaMilliliters(_ value: Int) -> Int {
-        max(10, min(300, value))
+        max(minFormulaMilliliters, min(maxFormulaMilliliters, value))
     }
 
     func restoreSleepLiveActivityIfNeeded() {

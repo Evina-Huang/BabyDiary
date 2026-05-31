@@ -988,6 +988,15 @@ struct BabyDiaryTests {
         #expect(store.formulaMlHistory == [150])
     }
 
+    @Test func shortcutFormulaAllowsLargerBottleMilliliters() {
+        let store = AppStore()
+
+        let event = store.recordFormulaFromShortcut(milliliters: 360)
+
+        #expect(event.sub == "360 ml")
+        #expect(store.formulaMlHistory == [360])
+    }
+
     @Test func shortcutFormulaUsesDefaultMillilitersWithoutHistory() {
         let store = AppStore()
 
