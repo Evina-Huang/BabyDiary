@@ -719,6 +719,40 @@ struct BabyDiaryTests {
         #expect(store.growth[0].ageMonths == 3)
     }
 
+    @Test func milestoneAgeMonthsComesFromDate() {
+        let store = AppStore()
+        let cal = Calendar.current
+        store.baby.birthDate = cal.date(from: DateComponents(year: 2026, month: 1, day: 1))!
+        let firstDate = cal.date(from: DateComponents(year: 2026, month: 2, day: 16))!
+        let secondDate = cal.date(from: DateComponents(year: 2026, month: 4, day: 1))!
+
+        store.addMilestone(.new(title: "第一次翻身", date: firstDate))
+        #expect(store.milestones[0].ageMonths == 1.5)
+
+        var updated = store.milestones[0]
+        updated.date = secondDate
+        store.updateMilestone(updated)
+
+        #expect(store.milestones[0].ageMonths == 3)
+    }
+
+    @Test func legacyMilestoneDecodesWithoutAgeMonths() throws {
+        let data = """
+        {
+          "id": "ms_legacy",
+          "date": "2026-02-01T00:00:00Z",
+          "title": "第一次抬头"
+        }
+        """.data(using: .utf8)!
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+
+        let milestone = try decoder.decode(Milestone.self, from: data)
+
+        #expect(milestone.ageMonths == 0)
+        #expect(milestone.title == "第一次抬头")
+    }
+
     @Test func updateBabyRefreshesBirthDateDerivedData() {
         let store = AppStore()
         let cal = Calendar.current
@@ -733,6 +767,9 @@ struct BabyDiaryTests {
         store.growth = [
             GrowthPoint(id: "g1", date: measured, ageMonths: 99, weightKg: 6, heightCm: 62, headCm: nil)
         ]
+        store.milestones = [
+            Milestone(id: "m1", date: measured, ageMonths: 99, title: "第一次站立")
+        ]
         store.vaccines = [
             Vaccine(id: "v1", name: "推荐疫苗", ageLabel: "2 月龄", ageMonths: 2, scheduledDate: oldRecommended, doneDate: nil),
             Vaccine(id: "v2", name: "自定义日期疫苗", ageLabel: "3 月龄", ageMonths: 3, scheduledDate: customDate, doneDate: nil),
@@ -743,6 +780,7 @@ struct BabyDiaryTests {
         store.updateBaby(baby)
 
         #expect(store.growth[0].ageMonths == 2)
+        #expect(store.milestones[0].ageMonths == 2)
         #expect(cal.isDate(store.vaccines.first { $0.id == "v1" }!.scheduledDate!, inSameDayAs: newRecommended))
         #expect(store.vaccines.first { $0.id == "v2" }!.scheduledDate == customDate)
     }

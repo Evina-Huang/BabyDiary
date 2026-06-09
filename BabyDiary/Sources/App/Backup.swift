@@ -151,6 +151,12 @@ extension AppStore {
         medications = snap.medications ?? []
         // 按位置合并,保证 20 颗位置齐全;老备份无 teeth 字段时回退为空记录
         milestones = snap.milestones ?? []
+        for idx in growth.indices {
+            growth[idx].ageMonths = ageMonths(on: growth[idx].date)
+        }
+        for idx in milestones.indices {
+            milestones[idx].ageMonths = ageMonths(on: milestones[idx].date)
+        }
         if let saved = snap.teeth {
             let byId = Dictionary(uniqueKeysWithValues: saved.map { ($0.id, $0) })
             teeth = ToothPosition.all.map { p in
