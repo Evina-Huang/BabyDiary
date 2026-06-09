@@ -337,6 +337,9 @@ final class AppStore {
         for idx in growth.indices {
             growth[idx].ageMonths = ageMonths(on: growth[idx].date)
         }
+        for idx in milestones.indices {
+            milestones[idx].ageMonths = ageMonths(on: milestones[idx].date)
+        }
 
         let cal = Calendar.current
         for idx in vaccines.indices {
@@ -910,11 +913,18 @@ final class AppStore {
 
     // MARK: — Milestones
 
-    func addMilestone(_ m: Milestone) { milestones.append(m); persist() }
+    func addMilestone(_ m: Milestone) {
+        var newMilestone = m
+        newMilestone.ageMonths = ageMonths(on: newMilestone.date)
+        milestones.append(newMilestone)
+        persist()
+    }
 
     func updateMilestone(_ m: Milestone) {
         guard let idx = milestones.firstIndex(where: { $0.id == m.id }) else { return }
-        milestones[idx] = m
+        var updated = m
+        updated.ageMonths = ageMonths(on: updated.date)
+        milestones[idx] = updated
         persist()
     }
 
@@ -1097,6 +1107,9 @@ final class AppStore {
                   note: nil,
                   emoji: "💞", photoData: nil),
         ]
+        for idx in milestones.indices {
+            milestones[idx].ageMonths = ageMonths(on: milestones[idx].date)
+        }
 
         growth = [
             .init(id: "g1", date: f.date(from: "2025-10-18")!, ageMonths: 0, weightKg: 3.2, heightCm: 50.0, headCm: nil),

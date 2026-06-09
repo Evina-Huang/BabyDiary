@@ -140,25 +140,20 @@ struct GrowthView: View {
                 .background(Palette.bg)
                 .navigationTitle("测量历史")
                 .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button("完成") { historySheet = false }
-                    }
-                }
             }
             .environment(store)
             .onAppear { historyOpen = true }
-        }
-        .sheet(item: $editingGrowth) { g in
-            GrowthEditSheet(
-                point: g,
-                onCancel: { editingGrowth = nil },
-                onSave: { updated in
-                    store.updateGrowth(updated)
-                    editingGrowth = nil
-                }
-            )
-            .environment(store)
+            .sheet(item: $editingGrowth) { g in
+                GrowthEditSheet(
+                    point: g,
+                    onCancel: { editingGrowth = nil },
+                    onSave: { updated in
+                        store.updateGrowth(updated)
+                        editingGrowth = nil
+                    }
+                )
+                .environment(store)
+            }
         }
         .sheet(item: $editingMilestone) { m in
             MilestoneEditSheet(
@@ -718,7 +713,8 @@ struct GrowthView: View {
 
     private var timelineItems: [TimelineItem] {
         var items: [TimelineItem] = store.milestones.map {
-            TimelineItem(id: $0.id, date: $0.date, title: $0.title, note: $0.note,
+            TimelineItem(id: $0.id, date: $0.date, ageMonths: store.ageMonths(on: $0.date),
+                         title: $0.title, note: $0.note,
                          emoji: $0.emoji, photoData: $0.photoData, source: .user($0))
         }
         for e in store.events {
@@ -733,7 +729,7 @@ struct GrowthView: View {
                 }
             }()
             items.append(TimelineItem(
-                id: "ev_" + e.id, date: e.at,
+                id: "ev_" + e.id, date: e.at, ageMonths: store.ageMonths(on: e.at),
                 title: e.title, note: e.sub, emoji: emoji, photoData: nil,
                 source: .event(e)
             ))
@@ -943,6 +939,7 @@ struct TabTitleHeader: View {
 struct TimelineItem: Identifiable {
     let id: String
     let date: Date
+    let ageMonths: Double
     let title: String
     let note: String?
     let emoji: String?
@@ -968,6 +965,9 @@ private struct MilestoneTimelineRow: View {
         f.locale = Locale(identifier: "zh_CN")
         f.dateFormat = "yyyy 年 M 月 d 日"
         return f.string(from: item.date)
+    }
+    private var ageStr: String {
+        milestoneAgeLabel(item.ageMonths)
     }
 
     var body: some View {
@@ -996,12 +996,21 @@ private struct MilestoneTimelineRow: View {
 
             Button(action: onTap) {
                 VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 6) {
-                        Text(dateStr)
-                            .font(.system(size: 11, weight: .heavy))
-                            .tracking(0.66)
-                            .textCase(.uppercase)
-                            .foregroundStyle(Palette.ink3)
+                    HStack(alignment: .top, spacing: 8) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(dateStr)
+                                .font(.system(size: 11, weight: .heavy))
+                                .tracking(0.66)
+                                .textCase(.uppercase)
+                                .foregroundStyle(Palette.ink3)
+                            Text(ageStr)
+                                .font(.system(size: 11, weight: .heavy))
+                                .tracking(-0.11)
+                                .foregroundStyle(ink)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(tint, in: Capsule())
+                        }
                         if item.isFromEvent {
                             Text("来自记录")
                                 .font(.system(size: 10, weight: .heavy))

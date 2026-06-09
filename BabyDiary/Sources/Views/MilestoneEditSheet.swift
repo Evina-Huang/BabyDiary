@@ -37,6 +37,9 @@ struct MilestoneEditSheet: View {
     private var canSave: Bool {
         !title.trimmingCharacters(in: .whitespaces).isEmpty
     }
+    private var calculatedAgeMonths: Double {
+        store.ageMonths(on: date)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -58,6 +61,28 @@ struct MilestoneEditSheet: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .background(Palette.bg2,
                                             in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        }
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            FieldLabel(text: "月龄")
+                            HStack(spacing: 8) {
+                                Text(milestoneAgeLabel(calculatedAgeMonths))
+                                    .font(.system(size: 16, weight: .heavy))
+                                    .foregroundStyle(Palette.ink)
+                                Spacer(minLength: 0)
+                                Text("自动计算")
+                                    .font(.system(size: 11, weight: .heavy))
+                                    .tracking(0.66)
+                                    .textCase(.uppercase)
+                                    .foregroundStyle(store.theme.primary600)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 5)
+                                    .background(store.theme.primaryTint, in: Capsule())
+                            }
+                            .padding(.horizontal, 14).padding(.vertical, 12)
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                            .background(Palette.bg2,
+                                        in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                         }
 
                         FormField(label: "标题") {
@@ -200,6 +225,7 @@ struct MilestoneEditSheet: View {
         let finalEmoji = emoji.isEmpty ? nil : emoji
         if var m = original {
             m.date = date
+            m.ageMonths = calculatedAgeMonths
             m.title = t
             m.note = trimmedNote.isEmpty ? nil : trimmedNote
             m.emoji = finalEmoji
@@ -207,7 +233,7 @@ struct MilestoneEditSheet: View {
             onSave(m)
         } else {
             onSave(Milestone.new(
-                title: t, date: date,
+                title: t, date: date, ageMonths: calculatedAgeMonths,
                 note: trimmedNote.isEmpty ? nil : trimmedNote,
                 emoji: finalEmoji, photoData: photoData
             ))
