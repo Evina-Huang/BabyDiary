@@ -443,7 +443,8 @@ struct LastFeedWidgetView: View {
             referenceDate: item.timerReferenceDate,
             fallback: text ?? item.value,
             size: size,
-            minimumScale: minimumScale
+            minimumScale: minimumScale,
+            alignment: .center
         )
         .foregroundStyle(BDColor.ink)
         .frame(maxWidth: .infinity, alignment: .center)
@@ -806,6 +807,7 @@ private struct ElapsedValueText: View {
     let size: CGFloat
     var weight: Font.Weight = .black
     var minimumScale: CGFloat = 0.7
+    var alignment: Alignment?
 
     var body: some View {
         Group {
@@ -820,8 +822,34 @@ private struct ElapsedValueText: View {
         .monospacedDigit()
         .lineLimit(1)
         .minimumScaleFactor(minimumScale)
-        .multilineTextAlignment(.center)
-        .frame(maxWidth: .infinity, alignment: .center)
+        .modifier(ElapsedValueAlignment(alignment: alignment))
+    }
+}
+
+private struct ElapsedValueAlignment: ViewModifier {
+    let alignment: Alignment?
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if let alignment {
+            content
+                .multilineTextAlignment(alignment.textAlignment)
+                .frame(maxWidth: .infinity, alignment: alignment)
+        } else {
+            content
+        }
+    }
+}
+
+private extension Alignment {
+    var textAlignment: TextAlignment {
+        if self == .trailing || self == .topTrailing || self == .bottomTrailing {
+            return .trailing
+        }
+        if self == .center || self == .top || self == .bottom {
+            return .center
+        }
+        return .leading
     }
 }
 
