@@ -21,7 +21,7 @@ struct LastFeedWidget: Widget {
         ) { entry in
             LastFeedWidgetView(entry: entry)
         }
-        .configurationDisplayName("喂奶与睡眠")
+        .configurationDisplayName("睡眠与喂奶")
         .description("自定义查看宝宝最近记录。")
         .supportedFamilies([
             .systemSmall,
@@ -55,10 +55,10 @@ struct BabyDiaryWidgetConfigurationIntent: WidgetConfigurationIntent {
     static var title: LocalizedStringResource = "显示内容"
     static var description = IntentDescription("选择小组件显示的模块。")
 
-    @Parameter(title: "第一项", default: BabyDiaryWidgetModule.feed)
+    @Parameter(title: "第一项", default: BabyDiaryWidgetModule.sleep)
     var firstModule: BabyDiaryWidgetModule
 
-    @Parameter(title: "第二项", default: BabyDiaryWidgetModule.sleep)
+    @Parameter(title: "第二项", default: BabyDiaryWidgetModule.feed)
     var secondModule: BabyDiaryWidgetModule
 
     @Parameter(title: "第三项", default: BabyDiaryWidgetModule.diaper)
@@ -146,7 +146,7 @@ struct LastFeedWidgetView: View {
         content
             .containerBackground(for: .widget) {
                 LinearGradient(
-                    colors: [BDColor.feedTint, Color(hex: 0xFFF8F2)],
+                    colors: [widgetBackgroundTint, Color(hex: 0xFFFDF9)],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
@@ -174,13 +174,14 @@ struct LastFeedWidgetView: View {
 
     private var smallWidget: some View {
         let item = primaryModuleContent
-        return VStack(alignment: .leading, spacing: 8) {
+        return VStack(alignment: .center, spacing: 8) {
             iconBadge(for: item)
             Spacer(minLength: 0)
             Text(item.title)
                 .font(.system(size: 13, weight: .heavy))
                 .foregroundStyle(item.tint)
                 .lineLimit(1)
+                .multilineTextAlignment(.center)
             moduleValue(item, size: 25, minimumScale: 0.72)
             Text(item.detail)
                 .font(.system(size: 12, weight: .semibold))
@@ -188,7 +189,9 @@ struct LastFeedWidgetView: View {
                 .foregroundStyle(BDColor.ink3)
                 .lineLimit(2)
                 .minimumScaleFactor(0.78)
+                .multilineTextAlignment(.center)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         .padding(4)
     }
 
@@ -207,9 +210,9 @@ struct LastFeedWidgetView: View {
                 ZStack {
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
                         .fill(Color.white.opacity(0.72))
-                    Image(systemName: "heart.fill")
+                    Image(systemName: primaryModule.systemImage)
                         .font(.system(size: 21, weight: .bold))
-                        .foregroundStyle(BDColor.feedInk)
+                        .foregroundStyle(primaryModule.tint)
                 }
                 .frame(width: 48, height: 48)
 
@@ -248,10 +251,7 @@ struct LastFeedWidgetView: View {
             Image(systemName: item.systemImage)
                 .font(.system(size: 16, weight: .bold))
                 .foregroundStyle(item.tint)
-            shortValue(item)
-                .font(.system(size: 12, weight: .black))
-                .foregroundStyle(BDColor.ink)
-                .minimumScaleFactor(0.7)
+            circularValue(item)
         }
     }
 
@@ -304,6 +304,17 @@ struct LastFeedWidgetView: View {
         moduleContent(for: primaryModule)
     }
 
+    private var widgetBackgroundTint: Color {
+        switch primaryModule {
+        case .feed, .activeFeed:
+            return BDColor.feedTint
+        case .sleep, .activeSleep:
+            return BDColor.sleepTint
+        case .diaper:
+            return BDColor.diaperTint
+        }
+    }
+
     private var configuredModules: [ConfiguredModule] {
         [
             ConfiguredModule(slot: 0, module: entry.configuration.firstModule),
@@ -337,7 +348,7 @@ struct LastFeedWidgetView: View {
     }
 
     private func summaryTile(_ item: WidgetModuleContent) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .center, spacing: 6) {
             HStack(spacing: 6) {
                 Image(systemName: item.systemImage)
                     .font(.system(size: 13, weight: .bold))
@@ -347,6 +358,7 @@ struct LastFeedWidgetView: View {
                     .foregroundStyle(item.tint)
                     .lineLimit(1)
             }
+            .frame(maxWidth: .infinity, alignment: .center)
 
             moduleValue(item, size: 22, minimumScale: 0.68)
 
@@ -356,6 +368,7 @@ struct LastFeedWidgetView: View {
                 .foregroundStyle(BDColor.ink2)
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
+                .multilineTextAlignment(.center)
 
             if let date = item.date {
                 Text(date)
@@ -363,12 +376,12 @@ struct LastFeedWidgetView: View {
                     .foregroundStyle(BDColor.ink3)
                     .lineLimit(1)
                     .minimumScaleFactor(0.78)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(maxWidth: .infinity, alignment: .center)
             }
 
             Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         .padding(12)
         .background(Color.white.opacity(0.62), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
@@ -384,11 +397,12 @@ struct LastFeedWidgetView: View {
             }
             .frame(width: 50, height: 50)
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .center, spacing: 4) {
                 Text(item.title)
                     .font(.system(size: 12, weight: .heavy))
                     .foregroundStyle(item.tint)
                     .lineLimit(1)
+                    .multilineTextAlignment(.center)
                 moduleValue(item, text: item.rowValue ?? item.value, size: 26, minimumScale: 0.72)
                 Text(item.detail)
                     .font(.system(size: 13, weight: .semibold))
@@ -396,7 +410,9 @@ struct LastFeedWidgetView: View {
                     .foregroundStyle(BDColor.ink2)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
+                    .multilineTextAlignment(.center)
             }
+            .frame(maxWidth: .infinity, alignment: .center)
             .layoutPriority(1)
 
             Spacer(minLength: 0)
@@ -430,12 +446,14 @@ struct LastFeedWidgetView: View {
             minimumScale: minimumScale
         )
         .foregroundStyle(BDColor.ink)
+        .frame(maxWidth: .infinity, alignment: .center)
     }
 
     @ViewBuilder
     private func inlineValue(_ item: WidgetModuleContent) -> some View {
         if let referenceDate = item.timerReferenceDate {
-            Text(timerInterval: elapsedTimerInterval(startingAt: referenceDate), countsDown: false, showsHours: true)
+            Text("\(item.title) ")
+            + Text(timerInterval: elapsedTimerInterval(startingAt: referenceDate), countsDown: false, showsHours: true)
         } else {
             Text("\(item.title) \(shortValueText(for: item))")
         }
@@ -445,8 +463,28 @@ struct LastFeedWidgetView: View {
     private func shortValue(_ item: WidgetModuleContent) -> some View {
         if let referenceDate = item.timerReferenceDate {
             Text(timerInterval: elapsedTimerInterval(startingAt: referenceDate), countsDown: false, showsHours: true)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity, alignment: .center)
         } else {
             Text(shortValueText(for: item))
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity, alignment: .center)
+        }
+    }
+
+    @ViewBuilder
+    private func circularValue(_ item: WidgetModuleContent) -> some View {
+        if let compactValue = item.compactValue, item.timerReferenceDate != nil {
+            Text(compactValue)
+                .font(.system(size: 11, weight: .black))
+                .foregroundStyle(BDColor.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.65)
+        } else {
+            shortValue(item)
+                .font(.system(size: 12, weight: .black))
+                .foregroundStyle(BDColor.ink)
+                .minimumScaleFactor(0.7)
         }
     }
 
@@ -466,6 +504,9 @@ struct LastFeedWidgetView: View {
                 empty: "暂无喂奶记录"
             )
         case .sleep:
+            if let activeSleep = entry.snapshot.activeSleep {
+                return activeSleepContent(module: module, activeSleep: activeSleep)
+            }
             return eventContent(
                 module: module,
                 event: entry.snapshot.lastSleep,
@@ -491,17 +532,7 @@ struct LastFeedWidgetView: View {
                     date: nil
                 )
             }
-            return WidgetModuleContent(
-                title: module.title,
-                systemImage: module.systemImage,
-                tint: module.tint,
-                value: formatDuration(activeSleep.elapsed(at: entry.date)),
-                rowValue: nil,
-                compactValue: nil,
-                detail: activeSleep.isRunning ? "正在睡觉" : "睡眠已暂停",
-                timerReferenceDate: activeSleep.timerReferenceDate,
-                date: "开始 \(timeText(activeSleep.startedAt))"
-            )
+            return activeSleepContent(module: module, activeSleep: activeSleep)
         case .activeFeed:
             guard let activeFeed = entry.snapshot.activeFeed else {
                 return WidgetModuleContent(
@@ -528,6 +559,23 @@ struct LastFeedWidgetView: View {
                 date: "开始 \(timeText(activeFeed.startedAt))"
             )
         }
+    }
+
+    private func activeSleepContent(
+        module: BabyDiaryWidgetModule,
+        activeSleep: BabyDiaryWidgetSleepTimer
+    ) -> WidgetModuleContent {
+        WidgetModuleContent(
+            title: activeSleep.isRunning ? "正在睡觉" : "睡眠已暂停",
+            systemImage: module.systemImage,
+            tint: module.tint,
+            value: formatDuration(activeSleep.elapsed(at: entry.date)),
+            rowValue: nil,
+            compactValue: activeSleep.isRunning ? "睡觉中" : "已暂停",
+            detail: activeSleep.isRunning ? "睡眠计时中" : "轻触继续记录",
+            timerReferenceDate: activeSleep.timerReferenceDate,
+            date: "开始 \(timeText(activeSleep.startedAt))"
+        )
     }
 
     private func eventContent(
@@ -772,6 +820,8 @@ private struct ElapsedValueText: View {
         .monospacedDigit()
         .lineLimit(1)
         .minimumScaleFactor(minimumScale)
+        .multilineTextAlignment(.center)
+        .frame(maxWidth: .infinity, alignment: .center)
     }
 }
 
@@ -827,6 +877,8 @@ private enum BDColor {
     static let ink2 = Color(hex: 0x5A4E46)
     static let ink3 = Color(hex: 0x9A8E85)
     static let feedTint = Color(hex: 0xFFD0DC)
+    static let sleepTint = Color(hex: 0xF7F1FC)
+    static let diaperTint = Color(hex: 0xEAF6FF)
     static let feedInk = Color(hex: 0xC26A84)
     static let sleepInk = Color(hex: 0x7C5EB0)
     static let diaperInk = Color(hex: 0x5598D6)
