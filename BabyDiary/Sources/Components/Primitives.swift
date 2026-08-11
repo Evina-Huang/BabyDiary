@@ -12,14 +12,15 @@ struct ScreenHeader<Right: View>: View {
             if let onBack {
                 Button(action: onBack) {
                     AppIcon.Back(size: 22, color: Palette.ink)
-                        .frame(width: 40, height: 40)
+                        .frame(width: 44, height: 44)
                         .background(Palette.bg2, in: Circle())
                 }
                 .buttonStyle(PressableStyle())
+                .accessibilityLabel("返回")
             }
             Text(title)
-                .font(.system(size: 22, weight: .heavy))
-                .tracking(-0.44)
+                .appFont(size: 22, weight: .bold)
+                .tracking(-0.3)
                 .frame(maxWidth: .infinity, alignment: .leading)
             right()
         }
@@ -39,11 +40,18 @@ struct ScreenBody<Content: View>: View {
     var padded: Bool = true
     @ViewBuilder var content: Content
     var body: some View {
-        ScrollView(showsIndicators: false) {
-            VStack(spacing: 0) { content }
-                .padding(.top, padded ? 8 : 0)
-                .padding(.horizontal, padded ? 20 : 0)
-                .padding(.bottom, padded ? 120 : 0)
+        GeometryReader { proxy in
+            let horizontalPadding: CGFloat = padded ? 20 : 0
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 0) { content }
+                    .padding(.top, padded ? 8 : 0)
+                    .padding(.bottom, padded ? 120 : 0)
+                    .frame(
+                        width: max(0, proxy.size.width - horizontalPadding * 2),
+                        alignment: .top
+                    )
+                    .padding(.horizontal, horizontalPadding)
+            }
         }
     }
 }
@@ -52,7 +60,7 @@ struct ScreenBody<Content: View>: View {
 
 struct Card<Content: View>: View {
     var padding: CGFloat = 18
-    var cornerRadius: CGFloat = 22
+    var cornerRadius: CGFloat = 20
     var onTap: (() -> Void)? = nil
     @ViewBuilder var content: () -> Content
 
@@ -61,6 +69,10 @@ struct Card<Content: View>: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(padding)
             .background(Palette.card, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .stroke(Palette.line, lineWidth: 1)
+            }
             .shadowCard()
         if let onTap {
             Button(action: onTap) { surface }
@@ -74,10 +86,13 @@ struct Card<Content: View>: View {
 // MARK: — Press-to-shrink style for tap affordance (matches `.press:active`)
 
 struct PressableStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
-            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+            .scaleEffect(reduceMotion ? 1 : (configuration.isPressed ? 0.97 : 1.0))
+            .opacity(configuration.isPressed ? 0.84 : 1)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }
 
@@ -110,7 +125,7 @@ struct EventRow: View {
             CategoryIcon(kind: event.kind, size: 44)
             VStack(alignment: .leading, spacing: 2) {
                 Text(display.title)
-                    .font(.system(size: 15, weight: .bold))
+                    .appFont(size: 15, weight: .bold)
                     .tracking(-0.15)
                     .foregroundStyle(Palette.ink)
                     .lineLimit(1)
@@ -118,7 +133,7 @@ struct EventRow: View {
                     .allowsTightening(true)
                 if let s = display.subtitle, !s.isEmpty {
                     Text(s)
-                        .font(.system(size: 13, weight: .medium))
+                        .appFont(size: 13, weight: .medium)
                         .foregroundStyle(Palette.ink3)
                         .lineLimit(1)
                         .minimumScaleFactor(0.84)
@@ -128,7 +143,7 @@ struct EventRow: View {
             .layoutPriority(1)
             Spacer(minLength: 0)
             Text(formatTime(event.at))
-                .font(.system(size: 13, weight: .bold))
+                .appFont(size: 13, weight: .bold)
                 .monospacedDigit()
                 .foregroundStyle(Palette.ink2)
             if onEdit != nil {
@@ -293,18 +308,18 @@ struct SinceLastBanner: View {
             HStack(spacing: 10) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(Color.white.opacity(0.6))
+                        .fill(Palette.card.opacity(0.6))
                     style.icon
                 }
                 .frame(width: 32, height: 32)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("距上次\(label)")
-                        .font(.system(size: 10, weight: .heavy))
+                        .appFont(size: 10, weight: .heavy)
                         .tracking(0.6)
                         .textCase(.uppercase)
                         .foregroundStyle(style.ink.opacity(0.75))
                     Text(h > 0 ? "\(h)时\(m)分" : "\(m)分")
-                        .font(.system(size: 16, weight: .black))
+                        .appFont(size: 16, weight: .black)
                         .tracking(-0.32)
                         .monospacedDigit()
                         .foregroundStyle(style.ink)
@@ -329,11 +344,11 @@ struct EmptyStateView: View {
         VStack(spacing: 14) {
             FriendlyMoonBlob().frame(width: 96, height: 96)
             Text(title)
-                .font(.system(size: 16, weight: .heavy))
+                .appFont(size: 16, weight: .heavy)
                 .foregroundStyle(Palette.ink)
             if let subtitle {
                 Text(subtitle)
-                    .font(.system(size: 14, weight: .medium))
+                    .appFont(size: 14, weight: .medium)
                     .foregroundStyle(Palette.ink3)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: 260)
@@ -351,22 +366,22 @@ private struct FriendlyMoonBlob: View {
             let s = size.width / 120
             func pt(_ x: Double, _ y: Double) -> CGPoint { .init(x: x * s, y: y * s) }
             ctx.fill(Path(ellipseIn: CGRect(x: 8 * s, y: 8 * s, width: 104 * s, height: 104 * s)),
-                     with: .color(Color(hex: 0xFFE8E0)))
+                     with: .color(AppTheme.coral.primaryTint))
             var moon = Path()
             moon.move(to: pt(82, 68))
             moon.addArc(center: pt(58, 68), radius: 24 * s, startAngle: .degrees(0), endAngle: .degrees(360), clockwise: false)
-            ctx.fill(moon, with: .color(Color(hex: 0xFFC7B5)))
+            ctx.fill(moon, with: .color(Palette.yellow))
             var eye1 = Path()
             eye1.move(to: pt(48, 58)); eye1.addQuadCurve(to: pt(56, 58), control: pt(52, 61))
             var eye2 = Path()
             eye2.move(to: pt(64, 58)); eye2.addQuadCurve(to: pt(72, 58), control: pt(68, 61))
-            ctx.stroke(eye1, with: .color(Color(hex: 0x2B2520)), style: StrokeStyle(lineWidth: 2.4 * s, lineCap: .round))
-            ctx.stroke(eye2, with: .color(Color(hex: 0x2B2520)), style: StrokeStyle(lineWidth: 2.4 * s, lineCap: .round))
-            ctx.fill(Path(ellipseIn: CGRect(x: 45 * s, y: 65 * s, width: 6 * s, height: 6 * s)), with: .color(Color(hex: 0xFF9B85).opacity(0.5)))
-            ctx.fill(Path(ellipseIn: CGRect(x: 69 * s, y: 65 * s, width: 6 * s, height: 6 * s)), with: .color(Color(hex: 0xFF9B85).opacity(0.5)))
-            ctx.fill(Path(ellipseIn: CGRect(x: 24 * s, y: 28 * s, width: 4 * s, height: 4 * s)), with: .color(Color(hex: 0xFFD0DC)))
-            ctx.fill(Path(ellipseIn: CGRect(x: 91.5 * s, y: 37.5 * s, width: 5 * s, height: 5 * s)), with: .color(Color(hex: 0xCFE4F5)))
-            ctx.fill(Path(ellipseIn: CGRect(x: 98.2 * s, y: 78.2 * s, width: 3.6 * s, height: 3.6 * s)), with: .color(Color(hex: 0xFFE8A8)))
+            ctx.stroke(eye1, with: .color(Palette.ink), style: StrokeStyle(lineWidth: 2.4 * s, lineCap: .round))
+            ctx.stroke(eye2, with: .color(Palette.ink), style: StrokeStyle(lineWidth: 2.4 * s, lineCap: .round))
+            ctx.fill(Path(ellipseIn: CGRect(x: 45 * s, y: 65 * s, width: 6 * s, height: 6 * s)), with: .color(AppTheme.coral.primary.opacity(0.5)))
+            ctx.fill(Path(ellipseIn: CGRect(x: 69 * s, y: 65 * s, width: 6 * s, height: 6 * s)), with: .color(AppTheme.coral.primary.opacity(0.5)))
+            ctx.fill(Path(ellipseIn: CGRect(x: 24 * s, y: 28 * s, width: 4 * s, height: 4 * s)), with: .color(Palette.pink))
+            ctx.fill(Path(ellipseIn: CGRect(x: 91.5 * s, y: 37.5 * s, width: 5 * s, height: 5 * s)), with: .color(Palette.blue))
+            ctx.fill(Path(ellipseIn: CGRect(x: 98.2 * s, y: 78.2 * s, width: 3.6 * s, height: 3.6 * s)), with: .color(Palette.yellow))
         }
     }
 }
@@ -383,12 +398,11 @@ struct CTAButton: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 17, weight: .heavy))
-                .tracking(-0.17)
+                .appFont(size: 17, weight: .semibold)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 18)
+                .padding(.vertical, 16)
                 .foregroundStyle(foreground)
-                .background(background, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .background(background, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                 .shadowPill(tint: shadowTint)
         }
         .buttonStyle(PressableStyle())
@@ -402,7 +416,7 @@ struct CTAButton: View {
         }
     }
     private var foreground: Color {
-        variant == .ghost ? Palette.ink : .white
+        variant == .ghost ? Palette.ink : theme.onPrimary
     }
     private var shadowTint: Color {
         switch variant {
@@ -426,15 +440,14 @@ struct SegPill<Value: Hashable>: View {
                     withAnimation(.easeOut(duration: 0.16)) { selection = val }
                 } label: {
                     Text(label)
-                        .font(.system(size: 14, weight: .bold))
-                        .tracking(-0.14)
+                        .appFont(size: 14, weight: .semibold)
                         .foregroundStyle(selection == val ? Palette.ink : Palette.ink2)
                         .padding(.horizontal, 18)
                         .padding(.vertical, 8)
                         .background {
                             if selection == val {
                                 RoundedRectangle(cornerRadius: 999, style: .continuous)
-                                    .fill(Color.white)
+                                    .fill(Palette.card)
                                     .shadow(color: .black.opacity(0.06), radius: 2, x: 0, y: 1)
                                     .shadow(color: .black.opacity(0.04), radius: 6, x: 0, y: 2)
                             }
@@ -457,9 +470,7 @@ struct FieldLabel: View {
     let text: String
     var body: some View {
         Text(text)
-            .font(.system(size: 12, weight: .bold))
-            .tracking(0.72)
-            .textCase(.uppercase)
+            .appFont(size: 12, weight: .semibold)
             .foregroundStyle(Palette.ink3)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -475,7 +486,7 @@ struct FormField<Content: View>: View {
                 .padding(.horizontal, 16).padding(.vertical, 14)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .font(.system(size: 16, weight: .semibold))
+                .appFont(size: 16, weight: .semibold)
                 .foregroundStyle(Palette.ink)
         }
     }

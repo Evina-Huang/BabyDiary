@@ -589,6 +589,71 @@ struct BabyDiaryTests {
         #expect(!settings.quietHoursEnabled)
         #expect(settings.normalizedQuietStartMinuteOfDay == 22 * 60)
         #expect(settings.normalizedQuietEndMinuteOfDay == 7 * 60)
+        #expect(settings.mode == .awakeInterval)
+        #expect(settings.normalizedScheduleEntries == SleepReminderSettings.defaultScheduleEntries)
+    }
+
+    @Test func sleepReminderFixedScheduleUsesNextDailyTimes() {
+        let cal = Calendar.current
+        let now = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 10, minute: 0))!
+        let settings = SleepReminderSettings(
+            isEnabled: true,
+            mode: .schedule,
+            scheduleEntries: [
+                .init(id: "morning", minuteOfDay: 9 * 60 + 30),
+                .init(id: "nap", minuteOfDay: 13 * 60 + 30),
+                .init(id: "night", minuteOfDay: 20 * 60),
+            ]
+        )
+
+        let dates = SleepReminderPlanner.scheduledDates(
+            settings: settings,
+            lastSleep: nil,
+            isSleeping: false,
+            now: now,
+            count: 3
+        )
+
+        #expect(dates == [
+            cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 13, minute: 30))!,
+            cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 20, minute: 0))!,
+            cal.date(from: DateComponents(year: 2026, month: 4, day: 23, hour: 9, minute: 30))!,
+        ])
+    }
+
+    @Test func sleepReminderFixedScheduleSkipsQuietTimeEntries() {
+        let cal = Calendar.current
+        let now = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 10, minute: 0))!
+        let settings = SleepReminderSettings(
+            isEnabled: true,
+            quietHoursEnabled: true,
+            quietStartMinuteOfDay: 12 * 60,
+            quietEndMinuteOfDay: 15 * 60,
+            mode: .schedule,
+            scheduleEntries: [
+                .init(id: "nap", minuteOfDay: 13 * 60 + 30),
+                .init(id: "night", minuteOfDay: 20 * 60),
+            ]
+        )
+
+        let due = SleepReminderPlanner.dueDate(
+            settings: settings,
+            lastSleep: nil,
+            isSleeping: false,
+            now: now
+        )
+
+        #expect(due == cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 20, minute: 0))!)
+    }
+
+    @Test func sleepReminderScheduleEntriesNormalizeAndLimit() {
+        let entries = (0..<8).map { index in
+            SleepReminderScheduleEntry(id: "entry_\(index)", minuteOfDay: 2_000 - index * 100)
+        }
+        let settings = SleepReminderSettings(mode: .schedule, scheduleEntries: entries)
+
+        #expect(settings.normalizedScheduleEntries.count == SleepReminderSettings.maxScheduleEntries)
+        #expect(settings.normalizedScheduleEntries.map(\.minuteOfDay) == [1_300, 1_400, 1_439, 1_439, 1_439, 1_439])
     }
 
     @Test func mostRecentBreastFeedIgnoresLaterFormulaEntry() throws {
@@ -794,6 +859,34 @@ struct BabyDiaryTests {
         #expect(!store.availableVaccineTemplates.contains { $0.id == "t_mmr1" })
     }
 
+    @Test func vaccineTemplatesGroupByFamilyForAddFlow() throws {
+        let hepb = try #require(VaccineCatalog.groupedPresets.first { $0.name == "乙肝疫苗" })
+
+        #expect(hepb.templates.map(\.id) == ["t_hepb1", "t_hepb2", "t_hepb3"])
+        #expect(hepb.ageRangeLabel == "出生时-6 月龄")
+        #expect(hepb.costSummary == "免费")
+    }
+
+    @Test func vaccineTemplateCostLabelsSeparateFreeAndPaid() throws {
+        let hepb = try #require(VaccineCatalog.presets.first { $0.id == "t_hepb1" })
+        let pcv = try #require(VaccineCatalog.presets.first { $0.id == "t_pcv13_1" })
+
+        #expect(hepb.isProgramVaccine)
+        #expect(hepb.costLabel == "免费")
+        #expect(!pcv.isProgramVaccine)
+        #expect(pcv.costLabel == "自费")
+    }
+
+    @Test func availableVaccineTemplateGroupsHideAddedDosesOnly() throws {
+        let store = AppStore()
+        store.vaccines = [
+            Vaccine(id: "t_hepb1", name: "乙肝疫苗 第1剂", ageLabel: "出生时", ageMonths: 0, scheduledDate: nil, doneDate: nil)
+        ]
+
+        let hepb = try #require(store.availableVaccineTemplateGroups.first { $0.name == "乙肝疫苗" })
+        #expect(hepb.templates.map(\.id) == ["t_hepb2", "t_hepb3"])
+    }
+
     @Test func toggleVaccineUsesActualCompletionDate() throws {
         let store = AppStore()
         let scheduled = Calendar.current.date(byAdding: .day, value: -10, to: Date())!
@@ -808,6 +901,22 @@ struct BabyDiaryTests {
         let doneDate = try #require(store.vaccines[0].doneDate)
         #expect(doneDate >= before)
         #expect(doneDate <= after)
+    }
+
+    @Test func completeVaccineUsesSelectedDateAndSortsBehindPending() throws {
+        let store = AppStore()
+        let cal = Calendar.current
+        let scheduled = cal.date(from: DateComponents(year: 2026, month: 4, day: 20))!
+        let done = cal.date(from: DateComponents(year: 2026, month: 4, day: 23))!
+        store.vaccines = [
+            Vaccine(id: "v1", name: "测试疫苗 A", ageLabel: "1 月龄", ageMonths: 1, scheduledDate: scheduled, doneDate: nil),
+            Vaccine(id: "v2", name: "测试疫苗 B", ageLabel: "2 月龄", ageMonths: 2, scheduledDate: scheduled, doneDate: nil)
+        ]
+
+        store.completeVaccine("v1", on: done)
+
+        #expect(store.vaccines.map(\.id) == ["v2", "v1"])
+        #expect(store.vaccines.first { $0.id == "v1" }?.doneDate == done)
     }
 
     @Test func medicationRecordsSortNewestFirst() {
@@ -1132,5 +1241,39 @@ struct BabyDiaryTests {
         #expect(store.teeth.allSatisfy { $0.eruptedAt == nil })
         #expect(store.medications.isEmpty)
         #expect(store.sleepReminder == SleepReminderSettings())
+    }
+
+    @Test func appearanceIsIncludedInSnapshot() {
+        let store = AppStore()
+        store.appearance = .dark
+
+        let snapshot = store.snapshot()
+        let restored = AppStore()
+        restored.apply(snapshot)
+
+        #expect(snapshot.version == 6)
+        #expect(snapshot.appearance == .dark)
+        #expect(restored.appearance == .dark)
+    }
+
+    @Test func legacySnapshotKeepsCurrentAppearancePreference() {
+        let store = AppStore()
+        store.appearance = .light
+        let legacy = DataSnapshot(
+            version: 5,
+            baby: store.baby,
+            events: [],
+            vaccines: [],
+            growth: [],
+            foods: [],
+            teeth: nil,
+            milestones: nil
+        )
+
+        store.apply(legacy)
+
+        #expect(store.appearance == .light)
+        #expect(AppAppearance.system.colorScheme == nil)
+        #expect(AppAppearance.dark.colorScheme == .dark)
     }
 }

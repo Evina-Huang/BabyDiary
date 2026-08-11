@@ -13,7 +13,7 @@ struct BabyDiaryApp: App {
             ContentView()
                 .environment(store)
                 .tint(store.theme.primary600)
-                .preferredColorScheme(.light)
+                .preferredColorScheme(store.appearance.colorScheme)
         }
     }
 }

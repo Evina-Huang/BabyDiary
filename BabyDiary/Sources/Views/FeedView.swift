@@ -20,6 +20,7 @@ struct FeedScreen: View {
     @State private var bManualMinR: Int = 0
     @State private var bManualTime: Date = .now
     @State private var bManualFirstSide: Side = .L
+    @State private var showBreastManualDetails = false
 
     // Breast timer state
     @State private var bPhase: Phase = .idle
@@ -40,8 +41,14 @@ struct FeedScreen: View {
     @State private var fSessionEnd: Date? = nil
     @State private var ml: Int = 210
     @State private var time: Date = .now
+    @State private var showFormulaManualDetails = false
 
-    private var formulaPresetValues: [Int] { store.formulaMlHistory }
+    private var formulaPresetValues: [Int] {
+        let recentCustomValues = store.formulaMlHistory.filter {
+            !AppStore.formulaMilliliterPresets.contains($0)
+        }
+        return Array(recentCustomValues.prefix(2)) + AppStore.formulaMilliliterPresets
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -100,6 +107,11 @@ struct FeedScreen: View {
             .disabled(!isIdle)
             .opacity(isIdle ? 1 : 0.65)
 
+        if let lastFeed {
+            lastFeedContext(lastFeed)
+                .padding(.top, 14)
+        }
+
         if mode == .breast {
             breastSection(now: now)
         } else {
@@ -140,8 +152,18 @@ struct FeedScreen: View {
                 FieldLabel(text: "右侧(分钟)")
                 StepperInput(value: $bManualMinR, step: 1, min: 0, max: 120, suffix: "分")
             }
-            breastManualOrderPicker
-            InlineWheelTimePicker(time: $bManualTime, theme: store.theme)
+            if bManualMinL > 0 && bManualMinR > 0 {
+                breastManualOrderPicker
+            }
+            optionalSettingsToggle(
+                title: "调整记录时间",
+                subtitle: "默认保存为现在",
+                expanded: $showBreastManualDetails
+            )
+            if showBreastManualDetails {
+                InlineWheelTimePicker(time: $bManualTime, theme: store.theme)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
             CTAButton(title: "保存记录",
                       variant: .primary,
                       theme: store.theme,
@@ -165,7 +187,7 @@ struct FeedScreen: View {
             bManualFirstSide = side
         } label: {
             Text(title)
-                .font(.system(size: 13, weight: .heavy))
+                .appFont(size: 13, weight: .heavy)
                 .lineLimit(1)
                 .minimumScaleFactor(0.84)
                 .foregroundStyle(bManualFirstSide == side ? .white : Palette.ink2)
@@ -196,11 +218,11 @@ struct FeedScreen: View {
 
             if bPhase == .idle {
                 Text("轻触任一侧开始计时")
-                    .font(.system(size: 13, weight: .semibold))
+                    .appFont(size: 13, weight: .semibold)
                     .foregroundStyle(Palette.ink3)
             } else {
                 Text(String(format: "共 %d 分 %d 秒", Int(total / 60), Int(total) % 60))
-                    .font(.system(size: 13, weight: .heavy))
+                    .appFont(size: 13, weight: .heavy)
                     .tracking(0.52)
                     .foregroundStyle(Palette.ink3)
             }
@@ -210,7 +232,7 @@ struct FeedScreen: View {
                           variant: .primary, theme: store.theme,
                           action: saveBreast)
                 Button("清空重来") { resetBreast() }
-                    .font(.system(size: 13, weight: .bold))
+                    .appFont(size: 13, weight: .bold)
                     .foregroundStyle(Palette.ink3)
                     .padding(.vertical, 8)
                     .frame(maxWidth: .infinity)
@@ -237,25 +259,24 @@ struct FeedScreen: View {
             Button(action: action) {
                 VStack(spacing: 8) {
                     Text(label)
-                        .font(.system(size: 14, weight: .heavy))
+                        .appFont(size: 14, weight: .semibold)
                         .foregroundStyle(active ? accent : sideInk)
                     Text(formatMMSS(ms))
-                        .font(.system(size: 34, weight: .black))
-                        .tracking(-0.68)
+                        .appFont(size: 32, weight: .bold)
+                        .tracking(-0.5)
                         .monospacedDigit()
                         .foregroundStyle(active ? accent : Palette.ink)
                     statusLabel(accent: accent)
                         .frame(height: 18)
                 }
-                .frame(maxWidth: .infinity, minHeight: 132)
-                .padding(.vertical, 24).padding(.horizontal, 14)
+                .frame(maxWidth: .infinity, minHeight: 124)
+                .padding(.vertical, 20).padding(.horizontal, 14)
                 .background(background,
                             in: RoundedRectangle(cornerRadius: 22, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: 22, style: .continuous)
                         .stroke(border, lineWidth: active ? 2.5 : 1.5)
                 )
-                .shadowCard()
             }
             .buttonStyle(PressableStyle())
         }
@@ -266,25 +287,25 @@ struct FeedScreen: View {
                 HStack(spacing: 5) {
                     Circle().fill(accent).frame(width: 6, height: 6)
                     Text("计时中")
-                        .font(.system(size: 10, weight: .heavy))
+                        .appFont(size: 10, weight: .heavy)
                         .tracking(0.6)
                         .textCase(.uppercase)
                 }
                 .foregroundStyle(accent)
             } else if active, phase == .paused {
                 Text("已暂停")
-                    .font(.system(size: 10, weight: .heavy))
+                    .appFont(size: 10, weight: .heavy)
                     .tracking(0.6)
                     .textCase(.uppercase)
                     .foregroundStyle(Palette.yellowInk)
             } else if showsLastEndedHint {
                 Text("上次从\(side == .L ? "左" : "右")边结束")
-                    .font(.system(size: 10, weight: .heavy))
+                    .appFont(size: 10, weight: .heavy)
                     .tracking(0.2)
                     .foregroundStyle(accent.opacity(0.78))
             } else {
                 Text("计时中")
-                    .font(.system(size: 10, weight: .heavy))
+                    .appFont(size: 10, weight: .heavy)
                     .tracking(0.6)
                     .textCase(.uppercase)
                     .foregroundStyle(.clear)
@@ -308,28 +329,28 @@ struct FeedScreen: View {
                 VStack(spacing: 14) {
                     VStack(spacing: 4) {
                         Text(formatMMSS(live))
-                            .font(.system(size: 46, weight: .black))
-                            .tracking(-1.38)
+                            .appFont(size: 44, weight: .bold)
+                            .tracking(-1.1)
                             .monospacedDigit()
                             .foregroundStyle(timerInk(for: fPhase))
                         if fPhase == .running {
                             HStack(spacing: 6) {
                                 Circle().fill(Palette.pinkInk).frame(width: 6, height: 6)
                                 Text("计时中")
-                                    .font(.system(size: 11, weight: .heavy))
+                                    .appFont(size: 11, weight: .heavy)
                                     .tracking(0.66)
                                     .textCase(.uppercase)
                             }
                             .foregroundStyle(Palette.pinkInk)
                         } else if fPhase == .paused {
                             Text("已暂停")
-                                .font(.system(size: 11, weight: .heavy))
+                                .appFont(size: 11, weight: .heavy)
                                 .tracking(0.66)
                                 .textCase(.uppercase)
                                 .foregroundStyle(Palette.yellowInk)
                         } else if fPhase == .stopped, let s = fSessionStart, let e = fSessionEnd {
                             Text("\(hhmm(s)) - \(hhmm(e))")
-                                .font(.system(size: 13, weight: .heavy))
+                                .appFont(size: 13, weight: .heavy)
                                 .monospacedDigit()
                                 .foregroundStyle(Palette.pinkInk.opacity(0.75))
                         }
@@ -343,7 +364,15 @@ struct FeedScreen: View {
                 }
             } else {
                 mlInput
-                manualTimePicker
+                optionalSettingsToggle(
+                    title: "调整记录时间",
+                    subtitle: "默认保存为现在",
+                    expanded: $showFormulaManualDetails
+                )
+                if showFormulaManualDetails {
+                    manualTimePicker
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                }
                 CTAButton(title: "保存记录",
                           variant: .primary,
                           theme: store.theme,
@@ -358,19 +387,19 @@ struct FeedScreen: View {
     private var formulaActionRow: some View {
         switch fPhase {
         case .idle:
-            CTAButton(title: "▶ 开始计时", theme: store.theme, action: startFormula)
+            CTAButton(title: "开始计时", theme: store.theme, action: startFormula)
         case .running:
             HStack(spacing: 10) {
-                CTAButton(title: "⏸ 暂停", variant: .ghost, theme: store.theme, action: pauseFormula)
+                CTAButton(title: "暂停", variant: .ghost, theme: store.theme, action: pauseFormula)
                     .frame(maxWidth: .infinity)
-                CTAButton(title: "✓ 停止", theme: store.theme, action: stopFormula)
+                CTAButton(title: "停止", theme: store.theme, action: stopFormula)
                     .frame(maxWidth: .infinity)
             }
         case .paused:
             HStack(spacing: 10) {
-                CTAButton(title: "▶ 继续", variant: .ghost, theme: store.theme, action: resumeFormula)
+                CTAButton(title: "继续", variant: .ghost, theme: store.theme, action: resumeFormula)
                     .frame(maxWidth: .infinity)
-                CTAButton(title: "✓ 停止", theme: store.theme, action: stopFormula)
+                CTAButton(title: "停止", theme: store.theme, action: stopFormula)
                     .frame(maxWidth: .infinity)
             }
         case .stopped:
@@ -387,6 +416,74 @@ struct FeedScreen: View {
         }
     }
 
+    private func lastFeedContext(_ event: Event) -> some View {
+        HStack(spacing: 12) {
+            CategoryIcon(kind: .feed, size: 40)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("上次喂奶")
+                    .appFont(size: 12, weight: .medium)
+                    .foregroundStyle(Palette.ink3)
+                Text(event.title)
+                    .appFont(size: 14, weight: .semibold)
+                    .foregroundStyle(Palette.ink)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 8)
+            Text(formatTime(event.occurredAt))
+                .appFont(size: 14, weight: .semibold)
+                .monospacedDigit()
+                .foregroundStyle(Palette.pinkInk)
+        }
+        .padding(.horizontal, 14)
+        .frame(minHeight: 60)
+        .background(Palette.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Palette.line, lineWidth: 1)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private func optionalSettingsToggle(
+        title: String,
+        subtitle: String,
+        expanded: Binding<Bool>
+    ) -> some View {
+        Button {
+            withAnimation(.easeOut(duration: 0.2)) {
+                expanded.wrappedValue.toggle()
+            }
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "clock.arrow.circlepath")
+                    .appFont(size: 16, weight: .semibold)
+                    .foregroundStyle(Palette.pinkInk)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .appFont(size: 14, weight: .semibold)
+                        .foregroundStyle(Palette.ink)
+                    Text(subtitle)
+                        .appFont(size: 12, weight: .medium)
+                        .foregroundStyle(Palette.ink3)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.down")
+                    .appFont(size: 12, weight: .bold)
+                    .foregroundStyle(Palette.ink3)
+                    .rotationEffect(.degrees(expanded.wrappedValue ? 180 : 0))
+            }
+            .padding(.horizontal, 14)
+            .frame(minHeight: 56)
+            .background(Palette.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(Palette.line, lineWidth: 1)
+            }
+        }
+        .buttonStyle(PressableStyle())
+        .accessibilityValue(expanded.wrappedValue ? "已展开" : "已收起")
+    }
+
     private var mlInput: some View {
         VStack(alignment: .leading, spacing: 12) {
             FieldLabel(text: "奶量 (ml)")
@@ -397,28 +494,42 @@ struct FeedScreen: View {
                 max: AppStore.maxFormulaMilliliters,
                 suffix: "ml"
             )
-            if !formulaPresetValues.isEmpty {
-                let columns = [GridItem(.adaptive(minimum: 72), spacing: 8)]
-                LazyVGrid(columns: columns, alignment: .leading, spacing: 8) {
-                    ForEach(formulaPresetValues, id: \.self) { v in
-                        Button {
-                            ml = v
-                        } label: {
-                            Text("\(v) ml")
-                                .font(.system(size: 13, weight: .bold))
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.84)
-                                .foregroundStyle(ml == v ? .white : Palette.ink2)
-                                .frame(maxWidth: .infinity)
-                                .padding(.horizontal, 6).padding(.vertical, 10)
-                                .background(ml == v ? store.theme.primary : Palette.bg2,
-                                            in: Capsule())
-                        }
-                        .buttonStyle(PressableStyle())
-                    }
+            Text("常用奶量")
+                .appFont(size: 11, weight: .heavy)
+                .tracking(0.66)
+                .foregroundStyle(Palette.ink3)
+
+            let columns = [GridItem(.adaptive(minimum: 72), spacing: 8)]
+            LazyVGrid(columns: columns, alignment: .leading, spacing: 8) {
+                ForEach(formulaPresetValues, id: \.self) { value in
+                    formulaPresetButton(value)
                 }
             }
         }
+    }
+
+    private func formulaPresetButton(_ value: Int) -> some View {
+        let isSelected = ml == value
+        return Button {
+            ml = value
+        } label: {
+            HStack(spacing: 5) {
+                if isSelected {
+                    AppIcon.Check(size: 12, color: .white)
+                }
+                Text("\(value) ml")
+                    .appFont(size: 13, weight: .bold)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.84)
+            }
+            .foregroundStyle(isSelected ? .white : Palette.ink2)
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .padding(.horizontal, 6)
+            .background(isSelected ? store.theme.primary : Palette.bg2, in: Capsule())
+        }
+        .buttonStyle(PressableStyle())
+        .accessibilityLabel("\(value) 毫升")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     private var manualTimePicker: some View {
@@ -683,13 +794,13 @@ struct StepperInput: View {
             StepBtn(symbol: "−") { value = Swift.max(min, value - step) }
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text("\(value)")
-                    .font(.system(size: 30, weight: .black))
+                    .appFont(size: 30, weight: .black)
                     .tracking(-0.6)
                     .monospacedDigit()
                     .foregroundStyle(Palette.ink)
                 if let suffix {
                     Text(suffix)
-                        .font(.system(size: 14, weight: .bold))
+                        .appFont(size: 14, weight: .bold)
                         .foregroundStyle(Palette.ink3)
                 }
             }
@@ -706,7 +817,7 @@ struct StepperInput: View {
         var body: some View {
             Button(action: action) {
                 Text(symbol)
-                    .font(.system(size: 22, weight: .bold))
+                    .appFont(size: 22, weight: .bold)
                     .foregroundStyle(Palette.ink)
                     .frame(width: 48, height: 48)
                     .background(.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))

@@ -15,55 +15,21 @@ struct BackupScreen: View {
         VStack(spacing: 0) {
             ScreenHeader(title: "数据备份", onBack: onBack)
             ScreenBody {
-                summaryCard
-                    .padding(.top, 10)
+                safetyOverview
+                    .padding(.top, 4)
 
-                autosaveCard
-                    .padding(.top, 12)
+                dataOverview
+                    .padding(.top, 22)
 
-                Card(padding: 18) {
-                    VStack(alignment: .leading, spacing: 14) {
-                        sectionLabel("导出 / 备份")
-                        Text("自动保存用于日常使用，导出用于换机、重装前或额外留底。建议在大版本更新前导出一次。")
-                            .font(.system(size: 12))
-                            .foregroundStyle(Palette.ink2)
+                exportSection
+                    .padding(.top, 22)
 
-                        exportJSONRow
-                        exportPDFRow
-                    }
-                }
-                .padding(.top, 12)
+                restoreSection
+                    .padding(.top, 22)
 
-                Card(padding: 18) {
-                    VStack(alignment: .leading, spacing: 14) {
-                        sectionLabel("恢复 / 导入")
-                        Text("从之前导出的 JSON 备份中恢复数据。导入会覆盖当前所有内容。")
-                            .font(.system(size: 12))
-                            .foregroundStyle(Palette.ink2)
-
-                        Button {
-                            showImporter = true
-                        } label: {
-                            HStack {
-                                Image(systemName: "square.and.arrow.down")
-                                Text("从 JSON 文件导入").font(.system(size: 14, weight: .semibold))
-                                Spacer()
-                            }
-                            .padding(.vertical, 12).padding(.horizontal, 14)
-                            .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 14))
-                            .foregroundStyle(Palette.ink)
-                        }
-                        .buttonStyle(PressableStyle())
-                    }
-                }
-                .padding(.top, 12)
-
-                if let msg = message {
-                    Text(msg)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Palette.ink2)
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .padding(.top, 10)
+                if let message {
+                    statusMessage(message)
+                        .padding(.top, 12)
                 }
             }
         }
@@ -76,119 +42,241 @@ struct BackupScreen: View {
             switch result {
             case .success(let urls):
                 if let url = urls.first { confirmImport = url }
-            case .failure(let err):
-                message = "选择文件失败：\(err.localizedDescription)"
+            case .failure(let error):
+                message = "选择文件失败：\(error.localizedDescription)"
             }
         }
-        .alert("确定要导入吗？", isPresented: Binding(
-            get: { confirmImport != nil },
-            set: { if !$0 { confirmImport = nil } }
-        )) {
+        .alert(
+            "确定覆盖当前数据？",
+            isPresented: Binding(
+                get: { confirmImport != nil },
+                set: { if !$0 { confirmImport = nil } }
+            )
+        ) {
             Button("取消", role: .cancel) {}
-            Button("覆盖当前数据", role: .destructive) {
+            Button("覆盖并恢复", role: .destructive) {
                 if let url = confirmImport { performImport(url) }
             }
         } message: {
-            Text("当前所有日常记录、成长、疫苗、用药和辅食数据将被备份文件中的内容覆盖。")
+            Text("当前所有日常记录、成长、疫苗、用药和辅食数据都会被备份文件替换。")
         }
     }
 
-    // MARK: — Rows
-
-    private var exportJSONRow: some View {
-        HStack(spacing: 10) {
-            rowIcon("doc.text", tint: .blue)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("导出 JSON 备份").font(.system(size: 14, weight: .semibold))
-                Text("完整数据，可再次导入恢复")
-                    .font(.system(size: 11)).foregroundStyle(Palette.ink3)
-            }
-            Spacer()
-            if let url = jsonURL {
-                ShareLink(item: url) {
-                    Image(systemName: "square.and.arrow.up")
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(store.theme.primary600)
-                }
-            } else {
-                Button("生成") { generateJSON() }
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(store.theme.primary600)
-            }
-        }
-        .padding(.vertical, 10).padding(.horizontal, 14)
-        .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 14))
-    }
-
-    private var exportPDFRow: some View {
-        HStack(spacing: 10) {
-            rowIcon("doc.richtext", tint: .red)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("导出 PDF 报告").font(.system(size: 14, weight: .semibold))
-                Text("直观易读，可直接打开查看")
-                    .font(.system(size: 11)).foregroundStyle(Palette.ink3)
-            }
-            Spacer()
-            if let url = pdfURL {
-                ShareLink(item: url) {
-                    Image(systemName: "square.and.arrow.up")
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(store.theme.primary600)
-                }
-            } else {
-                Button("生成") { generatePDF() }
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(store.theme.primary600)
-            }
-        }
-        .padding(.vertical, 10).padding(.horizontal, 14)
-        .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 14))
-    }
-
-    private var summaryCard: some View {
-        Card(padding: 16) {
-            VStack(alignment: .leading, spacing: 8) {
-                sectionLabel("当前数据")
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 14), count: 3), spacing: 10) {
-                    stat("\(store.events.count)", "记录")
-                    stat("\(store.growth.count)", "成长点")
-                    stat("\(store.vaccines.filter { $0.done }.count)/\(store.vaccines.count)", "疫苗")
-                    stat("\(store.medications.count)", "用药")
-                    stat("\(store.foods.count)", "辅食")
-                }
-            }
-        }
-    }
-
-    private var autosaveCard: some View {
+    private var safetyOverview: some View {
         Card(padding: 18) {
-            VStack(alignment: .leading, spacing: 14) {
-                sectionLabel("自动保存")
+            HStack(alignment: .top, spacing: 14) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(Palette.mintTint)
+                    AppIcon.Shield(size: 27, color: Palette.mint600, fill: .white.opacity(0.4))
+                }
+                .frame(width: 50, height: 50)
 
-                HStack(alignment: .top, spacing: 10) {
-                    rowIcon("checkmark.shield", tint: Palette.mint600)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("自动保存已开启")
+                        .appFont(size: 17, weight: .black)
+                        .tracking(-0.18)
+                        .foregroundStyle(Palette.ink)
+                    Text(lastSavedText)
+                        .appFont(size: 12, weight: .bold)
+                        .foregroundStyle(Palette.mint600)
+                    Text("本机数据会随每次修改保存；换机或卸载前仍建议导出完整备份。")
+                        .appFont(size: 13, weight: .semibold)
+                        .foregroundStyle(Palette.ink3)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
 
+                Spacer(minLength: 0)
+            }
+        }
+    }
+
+    private var dataOverview: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionTitle("当前数据")
+
+            Card(padding: 0) {
+                VStack(spacing: 0) {
+                    HStack(spacing: 0) {
+                        stat("\(store.events.count)", "记录")
+                        verticalDivider
+                        stat("\(store.growth.count)", "成长点")
+                        verticalDivider
+                        stat("\(store.vaccines.filter(\.done).count)/\(store.vaccines.count)", "疫苗")
+                    }
+                    .padding(.vertical, 16)
+
+                    Rectangle().fill(Palette.line).frame(height: 1)
+
+                    HStack(spacing: 0) {
+                        stat("\(store.medications.count)", "用药")
+                        verticalDivider
+                        stat("\(store.foods.count)", "食材")
+                        verticalDivider
+                        stat("\(store.recipes.count)", "食谱")
+                    }
+                    .padding(.vertical, 16)
+                }
+            }
+        }
+    }
+
+    private var exportSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionTitle("导出数据")
+
+            Card(padding: 0) {
+                VStack(spacing: 0) {
+                    exportRow(
+                        format: "JSON",
+                        title: "完整数据备份",
+                        subtitle: "用于换机、重装或再次导入恢复",
+                        tint: store.theme.primaryTint,
+                        ink: store.theme.primary600,
+                        url: jsonURL,
+                        generate: generateJSON
+                    )
+
+                    Rectangle()
+                        .fill(Palette.line)
+                        .frame(height: 1)
+                        .padding(.horizontal, 16)
+
+                    exportRow(
+                        format: "PDF",
+                        title: "可阅读报告",
+                        subtitle: "方便查看、打印或发送给家人医生",
+                        tint: Palette.blue,
+                        ink: Palette.blueInk,
+                        url: pdfURL,
+                        generate: generatePDF
+                    )
+                }
+            }
+        }
+    }
+
+    private var restoreSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionTitle("恢复数据")
+
+            Card(padding: 18) {
+                VStack(alignment: .leading, spacing: 14) {
                     VStack(alignment: .leading, spacing: 5) {
-                        Text("自动保存已开启")
-                            .font(.system(size: 14, weight: .semibold))
+                        Text("从 JSON 备份恢复")
+                            .appFont(size: 15, weight: .heavy)
                             .foregroundStyle(Palette.ink)
-
-                        Text("每次新增、修改、删除后，都会立即保存到当前设备。")
-                            .font(.system(size: 12))
-                            .foregroundStyle(Palette.ink2)
-
-                        Text(lastSavedText)
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(store.theme.primary600)
-
-                        Text("自动保存文件保存在 App 的本地空间里，不会直接出现在「文件」App。若担心卸载或换机，请导出 JSON 备份。")
-                            .font(.system(size: 11))
+                        Text("恢复会覆盖当前设备上的全部数据。选择文件后仍需再次确认。")
+                            .appFont(size: 13, weight: .semibold)
                             .foregroundStyle(Palette.ink3)
                             .fixedSize(horizontal: false, vertical: true)
                     }
+
+                    Button { showImporter = true } label: {
+                        Text("选择备份文件")
+                            .appFont(size: 14, weight: .heavy)
+                            .foregroundStyle(Palette.pinkInk)
+                            .frame(maxWidth: .infinity, minHeight: 50)
+                            .background(
+                                Palette.pink,
+                                in: RoundedRectangle(cornerRadius: 17, style: .continuous)
+                            )
+                    }
+                    .buttonStyle(PressableStyle())
                 }
             }
         }
+    }
+
+    private func exportRow(
+        format: String,
+        title: String,
+        subtitle: String,
+        tint: Color,
+        ink: Color,
+        url: URL?,
+        generate: @escaping () -> Void
+    ) -> some View {
+        HStack(spacing: 12) {
+            Text(format)
+                .appFont(size: 10, weight: .black)
+                .tracking(0.3)
+                .foregroundStyle(ink)
+                .frame(width: 48, height: 42)
+                .background(tint, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .appFont(size: 14, weight: .heavy)
+                    .foregroundStyle(Palette.ink)
+                Text(subtitle)
+                    .appFont(size: 11, weight: .semibold)
+                    .foregroundStyle(Palette.ink3)
+                    .lineLimit(2)
+            }
+
+            Spacer(minLength: 8)
+
+            if let url {
+                ShareLink(item: url) {
+                    Text("分享")
+                        .appFont(size: 13, weight: .heavy)
+                        .foregroundStyle(ink)
+                        .frame(minWidth: 58, minHeight: 44)
+                        .background(tint, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                }
+            } else {
+                Button(action: generate) {
+                    Text("生成")
+                        .appFont(size: 13, weight: .heavy)
+                        .foregroundStyle(ink)
+                        .frame(minWidth: 58, minHeight: 44)
+                        .background(tint, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                }
+                .buttonStyle(PressableStyle())
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+    }
+
+    private func statusMessage(_ message: String) -> some View {
+        let failed = message.contains("失败")
+        return Text(message)
+            .appFont(size: 13, weight: .semibold)
+            .foregroundStyle(failed ? Palette.pinkInk : Palette.mint600)
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .padding(.horizontal, 14)
+            .background(
+                failed ? Palette.pink : Palette.mintTint,
+                in: RoundedRectangle(cornerRadius: 15, style: .continuous)
+            )
+    }
+
+    private var verticalDivider: some View {
+        Rectangle()
+            .fill(Palette.line)
+            .frame(width: 1, height: 34)
+    }
+
+    private func stat(_ value: String, _ label: String) -> some View {
+        VStack(spacing: 5) {
+            Text(value)
+                .appFont(size: 19, weight: .black)
+                .monospacedDigit()
+                .foregroundStyle(Palette.ink)
+            Text(label)
+                .appFont(size: 11, weight: .bold)
+                .foregroundStyle(Palette.ink3)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func sectionTitle(_ title: String) -> some View {
+        Text(title)
+            .appFont(size: 15, weight: .heavy)
+            .tracking(-0.15)
+            .foregroundStyle(Palette.ink)
     }
 
     private var lastSavedText: String {
@@ -198,63 +286,39 @@ struct BackupScreen: View {
         return "最近保存：尚未生成本机保存文件"
     }
 
-    private func stat(_ value: String, _ label: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(value).font(.system(size: 20, weight: .black)).foregroundStyle(Palette.ink)
-            Text(label).font(.system(size: 11, weight: .semibold)).foregroundStyle(Palette.ink3)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private func sectionLabel(_ s: String) -> some View {
-        Text(s)
-            .font(.system(size: 11, weight: .bold))
-            .tracking(0.6).textCase(.uppercase)
-            .foregroundStyle(Palette.ink3)
-    }
-
-    private func rowIcon(_ name: String, tint: Color) -> some View {
-        Image(systemName: name)
-            .font(.system(size: 14, weight: .semibold))
-            .foregroundStyle(tint)
-            .frame(width: 32, height: 32)
-            .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
-    }
-
     private func formatAutosaveTime(_ date: Date) -> String {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "zh_CN")
-        f.dateFormat = "yyyy 年 M 月 d 日 HH:mm"
-        return f.string(from: date)
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.dateFormat = "M 月 d 日 HH:mm"
+        return formatter.string(from: date)
     }
-
-    // MARK: — Actions
 
     private func generateJSON() {
         do {
             jsonURL = try store.exportJSON()
-            message = "JSON 已生成，点击右侧分享"
+            message = "完整备份已生成，可以分享保存"
         } catch {
-            message = "导出 JSON 失败：\(error.localizedDescription)"
+            message = "生成备份失败：\(error.localizedDescription)"
         }
     }
 
     private func generatePDF() {
         do {
             pdfURL = try store.exportPDF()
-            message = "PDF 已生成，点击右侧分享"
+            message = "PDF 报告已生成，可以分享保存"
         } catch {
-            message = "导出 PDF 失败：\(error.localizedDescription)"
+            message = "生成 PDF 失败：\(error.localizedDescription)"
         }
     }
 
     private func performImport(_ url: URL) {
         do {
             try store.importJSON(from: url)
-            message = "导入成功 ✓"
-            jsonURL = nil; pdfURL = nil
+            message = "数据恢复完成"
+            jsonURL = nil
+            pdfURL = nil
         } catch {
-            message = "导入失败：\(error.localizedDescription)"
+            message = "恢复失败：\(error.localizedDescription)"
         }
         confirmImport = nil
     }

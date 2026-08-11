@@ -3,6 +3,30 @@ import SwiftUI
 struct RecordsView: View {
     @Environment(AppStore.self) private var store
 
+    private enum RecordFilter: String, CaseIterable, Hashable {
+        case all, feed, sleep, diaper, solid
+
+        var label: String {
+            switch self {
+            case .all: return "全部"
+            case .feed: return "喂奶"
+            case .sleep: return "睡眠"
+            case .diaper: return "尿布"
+            case .solid: return "辅食"
+            }
+        }
+
+        var kind: EventKind? {
+            switch self {
+            case .all: return nil
+            case .feed: return .feed
+            case .sleep: return .sleep
+            case .diaper: return .diaper
+            case .solid: return .solid
+            }
+        }
+    }
+
     @State private var anchor: Date = {
         let cal = Calendar.current
         return cal.date(from: cal.dateComponents([.year, .month], from: Date())) ?? Date()
@@ -10,14 +34,18 @@ struct RecordsView: View {
     @State private var selectedDate: Date? = nil
     @State private var calendarOpen = false
     @State private var editing: Event? = nil
+    @State private var filter: RecordFilter = .all
 
     private var filteredSorted: [Event] {
-        let base: [Event] = {
+        let dateFiltered: [Event] = {
             guard let sel = selectedDate else { return store.events }
             let cal = Calendar.current
             return store.events.filter { cal.isDate($0.at, inSameDayAs: sel) }
         }()
-        return base.sorted { $0.at > $1.at }
+        let kindFiltered = filter.kind.map { kind in
+            dateFiltered.filter { $0.kind == kind }
+        } ?? dateFiltered
+        return kindFiltered.sorted { $0.at > $1.at }
     }
 
     private struct DayGroup: Identifiable {
@@ -54,6 +82,12 @@ struct RecordsView: View {
     var body: some View {
         VStack(spacing: 0) {
             ScreenBody {
+                pageHeader
+                    .padding(.bottom, 18)
+
+                filterBar
+                    .padding(.bottom, 12)
+
                 monthCalendarHeader
 
                 if groups.isEmpty {
@@ -87,37 +121,105 @@ struct RecordsView: View {
         }
     }
 
+    private var pageHeader: some View {
+        HStack(alignment: .bottom, spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text("记录")
+                    .appFont(size: 28, weight: .bold)
+                    .tracking(-0.7)
+                    .foregroundStyle(Palette.ink)
+                Text(selectedDate == nil ? "按时间查看宝宝的日常" : collapsedLabel)
+                    .appFont(size: 13, weight: .medium)
+                    .foregroundStyle(Palette.ink3)
+            }
+            Spacer(minLength: 8)
+            Text("\(filteredSorted.count) 条")
+                .appFont(size: 13, weight: .semibold)
+                .monospacedDigit()
+                .foregroundStyle(store.theme.primary600)
+                .padding(.horizontal, 12)
+                .frame(height: 32)
+                .background(store.theme.primaryTint, in: Capsule())
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var filterBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(RecordFilter.allCases, id: \.self) { option in
+                    filterChip(option)
+                }
+            }
+        }
+        .contentMargins(.horizontal, 0, for: .scrollContent)
+    }
+
+    private func filterChip(_ option: RecordFilter) -> some View {
+        let selected = filter == option
+        let categoryStyle = option.kind.map { CategoryStyle.forKind($0, iconSize: 16) }
+        let ink = categoryStyle?.ink ?? store.theme.primary600
+        let tint = categoryStyle?.tint ?? store.theme.primaryTint
+
+        return Button {
+            withAnimation(.easeOut(duration: 0.18)) {
+                filter = option
+            }
+        } label: {
+            HStack(spacing: 6) {
+                if let categoryStyle {
+                    categoryStyle.icon
+                        .frame(width: 18, height: 18)
+                }
+                Text(option.label)
+                    .appFont(size: 14, weight: .semibold)
+            }
+            .foregroundStyle(selected ? ink : Palette.ink2)
+            .padding(.horizontal, 14)
+            .frame(minHeight: 44)
+            .background(selected ? tint : Palette.card, in: Capsule())
+            .overlay {
+                Capsule()
+                    .stroke(selected ? ink.opacity(0.1) : Palette.line, lineWidth: 1)
+            }
+        }
+        .buttonStyle(PressableStyle())
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
     @ViewBuilder
     private var monthCalendarHeader: some View {
         if !calendarOpen {
             Button { withAnimation(.spring()) { calendarOpen = true } } label: {
-                HStack(spacing: 10) {
+                HStack(spacing: 12) {
                     ZStack {
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
                             .fill(store.theme.primaryTint)
-                        AppIcon.Calendar(size: 18, color: store.theme.primary600)
+                        AppIcon.Calendar(size: 20, color: store.theme.primary600)
                     }
-                    .frame(width: 32, height: 32)
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("查看日期")
-                            .font(.system(size: 10, weight: .heavy))
-                            .tracking(0.6)
-                            .textCase(.uppercase)
+                    .frame(width: 40, height: 40)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("日期筛选")
+                            .appFont(size: 12, weight: .semibold)
                             .foregroundStyle(Palette.ink3)
                         Text(collapsedLabel)
-                            .font(.system(size: 14, weight: .heavy))
-                            .tracking(-0.14)
+                            .appFont(size: 15, weight: .semibold)
                             .foregroundStyle(Palette.ink)
                     }
                     Spacer(minLength: 0)
                     AppIcon.Chevron(size: 16, color: Palette.ink3)
+                        .rotationEffect(.degrees(90))
                 }
-                .padding(.horizontal, 16).padding(.vertical, 12)
-                .background(Palette.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .shadowCard()
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .background(Palette.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(Palette.line, lineWidth: 1)
+                }
             }
             .buttonStyle(PressableStyle())
-            .padding(.bottom, 14)
+            .padding(.bottom, 18)
         } else {
             MonthCalendarExpanded(
                 anchor: $anchor,
@@ -125,7 +227,7 @@ struct RecordsView: View {
                 events: store.events,
                 onCollapse: { withAnimation(.spring()) { calendarOpen = false } }
             )
-            .padding(.bottom, 14)
+            .padding(.bottom, 18)
         }
     }
 
@@ -156,30 +258,133 @@ struct RecordsView: View {
 
     private func groupBlock(_ g: DayGroup) -> some View {
         let summary = store.dailySummary(on: g.day)
-        return VStack(alignment: .leading, spacing: 0) {
-            Text(g.label)
-                .font(.system(size: 13, weight: .heavy))
-                .tracking(0.52)
-                .foregroundStyle(Palette.ink3)
-                .padding(.horizontal, 6)
-                .padding(.bottom, 8)
-            if !summary.isEmpty {
-                DailySummaryText(summary: summary)
-                    .padding(.horizontal, 6)
-                    .padding(.bottom, 10)
-            }
-            Card(padding: 0) {
+        return Card(padding: 0) {
+            VStack(alignment: .leading, spacing: 0) {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text(g.label)
+                            .appFont(size: 20, weight: .bold)
+                            .tracking(-0.4)
+                            .foregroundStyle(Palette.ink)
+                        Text(groupDateDetail(g.day))
+                            .appFont(size: 12, weight: .medium)
+                            .foregroundStyle(Palette.ink3)
+                        Spacer(minLength: 8)
+                        Text("\(g.items.count) 条")
+                            .appFont(size: 12, weight: .semibold)
+                            .monospacedDigit()
+                            .foregroundStyle(Palette.ink3)
+                    }
+
+                    if filter == .all, !summary.isEmpty {
+                        DailySummaryText(summary: summary)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+                .padding(.bottom, 14)
+
+                Rectangle()
+                    .fill(Palette.line)
+                    .frame(height: 1)
+
                 VStack(spacing: 0) {
-                    ForEach(Array(g.items.enumerated()), id: \.element.id) { i, e in
-                        EventRow(event: e,
-                                 last: i == g.items.count - 1,
-                                 onDelete: { store.deleteEvent($0) },
-                                 onEdit: { editing = $0 })
-                            .padding(.horizontal, 16)
+                    ForEach(Array(g.items.enumerated()), id: \.element.id) { index, event in
+                        RecordsTimelineRow(
+                            event: event,
+                            isLast: index == g.items.count - 1,
+                            onDelete: { store.deleteEvent($0) },
+                            onEdit: { editing = $0 }
+                        )
                     }
                 }
             }
         }
+    }
+
+    private func groupDateDetail(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.dateFormat = "M月d日 EEEE"
+        return formatter.string(from: date)
+    }
+}
+
+private struct RecordsTimelineRow: View {
+    let event: Event
+    let isLast: Bool
+    let onDelete: (Event) -> Void
+    let onEdit: (Event) -> Void
+
+    var body: some View {
+        let display = recordDisplayText(for: event)
+        let style = CategoryStyle.forKind(event.kind, iconSize: 22)
+
+        Button {
+            onEdit(event)
+        } label: {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(spacing: 4) {
+                    CategoryIcon(kind: event.kind, size: 40)
+                    if !isLast {
+                        RoundedRectangle(cornerRadius: 1)
+                            .fill(style.ink.opacity(0.16))
+                            .frame(width: 2, height: 22)
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 5) {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text(display.title)
+                            .appFont(size: 15, weight: .semibold)
+                            .foregroundStyle(Palette.ink)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                        Spacer(minLength: 8)
+                        Text(formatTime(event.at))
+                            .appFont(size: 13, weight: .semibold)
+                            .monospacedDigit()
+                            .foregroundStyle(style.ink)
+                    }
+
+                    if let subtitle = display.subtitle, !subtitle.isEmpty {
+                        Text(subtitle)
+                            .appFont(size: 13, weight: .medium)
+                            .foregroundStyle(Palette.ink3)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                    }
+
+                    if !isLast {
+                        Rectangle()
+                            .fill(Palette.line.opacity(0.8))
+                            .frame(height: 1)
+                            .padding(.top, 7)
+                    }
+                }
+                .padding(.top, 2)
+                .padding(.bottom, isLast ? 16 : 0)
+            }
+            .padding(.top, 14)
+            .padding(.horizontal, 16)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PressableStyle())
+        .contextMenu {
+            Button {
+                onEdit(event)
+            } label: {
+                Label("编辑", systemImage: "pencil")
+            }
+            Button(role: .destructive) {
+                let feedback = UINotificationFeedbackGenerator()
+                feedback.notificationOccurred(.success)
+                onDelete(event)
+            } label: {
+                Label("删除", systemImage: "trash")
+            }
+        }
+        .accessibilityHint("轻触编辑，长按可删除")
     }
 }
 
@@ -205,7 +410,7 @@ private struct DailySummaryText: View {
             rows.append(.init(
                 id: "formula",
                 title: "奶粉 \(summary.formulaCount)次 \(summary.formulaMilliliters)ml",
-                color: Color(hex: 0xFF8B7B)
+                color: AppTheme.coral.primary600
             ))
         }
         if summary.sleepCount > 0 {
@@ -242,7 +447,7 @@ private struct DailySummaryText: View {
                         .fill(item.color)
                         .frame(width: 6, height: 6)
                     Text(item.title)
-                        .font(.system(size: 13, weight: .semibold))
+                        .appFont(size: 13, weight: .semibold)
                         .foregroundStyle(Palette.ink2)
                         .lineLimit(1)
                         .minimumScaleFactor(0.86)
@@ -255,6 +460,7 @@ private struct DailySummaryText: View {
 // MARK: — Expanded month calendar
 
 private struct MonthCalendarExpanded: View {
+    @Environment(AppStore.self) private var store
     @Binding var anchor: Date
     @Binding var selectedDate: Date?
     let events: [Event]
@@ -272,7 +478,7 @@ private struct MonthCalendarExpanded: View {
                 HStack(spacing: 2) {
                     ForEach(weekdays, id: \.self) { w in
                         Text(w)
-                            .font(.system(size: 10, weight: .heavy))
+                            .appFont(size: 10, weight: .heavy)
                             .tracking(0.4)
                             .foregroundStyle(Palette.ink3)
                             .frame(maxWidth: .infinity)
@@ -283,11 +489,10 @@ private struct MonthCalendarExpanded: View {
                 if selectedDate != nil {
                     Button { selectedDate = nil } label: {
                         Text("显示全部日期")
-                            .font(.system(size: 12, weight: .heavy))
-                            .tracking(-0.12)
+                            .appFont(size: 13, weight: .semibold)
                             .foregroundStyle(Palette.ink2)
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
+                            .frame(minHeight: 44)
                             .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                     }
                     .buttonStyle(PressableStyle())
@@ -300,13 +505,12 @@ private struct MonthCalendarExpanded: View {
         HStack(spacing: 8) {
             navBtn(mirrored: false) { shiftMonth(-1) }
             Text("\(String(format: "%d", year)) 年 \(month) 月")
-                .font(.system(size: 15, weight: .heavy))
-                .tracking(-0.15)
+                .appFont(size: 15, weight: .semibold)
                 .frame(maxWidth: .infinity)
             navBtn(mirrored: true) { shiftMonth(1) }
             Button(action: onCollapse) {
                 AppIcon.Close(size: 16, color: Palette.ink2)
-                    .frame(width: 32, height: 32)
+                    .frame(width: 44, height: 44)
                     .background(Palette.bg2, in: Circle())
             }
             .buttonStyle(PressableStyle())
@@ -316,7 +520,7 @@ private struct MonthCalendarExpanded: View {
     private func navBtn(mirrored: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             AppIcon.Back(size: 18, color: Palette.ink2)
-                .frame(width: 32, height: 32)
+                .frame(width: 44, height: 44)
                 .background(Palette.bg2, in: Circle())
                 .scaleEffect(x: mirrored ? -1 : 1, y: 1)
         }
@@ -370,36 +574,36 @@ private struct MonthCalendarExpanded: View {
                 } label: {
                     VStack(spacing: 2) {
                         Text("\(d)")
-                            .font(.system(size: 13, weight: isSelected || isToday ? .heavy : .semibold))
+                            .appFont(size: 13, weight: isSelected || isToday ? .heavy : .semibold)
                             .monospacedDigit()
                             .foregroundStyle(
                                 isSelected ? .white
-                                : isToday ? Color(hex: 0xFF7F64)
+                                : isToday ? store.theme.primary600
                                 : Palette.ink
                             )
                         HStack(spacing: 2) {
                             ForEach(kinds.prefix(4), id: \.self) { k in
                                 Circle()
-                                    .fill(isSelected ? Color.white : kindColor(k))
+                                    .fill(isSelected ? Palette.card : kindColor(k))
                                     .frame(width: 4, height: 4)
                             }
                         }
                         .frame(height: 4)
                     }
                     .frame(maxWidth: .infinity)
-                    .frame(height: 40)
+                    .frame(height: 44)
                     .background(
                         RoundedRectangle(cornerRadius: 10, style: .continuous)
                             .fill(
-                                isSelected ? Color(hex: 0xFF9B85)
-                                : isToday ? Color(hex: 0xFFE8E0)
+                                isSelected ? store.theme.primary600
+                                : isToday ? store.theme.primaryTint
                                 : .clear
                             )
                     )
                 }
                 .buttonStyle(PressableStyle())
             } else {
-                Color.clear.frame(height: 40)
+                Color.clear.frame(height: 44)
             }
         }
     }

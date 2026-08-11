@@ -10,21 +10,156 @@ struct StatsView: View {
 
     @State private var range: Range = .d7
 
+    private var periodStart: Date {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        return calendar.date(byAdding: .day, value: -(range.rawValue - 1), to: today) ?? today
+    }
+
+    private var periodEnd: Date {
+        Calendar.current.date(byAdding: .day, value: 1,
+                              to: Calendar.current.startOfDay(for: Date())) ?? Date()
+    }
+
+    private var periodEvents: [Event] {
+        store.events.filter { $0.at >= periodStart && $0.at < periodEnd }
+    }
+
+    private var averageSleep: TimeInterval {
+        let seconds = store.events.reduce(0.0) { result, event in
+            guard event.kind == .sleep, let endAt = event.endAt else { return result }
+            let clippedStart = max(event.at, periodStart)
+            let clippedEnd = min(endAt, periodEnd)
+            return result + max(0, clippedEnd.timeIntervalSince(clippedStart))
+        }
+        return seconds / Double(range.rawValue)
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             ScreenBody {
+                pageHeader
+                    .padding(.bottom, 18)
+
                 rangeSeg
                     .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.bottom, 14)
-                PatternChart(events: store.events, range: range.rawValue)
+                    .padding(.bottom, 16)
+
+                overviewCard
+                    .padding(.bottom, 16)
+
+                PatternChart(events: store.events, range: range.rawValue, theme: store.theme)
             }
         }
         .background(Palette.bg)
     }
 
+    private var pageHeader: some View {
+        HStack(alignment: .bottom, spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text("统计")
+                    .appFont(size: 28, weight: .bold)
+                    .tracking(-0.7)
+                    .foregroundStyle(Palette.ink)
+                Text("查看宝宝最近的照护节奏")
+                    .appFont(size: 13, weight: .medium)
+                    .foregroundStyle(Palette.ink3)
+            }
+            Spacer(minLength: 8)
+            Text("\(periodEvents.count) 条记录")
+                .appFont(size: 13, weight: .semibold)
+                .monospacedDigit()
+                .foregroundStyle(store.theme.primary600)
+                .padding(.horizontal, 12)
+                .frame(height: 32)
+                .background(store.theme.primaryTint, in: Capsule())
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
     private var rangeSeg: some View {
         SegPill(selection: $range,
                 options: Range.allCases.map { ($0, $0.label) })
+    }
+
+    private var overviewCard: some View {
+        Card(padding: 16) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text("周期概览")
+                        .appFont(size: 16, weight: .bold)
+                        .tracking(-0.2)
+                        .foregroundStyle(Palette.ink)
+                    Spacer(minLength: 8)
+                    Text(periodDateLabel)
+                        .appFont(size: 12, weight: .medium)
+                        .foregroundStyle(Palette.ink3)
+                }
+
+                HStack(spacing: 10) {
+                    summaryCell(kind: .sleep,
+                                value: formatDurShort(averageSleep),
+                                subtitle: "日均时长")
+                    summaryCell(kind: .feed,
+                                value: averageCount(for: .feed),
+                                subtitle: "日均次数")
+                }
+                HStack(spacing: 10) {
+                    summaryCell(kind: .diaper,
+                                value: averageCount(for: .diaper),
+                                subtitle: "日均次数")
+                    summaryCell(kind: .solid,
+                                value: averageCount(for: .solid),
+                                subtitle: "日均次数")
+                }
+            }
+        }
+    }
+
+    private func summaryCell(kind: EventKind, value: String, subtitle: String) -> some View {
+        let style = CategoryStyle.forKind(kind, iconSize: 17)
+        return HStack(spacing: 10) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 11, style: .continuous)
+                    .fill(Palette.card.opacity(0.7))
+                style.icon
+            }
+            .frame(width: 36, height: 36)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(style.label)
+                    .appFont(size: 11, weight: .medium)
+                    .foregroundStyle(style.ink)
+                Text(value)
+                    .appFont(size: 17, weight: .bold)
+                    .tracking(-0.25)
+                    .monospacedDigit()
+                    .foregroundStyle(Palette.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+                Text(subtitle)
+                    .appFont(size: 10, weight: .medium)
+                    .foregroundStyle(Palette.ink3)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, minHeight: 78, alignment: .leading)
+        .background(style.tint, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+    }
+
+    private func averageCount(for kind: EventKind) -> String {
+        let count = periodEvents.filter { $0.kind == kind }.count
+        let average = Double(count) / Double(range.rawValue)
+        return String(format: "%.1f 次", average)
+    }
+
+    private var periodDateLabel: String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.dateFormat = "M月d日"
+        let lastDay = Calendar.current.date(byAdding: .day, value: -1, to: periodEnd) ?? Date()
+        return "\(formatter.string(from: periodStart)) – \(formatter.string(from: lastDay))"
     }
 }
 
@@ -32,6 +167,7 @@ struct StatsView: View {
 private struct PatternChart: View {
     let events: [Event]
     let range: Int
+    let theme: AppTheme
 
     enum Filter: Hashable { case all, feed, sleep, diaper, solid
         var label: String {
@@ -43,26 +179,32 @@ private struct PatternChart: View {
             case .solid: return "辅食"
             }
         }
-        var color: Color {
+        var kind: EventKind? {
             switch self {
-            case .all: return Palette.ink
-            case .feed: return Palette.pinkInk
-            case .sleep: return Palette.lavenderInk
-            case .diaper: return Palette.blueInk
-            case .solid: return Palette.yellowInk
+            case .all: return nil
+            case .feed: return .feed
+            case .sleep: return .sleep
+            case .diaper: return .diaper
+            case .solid: return .solid
             }
+        }
+        var color: Color {
+            kind.map { CategoryStyle.forKind($0).ink } ?? Palette.ink
+        }
+        var tint: Color {
+            kind.map { CategoryStyle.forKind($0).tint } ?? Palette.card
         }
     }
 
     @State private var filter: Filter = .all
 
     private let HOURS = 24
-    private let CELL_H: CGFloat = 18
+    private let CELL_H: CGFloat = 16
     private let AXIS_W: CGFloat = 28
     private let AXIS_LABEL_H: CGFloat = 16
 
     private var chartH: CGFloat { CGFloat(HOURS) * CELL_H }
-    private var tickHours: [Int] { Array(stride(from: 0, through: HOURS, by: 2)) }
+    private var tickHours: [Int] { Array(stride(from: 0, through: HOURS, by: 3)) }
 
     private var days: [Date] {
         let cal = Calendar.current
@@ -73,10 +215,10 @@ private struct PatternChart: View {
     }
 
     var body: some View {
-        Card(padding: 18) {
+        Card(padding: 16) {
             VStack(alignment: .leading, spacing: 0) {
-                header.padding(.bottom, 6)
-                filterChips.padding(.bottom, 12)
+                header.padding(.bottom, 10)
+                filterChips.padding(.bottom, 14)
                 chartBody
                 legend.padding(.top, 14)
             }
@@ -84,17 +226,15 @@ private struct PatternChart: View {
     }
 
     private var header: some View {
-        HStack(spacing: 10) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(Color(hex: 0xFFE8E0))
-                AppIcon.Clock(size: 20, color: Color(hex: 0xFF7F64))
-            }
-            .frame(width: 32, height: 32)
-            VStack(alignment: .leading, spacing: 1) {
-                Text("时间规律")
-                    .font(.system(size: 15, weight: .heavy))
-                    .tracking(-0.15)
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("24 小时时间分布")
+                    .appFont(size: 16, weight: .bold)
+                    .tracking(-0.2)
+                    .foregroundStyle(Palette.ink)
+                Text("纵向查看每天的记录发生时段")
+                    .appFont(size: 12, weight: .medium)
+                    .foregroundStyle(Palette.ink3)
             }
             Spacer(minLength: 0)
         }
@@ -106,13 +246,18 @@ private struct PatternChart: View {
                 ForEach([Filter.all, .feed, .sleep, .diaper, .solid], id: \.self) { f in
                     Button { withAnimation(.easeOut(duration: 0.16)) { filter = f } } label: {
                         Text(f.label)
-                            .font(.system(size: 12, weight: .heavy))
-                            .tracking(-0.12)
-                            .foregroundStyle(filter == f ? .white : Palette.ink2)
-                            .padding(.horizontal, 12).padding(.vertical, 6)
-                            .background(filter == f ? f.color : Palette.bg2, in: Capsule())
+                            .appFont(size: 13, weight: .semibold)
+                            .foregroundStyle(filter == f ? f.color : Palette.ink2)
+                            .padding(.horizontal, 14)
+                            .frame(minHeight: 44)
+                            .background(filter == f ? f.tint : Palette.bg2, in: Capsule())
+                            .overlay {
+                                Capsule()
+                                    .stroke(filter == f ? f.color.opacity(0.12) : Palette.line, lineWidth: 1)
+                            }
                     }
                     .buttonStyle(PressableStyle())
+                    .accessibilityAddTraits(filter == f ? .isSelected : [])
                 }
             }
             .padding(.horizontal, 2)
@@ -131,13 +276,15 @@ private struct PatternChart: View {
                 daysRow(minWidth: nil)
             }
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("过去 \(range) 天的\(filter.label)时间分布，纵轴从零点到二十四点")
     }
 
     private var yAxis: some View {
         ZStack(alignment: .topTrailing) {
             ForEach(tickHours, id: \.self) { hour in
                 Text(String(format: "%02d", hour))
-                    .font(.system(size: 10, weight: .bold))
+                    .appFont(size: 10, weight: .bold)
                     .monospacedDigit()
                     .foregroundStyle(Palette.ink3)
                     .frame(width: AXIS_W, height: AXIS_LABEL_H, alignment: .trailing)
@@ -172,13 +319,13 @@ private struct PatternChart: View {
         return VStack(spacing: 6) {
             ZStack(alignment: .topLeading) {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(isToday ? Color(hex: 0xFFE8E0) : Palette.bg2)
+                    .fill(isToday ? theme.primaryTint : Palette.bg2)
                     .opacity(isToday ? 1 : 0.7)
                     .frame(height: chartH)
 
                 ForEach(tickHours, id: \.self) { hour in
                     Rectangle()
-                        .fill(Color.white.opacity(0.7))
+                        .fill(Palette.card.opacity(0.7))
                         .frame(height: 1)
                         .offset(y: yOffset(forHour: Double(hour)))
                 }
@@ -189,9 +336,9 @@ private struct PatternChart: View {
                 ForEach(points) { e in eventDot(e) }
             }
             Text(xLabel(for: d))
-                .font(.system(size: 10, weight: .heavy))
+                .appFont(size: 10, weight: .bold)
                 .monospacedDigit()
-                .foregroundStyle(isToday ? Color(hex: 0xFF7F64) : Palette.ink3)
+                .foregroundStyle(isToday ? theme.primary600 : Palette.ink3)
         }
     }
 
@@ -231,20 +378,14 @@ private struct PatternChart: View {
         return GeometryReader { geo in
             Circle()
                 .fill(kindColor(e.kind))
-                .overlay(Circle().stroke(Color.white, lineWidth: 1.5))
+                .overlay(Circle().stroke(Palette.card, lineWidth: 1.5))
                 .frame(width: 10, height: 10)
-                .shadow(color: .black.opacity(0.12), radius: 1, x: 0, y: 1)
                 .offset(x: geo.size.width / 2 - 5, y: top - 5)
         }
     }
 
     private func kindColor(_ k: EventKind) -> Color {
-        switch k {
-        case .feed:   return Palette.pinkInk
-        case .sleep:  return Palette.lavenderInk
-        case .diaper: return Palette.blueInk
-        case .solid:  return Palette.yellowInk
-        }
+        CategoryStyle.forKind(k).ink
     }
 
     private func matchesFilter(_ e: Event) -> Bool {
@@ -278,11 +419,15 @@ private struct PatternChart: View {
     }
 
     private var legend: some View {
-        HStack(spacing: 14) {
-            legendItem(circle: Palette.pinkInk,     label: "喂奶")
-            legendItem(ring: Palette.lavenderInk,   label: "睡眠")
-            legendItem(circle: Palette.blueInk,     label: "尿布")
-            legendItem(circle: Palette.yellowInk,   label: "辅食")
+        let feed = CategoryStyle.forKind(.feed)
+        let sleep = CategoryStyle.forKind(.sleep)
+        let diaper = CategoryStyle.forKind(.diaper)
+        let solid = CategoryStyle.forKind(.solid)
+        return HStack(spacing: 14) {
+            legendItem(circle: feed.ink, label: feed.label)
+            legendItem(ring: sleep.ink, label: sleep.label)
+            legendItem(circle: diaper.ink, label: "尿布")
+            legendItem(circle: solid.ink, label: solid.label)
             Spacer()
         }
         .padding(.top, 10)
@@ -293,7 +438,7 @@ private struct PatternChart: View {
         HStack(spacing: 6) {
             Circle().fill(circle).frame(width: 10, height: 10)
             Text(label)
-                .font(.system(size: 12, weight: .bold))
+                .appFont(size: 12, weight: .bold)
                 .foregroundStyle(Palette.ink2)
         }
     }
@@ -301,7 +446,7 @@ private struct PatternChart: View {
         HStack(spacing: 6) {
             Circle().stroke(ring, lineWidth: 3).frame(width: 10, height: 10).opacity(0.45)
             Text(label)
-                .font(.system(size: 12, weight: .bold))
+                .appFont(size: 12, weight: .bold)
                 .foregroundStyle(Palette.ink2)
         }
     }

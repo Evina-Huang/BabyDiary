@@ -7,7 +7,7 @@ import WidgetKit
 // MARK: — Snapshot
 
 struct DataSnapshot: Codable {
-    var version: Int = 5
+    var version: Int = 6
     var exportedAt: Date = Date()
     var baby: Baby
     var events: [Event]
@@ -23,9 +23,10 @@ struct DataSnapshot: Codable {
     var feedReminder: FeedReminderSettings? = nil
     var sleepReminder: SleepReminderSettings? = nil
     var formulaMlHistory: [Int]? = nil
+    var appearance: AppAppearance? = nil
 
     init(
-        version: Int = 5,
+        version: Int = 6,
         exportedAt: Date = Date(),
         baby: Baby,
         events: [Event],
@@ -40,7 +41,8 @@ struct DataSnapshot: Codable {
         feedDraft: FeedDraft? = nil,
         feedReminder: FeedReminderSettings? = nil,
         sleepReminder: SleepReminderSettings? = nil,
-        formulaMlHistory: [Int]? = nil
+        formulaMlHistory: [Int]? = nil,
+        appearance: AppAppearance? = nil
     ) {
         self.version = version
         self.exportedAt = exportedAt
@@ -58,10 +60,11 @@ struct DataSnapshot: Codable {
         self.feedReminder = feedReminder
         self.sleepReminder = sleepReminder
         self.formulaMlHistory = formulaMlHistory
+        self.appearance = appearance
     }
 
     init(
-        version: Int = 5,
+        version: Int = 6,
         exportedAt: Date = Date(),
         baby: Baby,
         events: [Event],
@@ -87,7 +90,8 @@ struct DataSnapshot: Codable {
             feedDraft: nil,
             feedReminder: nil,
             sleepReminder: nil,
-            formulaMlHistory: nil
+            formulaMlHistory: nil,
+            appearance: nil
         )
     }
 }
@@ -138,7 +142,8 @@ extension AppStore {
                      milestones: milestones, activeTimer: activeTimer,
                      feedDraft: feedDraft, feedReminder: feedReminder,
                      sleepReminder: sleepReminder,
-                     formulaMlHistory: formulaMlHistory)
+                     formulaMlHistory: formulaMlHistory,
+                     appearance: appearance)
     }
 
     func apply(_ snap: DataSnapshot) {
@@ -170,6 +175,9 @@ extension AppStore {
         feedReminder = snap.feedReminder ?? .init()
         sleepReminder = snap.sleepReminder ?? .init()
         formulaMlHistory = snap.formulaMlHistory ?? formulaMlHistory
+        if let savedAppearance = snap.appearance {
+            appearance = savedAppearance
+        }
     }
 
     func clearPresetDataForPersonalUseIfNeeded() {

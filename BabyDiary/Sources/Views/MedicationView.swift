@@ -42,32 +42,34 @@ struct MedicationScreen: View {
     }
 
     private var allergySummary: some View {
-        let danger = Color(hex: 0xD44E3A)
         return Card(padding: 18) {
             HStack(alignment: .top, spacing: 14) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(allergic.isEmpty ? Palette.mintTint : Color(hex: 0xFFDDD8))
-                    AppIcon.Pill(size: 28, color: allergic.isEmpty ? Palette.mint600 : danger)
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(allergic.isEmpty ? Palette.mintTint : Palette.pink)
+                    AppIcon.Pill(
+                        size: 26,
+                        color: allergic.isEmpty ? Palette.mint600 : Palette.pinkInk
+                    )
                 }
-                .frame(width: 54, height: 54)
+                .frame(width: 50, height: 50)
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text(allergic.isEmpty ? "暂无药物过敏记录" : "疑似药物过敏 \(allergic.count) 项")
-                        .font(.system(size: 18, weight: .black))
+                        .appFont(size: 17, weight: .black)
                         .tracking(-0.18)
                         .foregroundStyle(Palette.ink)
 
                     if allergic.isEmpty {
                         Text("新增用药后可标记观察中、无异常或疑似过敏。")
-                            .font(.system(size: 13, weight: .semibold))
+                            .appFont(size: 13, weight: .semibold)
                             .foregroundStyle(Palette.ink3)
                     } else {
                         VStack(alignment: .leading, spacing: 4) {
                             ForEach(allergic.prefix(3)) { record in
                                 Text(allergyLine(record))
-                                    .font(.system(size: 13, weight: .semibold))
-                                    .foregroundStyle(danger)
+                                    .appFont(size: 13, weight: .semibold)
+                                    .foregroundStyle(Palette.pinkInk)
                                     .lineLimit(2)
                             }
                         }
@@ -83,12 +85,11 @@ struct MedicationScreen: View {
             HStack(spacing: 8) {
                 AppIcon.Plus(size: 18, color: .white)
                 Text("新增用药记录")
-                    .font(.system(size: 15, weight: .heavy))
+                    .appFont(size: 15, weight: .heavy)
                     .tracking(-0.15)
             }
             .foregroundStyle(.white)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 16)
+            .frame(maxWidth: .infinity, minHeight: 56)
             .background(store.theme.primary,
                         in: RoundedRectangle(cornerRadius: 20, style: .continuous))
             .shadowPill(tint: store.theme.primary600)
@@ -100,11 +101,11 @@ struct MedicationScreen: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
                 Text("最近用药")
-                    .font(.system(size: 15, weight: .heavy))
+                    .appFont(size: 15, weight: .heavy)
                     .tracking(-0.15)
                 Spacer()
                 Text("\(records.count) 条")
-                    .font(.system(size: 12, weight: .bold))
+                    .appFont(size: 12, weight: .bold)
                     .foregroundStyle(Palette.ink3)
             }
 
@@ -148,20 +149,13 @@ private struct MedicationRow: View {
         Button(action: onTap) {
             VStack(spacing: 0) {
                 HStack(spacing: 12) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(reactionStyle.tint)
-                        AppIcon.Pill(size: 22, color: reactionStyle.ink)
-                    }
-                    .frame(width: 40, height: 40)
-
                     VStack(alignment: .leading, spacing: 3) {
                         Text(record.name)
-                            .font(.system(size: 15, weight: .heavy))
+                            .appFont(size: 15, weight: .heavy)
                             .tracking(-0.15)
                             .foregroundStyle(Palette.ink)
                         Text(detailLine)
-                            .font(.system(size: 12, weight: .semibold))
+                            .appFont(size: 12, weight: .semibold)
                             .foregroundStyle(Palette.ink3)
                             .lineLimit(2)
                     }
@@ -169,7 +163,7 @@ private struct MedicationRow: View {
                     Spacer(minLength: 0)
 
                     Text(record.reaction.label)
-                        .font(.system(size: 11, weight: .heavy))
+                        .appFont(size: 11, weight: .heavy)
                         .foregroundStyle(reactionStyle.ink)
                         .padding(.horizontal, 9)
                         .padding(.vertical, 5)
@@ -177,7 +171,7 @@ private struct MedicationRow: View {
 
                     AppIcon.Chevron(size: 14, color: Palette.ink3)
                 }
-                .padding(.vertical, 13)
+                .frame(minHeight: 68)
 
                 if !last {
                     Rectangle().fill(Palette.line).frame(height: 1)
@@ -213,6 +207,7 @@ private struct MedicationEditSheet: View {
     @State private var reaction: MedicationReaction
     @State private var reactionNote: String
     @State private var note: String
+    @State private var showNote: Bool
     @State private var showDeleteConfirm = false
 
     init(record: MedicationRecord?, onClose: @escaping () -> Void) {
@@ -225,6 +220,7 @@ private struct MedicationEditSheet: View {
         self._reaction = State(initialValue: record?.reaction ?? .observing)
         self._reactionNote = State(initialValue: record?.reactionNote ?? "")
         self._note = State(initialValue: record?.note ?? "")
+        self._showNote = State(initialValue: !(record?.note ?? "").isEmpty)
     }
 
     var body: some View {
@@ -232,22 +228,19 @@ private struct MedicationEditSheet: View {
             ScreenHeader(title: record == nil ? "新增用药" : "编辑用药", onBack: onClose)
             ScreenBody {
                 VStack(spacing: 18) {
-                    Card {
-                        VStack(spacing: 16) {
-                            FormField(label: "药名") {
-                                TextField("例如：对乙酰氨基酚", text: $name)
+                    Card(padding: 16) {
+                        VStack(alignment: .leading, spacing: 16) {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("用药信息")
+                                    .appFont(size: 17, weight: .bold)
+                                    .foregroundStyle(Palette.ink)
+                                Text("填写药名、剂量和服用时间")
+                                    .appFont(size: 12, weight: .medium)
+                                    .foregroundStyle(Palette.ink3)
                             }
 
-                            VStack(alignment: .leading, spacing: 8) {
-                                FieldLabel(text: "用药时间")
-                                DatePicker("", selection: $takenAt, displayedComponents: [.date, .hourAndMinute])
-                                    .labelsHidden()
-                                    .environment(\.locale, Locale(identifier: "zh_CN"))
-                                    .tint(store.theme.primary600)
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 10)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                            FormField(label: "药名") {
+                                TextField("例如：对乙酰氨基酚", text: $name)
                             }
 
                             FormField(label: "剂量") {
@@ -258,43 +251,97 @@ private struct MedicationEditSheet: View {
                                 TextField("例如：发热、咳嗽、医生开具", text: $reason)
                             }
 
+                            InlineWheelTimePicker(time: $takenAt, theme: store.theme, label: "用药时间")
+                        }
+                    }
+
+                    Card(padding: 16) {
+                        VStack(alignment: .leading, spacing: 16) {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("反应观察")
+                                    .appFont(size: 17, weight: .bold)
+                                    .foregroundStyle(Palette.ink)
+                                Text("服药后可继续更新状态")
+                                    .appFont(size: 12, weight: .medium)
+                                    .foregroundStyle(Palette.ink3)
+                            }
+
                             VStack(alignment: .leading, spacing: 8) {
-                                FieldLabel(text: "过敏反应")
+                                FieldLabel(text: "当前状态")
                                 SegPill(selection: $reaction, options: [
                                     (.observing, "观察中"),
                                     (.none, "无异常"),
                                     (.allergic, "疑似过敏"),
                                 ])
+                                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                             }
 
-                            FormField(label: "反应记录（可选）") {
-                                TextField("例如：皮疹、腹泻、呕吐、嗜睡", text: $reactionNote)
-                            }
-
-                            FormField(label: "备注（可选）") {
-                                TextField("例如：饭后服用、已停用", text: $note)
+                            if reaction != .none {
+                                FormField(label: reaction == .allergic ? "异常表现" : "观察记录（可选）") {
+                                    TextField("例如：皮疹、腹泻、呕吐、嗜睡", text: $reactionNote)
+                                }
+                                .transition(.opacity.combined(with: .move(edge: .top)))
                             }
                         }
                     }
 
-                    CTAButton(title: "保存", theme: store.theme) {
+                    Card(padding: 0) {
+                        VStack(spacing: 0) {
+                            Button {
+                                withAnimation(.easeOut(duration: 0.2)) {
+                                    showNote.toggle()
+                                }
+                            } label: {
+                                HStack(spacing: 10) {
+                                    AppIcon.Plus(size: 18, color: store.theme.primary600)
+                                        .rotationEffect(.degrees(showNote ? 45 : 0))
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("补充备注")
+                                            .appFont(size: 14, weight: .bold)
+                                            .foregroundStyle(Palette.ink)
+                                        Text("服用要求、是否停药等，可选")
+                                            .appFont(size: 11, weight: .medium)
+                                            .foregroundStyle(Palette.ink3)
+                                    }
+                                    Spacer(minLength: 0)
+                                    Text(showNote ? "收起" : "填写")
+                                        .appFont(size: 12, weight: .bold)
+                                        .foregroundStyle(store.theme.primary600)
+                                }
+                                .padding(.horizontal, 16)
+                                .frame(maxWidth: .infinity, minHeight: 64)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(PressableStyle())
+                            .accessibilityValue(showNote ? "已展开" : "已收起")
+
+                            if showNote {
+                                TextField("例如：饭后服用、已停用", text: $note, axis: .vertical)
+                                    .lineLimit(2...4)
+                                    .appFont(size: 16, weight: .semibold)
+                                    .foregroundStyle(Palette.ink)
+                                    .padding(14)
+                                    .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+                                    .padding(.horizontal, 16)
+                                    .padding(.bottom, 16)
+                                    .transition(.opacity)
+                            }
+                        }
+                    }
+
+                    CTAButton(title: record == nil ? "保存用药记录" : "保存修改", theme: store.theme) {
                         save()
                     }
                     .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
                     if record != nil {
                         Button { showDeleteConfirm = true } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: "trash")
-                                    .font(.system(size: 13, weight: .bold))
-                                Text("删除此用药记录")
-                                    .font(.system(size: 14, weight: .heavy))
-                                    .tracking(-0.14)
-                            }
-                            .foregroundStyle(Color(hex: 0xD44E3A))
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                            .background(Color(hex: 0xFFDDD8), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                            Text("删除此用药记录")
+                                .appFont(size: 14, weight: .heavy)
+                                .tracking(-0.14)
+                                .foregroundStyle(Palette.pinkInk)
+                                .frame(maxWidth: .infinity, minHeight: 50)
+                                .background(Palette.pink, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                         }
                         .buttonStyle(PressableStyle())
                     }
@@ -350,7 +397,7 @@ private func style(for reaction: MedicationReaction) -> (tint: Color, ink: Color
     case .none:
         return (Palette.mintTint, Palette.mint600)
     case .allergic:
-        return (Color(hex: 0xFFDDD8), Color(hex: 0xD44E3A))
+        return (Palette.pink, Palette.pinkInk)
     }
 }
 

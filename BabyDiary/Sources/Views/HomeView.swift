@@ -10,21 +10,22 @@ struct HomeView: View {
 
             ScreenBody {
                 BabyBadge()
-                    .padding(.top, 10)
+                    .padding(.top, 8)
+
+                HomeSectionHeader(title: "快速记录", detail: "轻触即可开始")
+                    .padding(.top, 20)
 
                 // 2×2 quick-add grid
-                let cols = [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)]
-                LazyVGrid(columns: cols, spacing: 16) {
+                let cols = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
+                LazyVGrid(columns: cols, spacing: 12) {
                     QuickTile(kind: .sleep,  onTap: { onOpen(.sleep) })
                     QuickTile(kind: .feed,   onTap: { onOpen(.feed) })
                     QuickTile(kind: .diaper, onTap: { onOpen(.diaper) })
                     QuickTile(kind: .solid,  onTap: { onOpen(.solid) })
                 }
-                .padding(.top, 12)
+                .padding(.top, 10)
 
-                SinceLastRow().padding(.top, 10)
-
-                DailySummaryStrip().padding(.top, 4)
+                DailySummaryStrip().padding(.top, 16)
 
                 VaccineReminderBanner(onOpen: { onOpen(.vaccine) })
                     .padding(.top, 14)
@@ -36,35 +37,54 @@ struct HomeView: View {
     }
 }
 
+private struct HomeSectionHeader: View {
+    let title: String
+    let detail: String
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(title)
+                .appFont(size: 17, weight: .bold)
+                .foregroundStyle(Palette.ink)
+            Spacer(minLength: 8)
+            Text(detail)
+                .appFont(size: 12, weight: .medium)
+                .foregroundStyle(Palette.ink3)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+        }
+    }
+}
+
 private struct HomeHeader: View {
     @Environment(AppStore.self) private var store
     var onOpen: (SubScreen) -> Void
 
     var body: some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 2) {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(dateLine())
-                    .font(.system(size: 12, weight: .bold))
-                    .tracking(0.72)
-                    .textCase(.uppercase)
-                    .foregroundStyle(Palette.ink3)
-                let g = greeting(for: store.baby)
-                Text(g.text)
-                    .font(.system(size: 18, weight: .heavy))
-                    .tracking(-0.36)
-                    .foregroundStyle(Palette.ink)
-                if let sub = g.sub {
-                    Text(sub)
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(g.isSpecial ? store.theme.primary600 : Palette.ink3)
-                        .padding(.top, 2)
+                    .appFont(size: 15, weight: .semibold)
+                    .foregroundStyle(Palette.ink2)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.86)
+                    .allowsTightening(true)
+
+                if let greeting = specialGreeting(for: store.baby) {
+                    Text(greeting.text)
+                        .appFont(size: 18, weight: .bold)
+                        .foregroundStyle(Palette.ink)
+                    Text(greeting.detail)
+                        .appFont(size: 12, weight: .semibold)
+                        .foregroundStyle(store.theme.primary600)
                 }
             }
-            Spacer()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .layoutPriority(1)
             HStack(spacing: 10) {
                 Button { onOpen(.settings) } label: {
                     Image(systemName: "gearshape")
-                        .font(.system(size: 18, weight: .semibold))
+                        .appFont(size: 18, weight: .semibold)
                         .foregroundStyle(store.theme.primary600)
                         .frame(width: 40, height: 40)
                         .background(store.theme.primaryTint, in: Circle())
@@ -74,7 +94,7 @@ private struct HomeHeader: View {
 
                 Button { onOpen(.backup) } label: {
                     Image(systemName: "square.and.arrow.up.on.square")
-                        .font(.system(size: 18, weight: .semibold))
+                        .appFont(size: 18, weight: .semibold)
                         .foregroundStyle(store.theme.primary600)
                         .frame(width: 40, height: 40)
                         .background(store.theme.primaryTint, in: Circle())
@@ -82,6 +102,7 @@ private struct HomeHeader: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel("数据备份")
             }
+            .fixedSize()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 20)
@@ -108,6 +129,47 @@ private struct HomeHeader: View {
     }
 }
 
+private struct SpecialGreeting {
+    let text: String
+    let detail: String
+}
+
+private func specialGreeting(for baby: Baby) -> SpecialGreeting? {
+    let calendar = Calendar.current
+    let today = calendar.startOfDay(for: Date())
+    let birthDate = calendar.startOfDay(for: baby.birthDate)
+    let days = max(0, calendar.dateComponents([.day], from: birthDate, to: today).day ?? 0)
+
+    if days > 0, days % 100 == 0 {
+        return SpecialGreeting(
+            text: "\(baby.name)来到这个世界的第 \(days) 天",
+            detail: "值得纪念的一天"
+        )
+    }
+
+    let components = calendar.dateComponents([.year, .month, .day], from: birthDate, to: today)
+    if components.day == 0 {
+        let months = (components.year ?? 0) * 12 + (components.month ?? 0)
+        if months == 12 {
+            return SpecialGreeting(text: "\(baby.name)一岁了", detail: "生日快乐")
+        }
+        if months > 0 {
+            return SpecialGreeting(text: "\(baby.name)满 \(months) 个月了", detail: "成长纪念日")
+        }
+    }
+
+    let birthDay = calendar.dateComponents([.month, .day], from: birthDate)
+    let currentDay = calendar.dateComponents([.month, .day], from: today)
+    if let years = components.year,
+       years >= 1,
+       birthDay.month == currentDay.month,
+       birthDay.day == currentDay.day {
+        return SpecialGreeting(text: "\(baby.name) \(years) 岁了", detail: "生日快乐")
+    }
+
+    return nil
+}
+
 private struct HeaderBottomFade: View {
     var body: some View {
         LinearGradient(
@@ -124,201 +186,152 @@ private struct HeaderBottomFade: View {
     }
 }
 
-// MARK: — Greeting: daily random phrase + milestone celebration
-
-private struct Greeting {
-    let text: String
-    let sub: String?
-    let isSpecial: Bool
-}
-
-private let dailyPhrases: [String] = [
-    "今天也是被爱着的一天 🤍",
-    "做父母是一场温柔的修行 🌱",
-    "再累的夜,都会等到天亮 ☀️",
-    "小小的抱抱,大大的力量 🫶",
-    "你已经做得很好啦 ✨",
-    "慢慢来,没关系 🍃",
-    "每一次喂奶都是心跳的对话 🫧",
-    "别忘了也爱自己一下 🌷",
-    "今天的笑声要记得存好 🎀",
-    "成长是一场看不见的烟花 🎆",
-    "软软的小手,抓住了整个世界 🌏",
-    "今天的云也像棉花糖 ☁️",
-    "安心呼吸,一切都在变好 🌼",
-    "陪伴,是最长情的告白 💌",
-    "你是他最喜欢的人 💕",
-]
-
-private func greeting(for baby: Baby) -> Greeting {
-    let cal = Calendar.current
-    let today = cal.startOfDay(for: Date())
-    let birth = cal.startOfDay(for: baby.birthDate)
-    let days = max(0, cal.dateComponents([.day], from: birth, to: today).day ?? 0)
-
-    // Special day: 100-day, 200-day, 365-day, exact monthly anniversary
-    if days > 0, days % 100 == 0 {
-        return Greeting(text: "\(baby.name)来到这个世界的第 \(days) 天 🎉",
-                        sub: "每一个 100 天,都是了不起的里程碑",
-                        isSpecial: true)
-    }
-    if days == 365 {
-        return Greeting(text: "\(baby.name)一岁啦 🎂", sub: "生日快乐,第一个小生日", isSpecial: true)
-    }
-    let comps = cal.dateComponents([.year, .month, .day], from: birth, to: today)
-    if comps.day == 0 {
-        let months = (comps.year ?? 0) * 12 + (comps.month ?? 0)
-        if months > 0 {
-            if months == 12 {
-                return Greeting(text: "满一岁了 🎂", sub: "\(baby.name)整整一岁啦", isSpecial: true)
-            }
-            return Greeting(text: "\(baby.name)满 \(months) 个月啦 🎊",
-                            sub: "一个月又一个月的奇迹",
-                            isSpecial: true)
-        }
-    }
-    // Birthday anniversary (after first year)
-    let b = cal.dateComponents([.month, .day], from: birth)
-    let t = cal.dateComponents([.month, .day], from: today)
-    if let y = comps.year, y >= 1, b.month == t.month, b.day == t.day {
-        return Greeting(text: "\(baby.name) \(y) 岁啦 🎂", sub: "生日快乐呀", isSpecial: true)
-    }
-
-    // Regular day: daily random, seeded stably by day
-    let seed = cal.ordinality(of: .day, in: .era, for: today) ?? days
-    let phrase = dailyPhrases[abs(seed) % dailyPhrases.count]
-    return Greeting(text: phrase, sub: nil, isSpecial: false)
-}
-
 // MARK: — Baby badge header card
 
 private struct BabyBadge: View {
     @Environment(AppStore.self) private var store
     @State private var editing = false
     var body: some View {
-        Card(padding: 16) {
-            HStack(spacing: 14) {
-                Group {
-                    if let data = store.baby.avatarData, let ui = UIImage(data: data) {
-                        Image(uiImage: ui).resizable().scaledToFill()
-                    } else {
-                        BabyAvatar()
-                    }
+        HStack(spacing: 12) {
+            Group {
+                if let data = store.baby.avatarData, let ui = UIImage(data: data) {
+                    Image(uiImage: ui).resizable().scaledToFill()
+                } else {
+                    BabyAvatar()
                 }
-                .frame(width: 56, height: 56)
-                .clipShape(Circle())
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(store.baby.ageLabel)
-                        .font(.system(size: 13, weight: .bold))
-                        .tracking(0.52)
-                        .foregroundStyle(store.theme.primary600)
-                    Text(store.baby.name)
-                        .font(.system(size: 22, weight: .black))
-                        .tracking(-0.44)
-                        .foregroundStyle(Palette.ink)
-                    Text("出生 \(store.baby.birthLabel)")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Palette.ink3)
-                }
-                Spacer(minLength: 0)
-                Button { editing = true } label: {
-                    Image(systemName: "pencil")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(Palette.ink2)
-                        .frame(width: 36, height: 36)
-                        .background(Color.white.opacity(0.7), in: Circle())
-                }
-                .buttonStyle(PressableStyle())
             }
+            .frame(width: 48, height: 48)
+            .clipShape(Circle())
+
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(store.baby.name)
+                        .appFont(size: 19, weight: .bold)
+                        .foregroundStyle(Palette.ink)
+                    Text(store.baby.ageLabel)
+                        .appFont(size: 12, weight: .semibold)
+                        .foregroundStyle(store.theme.primary600)
+                }
+                Text("出生 \(store.baby.birthLabel)")
+                    .appFont(size: 12, weight: .medium)
+                    .foregroundStyle(Palette.ink3)
+            }
+            .layoutPriority(1)
+
+            Spacer(minLength: 0)
+
+            Button { editing = true } label: {
+                Image(systemName: "pencil")
+                    .appFont(size: 14, weight: .semibold)
+                    .foregroundStyle(Palette.ink2)
+                    .frame(width: 44, height: 44)
+                    .background(Palette.bg2, in: Circle())
+            }
+            .buttonStyle(PressableStyle())
+            .accessibilityLabel("编辑宝宝资料")
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(Palette.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(Palette.line, lineWidth: 1)
         }
         .sheet(isPresented: $editing) {
             EditBabyScreen(onClose: { editing = false })
                 .environment(store)
         }
-        .background(
-            LinearGradient(
-                colors: [Color(hex: 0xFFF5EE), Color(hex: 0xFFE8E0)],
-                startPoint: .topLeading, endPoint: .bottomTrailing
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-        )
     }
 }
 
 private struct BabyAvatar: View {
+    @Environment(AppStore.self) private var store
+
     var body: some View {
-        ZStack {
-            Circle().fill(Color(hex: 0xFFC7B5))
-            Canvas { ctx, size in
-                let s = size.width / 56
-                func pt(_ x: Double, _ y: Double) -> CGPoint { .init(x: x * s, y: y * s) }
-                ctx.fill(Path(ellipseIn: CGRect(x: 12*s, y: 10*s, width: 32*s, height: 32*s)),
-                         with: .color(Color(hex: 0xFFE0D2)))
-                // Hair tuft
-                var hair = Path()
-                hair.move(to: pt(20, 16))
-                hair.addQuadCurve(to: pt(36, 16), control: pt(28, 10))
-                ctx.stroke(hair, with: .color(Color(hex: 0x8B5A3C)),
-                           style: StrokeStyle(lineWidth: 3 * s, lineCap: .round))
-                // Eyes
-                var e1 = Path(); e1.move(to: pt(22, 26)); e1.addQuadCurve(to: pt(26, 26), control: pt(24, 28))
-                var e2 = Path(); e2.move(to: pt(30, 26)); e2.addQuadCurve(to: pt(34, 26), control: pt(32, 28))
-                ctx.stroke(e1, with: .color(Color(hex: 0x2B2520)), style: StrokeStyle(lineWidth: 1.8 * s, lineCap: .round))
-                ctx.stroke(e2, with: .color(Color(hex: 0x2B2520)), style: StrokeStyle(lineWidth: 1.8 * s, lineCap: .round))
-                // Blush
-                ctx.fill(Path(ellipseIn: CGRect(x: 20*s, y: 30*s, width: 4*s, height: 4*s)),
-                         with: .color(Color(hex: 0xFF9B85).opacity(0.55)))
-                ctx.fill(Path(ellipseIn: CGRect(x: 32*s, y: 30*s, width: 4*s, height: 4*s)),
-                         with: .color(Color(hex: 0xFF9B85).opacity(0.55)))
-                // Smile
-                var smile = Path()
-                smile.move(to: pt(25, 32))
-                smile.addQuadCurve(to: pt(31, 32), control: pt(28, 34))
-                ctx.stroke(smile, with: .color(Color(hex: 0x2B2520)),
-                           style: StrokeStyle(lineWidth: 1.8 * s, lineCap: .round))
+        GeometryReader { proxy in
+            ZStack {
+                Circle()
+                    .fill(store.theme.primaryTint)
+                    .overlay {
+                        Circle()
+                            .stroke(store.theme.primary600.opacity(0.12), lineWidth: 1)
+                    }
+
+                Image(systemName: "person.fill")
+                    .font(.system(
+                        size: max(19, proxy.size.width * 0.42),
+                        weight: .medium
+                    ))
+                    .foregroundStyle(store.theme.primary600)
             }
         }
+        .accessibilityHidden(true)
     }
 }
 
 // MARK: — Quick-action tile
 
 private struct QuickTile: View {
+    @Environment(AppStore.self) private var store
     let kind: EventKind
     let onTap: () -> Void
 
     var body: some View {
-        let style = CategoryStyle.forKind(kind, iconSize: 30)
-        Button(action: onTap) {
-            ZStack(alignment: .topTrailing) {
-                VStack(alignment: .leading, spacing: 10) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .fill(Color.white.opacity(0.55))
-                        style.icon
+        TimelineView(.periodic(from: .now, by: 30)) { context in
+            let style = CategoryStyle.forKind(kind, iconSize: 24)
+            Button(action: onTap) {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(alignment: .top) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 13, style: .continuous)
+                                .fill(Palette.card.opacity(0.72))
+                            style.icon
+                        }
+                        .frame(width: 42, height: 42)
+                        Spacer(minLength: 8)
+                        AppIcon.Plus(size: 14, color: style.ink)
+                            .frame(width: 32, height: 32)
+                            .background(Palette.card.opacity(0.62), in: Circle())
                     }
-                    .frame(width: 52, height: 52)
-                    Text(style.label)
-                        .font(.system(size: 17, weight: .heavy))
-                        .tracking(-0.17)
-                        .foregroundStyle(style.ink)
-                    Spacer(minLength: 0)
-                }
-                .padding(16)
-                .frame(maxWidth: .infinity, alignment: .topLeading)
-                .aspectRatio(1.05, contentMode: .fit)
 
-                // Plus badge
-                ZStack {
-                    Circle().fill(Color.white.opacity(0.6))
-                    AppIcon.Plus(size: 16, color: style.ink)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(style.label)
+                            .appFont(size: 17, weight: .bold)
+                            .foregroundStyle(style.ink)
+                        Text(statusText(at: context.date))
+                            .appFont(size: 12, weight: .medium)
+                            .monospacedDigit()
+                            .foregroundStyle(style.ink.opacity(0.78))
+                            .lineLimit(1)
+                    }
                 }
-                .frame(width: 26, height: 26)
                 .padding(14)
+                .frame(maxWidth: .infinity, minHeight: 118, alignment: .topLeading)
+                .background(style.tint, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .stroke(style.ink.opacity(0.08), lineWidth: 1)
+                }
             }
-            .background(style.tint, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .buttonStyle(PressableStyle())
+            .accessibilityLabel("记录\(style.label)，\(statusText(at: context.date))")
         }
-        .buttonStyle(PressableStyle())
+    }
+
+    private func statusText(at now: Date) -> String {
+        if kind == .sleep, let timer = store.activeTimer, timer.kind == .sleep {
+            return timer.isRunning ? "正在进行" : "已经暂停"
+        }
+        if kind == .feed, store.feedDraft?.hasActiveState == true {
+            return "正在记录"
+        }
+        guard let event = store.mostRecentEvent(kind: kind) else {
+            return "还没有记录"
+        }
+        let seconds = max(0, Int(now.timeIntervalSince(event.occurredAt)))
+        let hours = seconds / 3600
+        let minutes = (seconds % 3600) / 60
+        return hours > 0 ? "上次 · \(hours)时\(minutes)分前" : "上次 · \(minutes)分前"
     }
 }
 
@@ -330,13 +343,13 @@ private struct TimerBanner: View {
         TimelineView(.periodic(from: .now, by: 1)) { ctx in
             let running = timer.isRunning
             let dur = running ? timer.elapsed(at: ctx.date) : timer.accumulated
-            let tint = running ? Palette.lavender : Color(hex: 0xEDE7F8)
+            let tint = running ? Palette.lavender : Palette.bg2
             let ink = running ? Palette.lavenderInk : Palette.ink2
 
             HStack(spacing: 12) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(Color.white.opacity(0.6))
+                        .fill(Palette.card.opacity(0.6))
                     AppIcon.Moon(size: 26, color: ink)
                 }
                 .frame(width: 42, height: 42)
@@ -347,13 +360,13 @@ private struct TimerBanner: View {
                             PulseDot(color: ink)
                         }
                         Text(running ? "正在睡觉" : "已暂停")
-                            .font(.system(size: 12, weight: .heavy))
+                            .appFont(size: 12, weight: .heavy)
                             .tracking(0.72)
                             .textCase(.uppercase)
                             .foregroundStyle(ink)
                     }
                     Text(formatDur(dur))
-                        .font(.system(size: 22, weight: .black))
+                        .appFont(size: 22, weight: .black)
                         .tracking(-0.44)
                         .monospacedDigit()
                         .foregroundStyle(ink)
@@ -368,15 +381,16 @@ private struct TimerBanner: View {
 
 private struct PulseDot: View {
     let color: Color
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var on: Bool = false
     var body: some View {
         Circle()
             .fill(color)
             .frame(width: 8, height: 8)
-            .opacity(on ? 0.4 : 1.0)
-            .scaleEffect(on ? 0.8 : 1.0)
-            .animation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true), value: on)
-            .onAppear { on = true }
+            .opacity(reduceMotion ? 1 : (on ? 0.4 : 1.0))
+            .scaleEffect(reduceMotion ? 1 : (on ? 0.8 : 1.0))
+            .animation(reduceMotion ? nil : .easeInOut(duration: 1.4).repeatForever(autoreverses: true), value: on)
+            .onAppear { on = !reduceMotion }
     }
 }
 
@@ -388,58 +402,54 @@ private struct DailySummaryStrip: View {
         TimelineView(.periodic(from: .now, by: 30)) { ctx in
             let summary = store.dailySummary(on: ctx.date, now: ctx.date)
 
-            HStack(spacing: 8) {
-                SummaryCell(tint: Palette.lavender, ink: Palette.lavenderInk,
-                            value: formatDurShort(summary.sleepDuration).replacingOccurrences(of: " ", with: ""),
-                            label: "睡眠")
-                SummaryCell(tint: Palette.pink, ink: Palette.pinkInk,
-                            value: "\(summary.feedCount)次",
-                            label: "喂奶",
-                            detail: "奶粉\(summary.formulaMilliliters)ml")
-                SummaryCell(tint: Palette.blue, ink: Palette.blueInk,
-                            value: "\(summary.diaperCount)次", label: "尿布")
-                SummaryCell(tint: Palette.yellow, ink: Palette.yellowInk,
-                            value: "\(summary.solidCount)次", label: "辅食")
+            Card(padding: 16, cornerRadius: 20) {
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text("今天")
+                            .appFont(size: 17, weight: .bold)
+                            .foregroundStyle(Palette.ink)
+                        Spacer()
+                        Text("实时汇总")
+                            .appFont(size: 12, weight: .medium)
+                            .foregroundStyle(Palette.ink3)
+                    }
+                    HStack(spacing: 0) {
+                        SummaryCell(ink: Palette.lavenderInk,
+                                    value: formatDurShort(summary.sleepDuration).replacingOccurrences(of: " ", with: ""),
+                                    label: "睡眠")
+                        SummaryCell(ink: Palette.pinkInk,
+                                    value: "\(summary.feedCount)次",
+                                    label: "喂奶")
+                        SummaryCell(ink: Palette.blueInk,
+                                    value: "\(summary.diaperCount)次", label: "尿布")
+                        SummaryCell(ink: Palette.yellowInk,
+                                    value: "\(summary.solidCount)次", label: "辅食")
+                    }
+                }
             }
         }
     }
 
     private struct SummaryCell: View {
-        let tint: Color
         let ink: Color
         let value: String
         let label: String
-        var detail: String? = nil
 
         var body: some View {
-            VStack(spacing: 3) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(value)
-                    .font(.system(size: 16, weight: .black))
-                    .tracking(-0.32)
+                    .appFont(size: 16, weight: .bold)
                     .monospacedDigit()
                     .foregroundStyle(ink)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.78)
+                    .minimumScaleFactor(0.6)
                     .allowsTightening(true)
                 Text(label)
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(ink.opacity(0.75))
-                if let detail {
-                    Text(detail)
-                        .font(.system(size: 9, weight: .bold))
-                        .monospacedDigit()
-                        .foregroundStyle(ink.opacity(0.72))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.75)
-                } else {
-                    Text(" ")
-                        .font(.system(size: 9, weight: .bold))
-                        .hidden()
-                }
+                    .appFont(size: 11, weight: .medium)
+                    .foregroundStyle(Palette.ink3)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 10).padding(.horizontal, 6)
-            .background(tint, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .padding(.horizontal, 4)
         }
     }
 }
@@ -474,17 +484,17 @@ private struct SinceLastRow: View {
             if !items.isEmpty {
                 HStack(alignment: .center, spacing: 10) {
                     Text("距上次")
-                        .font(.system(size: 10, weight: .heavy))
+                        .appFont(size: 10, weight: .heavy)
                         .tracking(0.6)
                         .textCase(.uppercase)
                     HStack(spacing: 8) {
                         ForEach(Array(items.enumerated()), id: \.offset) { _, it in
                             HStack(spacing: 4) {
                                 Text(it.0)
-                                    .font(.system(size: 11, weight: .heavy))
+                                    .appFont(size: 11, weight: .heavy)
                                     .foregroundStyle(it.2)
                                 Text(it.1)
-                                    .font(.system(size: 11, weight: .bold))
+                                    .appFont(size: 11, weight: .bold)
                                     .monospacedDigit()
                                     .foregroundStyle(Palette.ink2)
                             }
@@ -492,7 +502,7 @@ private struct SinceLastRow: View {
                             .fixedSize(horizontal: true, vertical: false)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 6)
-                            .background(Color.white.opacity(0.72),
+                            .background(Palette.card.opacity(0.72),
                                         in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                         }
                     }
@@ -534,31 +544,31 @@ private struct VaccineReminderBanner: View {
 
         if let v = next {
             let isOverdue = v.status() == .overdue
-            let tint: Color = isOverdue ? Color(hex: 0xFFE8E0) : Palette.yellow
-            let ink: Color = isOverdue ? Color(hex: 0xD44E3A) : Palette.yellowInk
+            let tint: Color = isOverdue ? Palette.dangerTint : Palette.yellow
+            let ink: Color = isOverdue ? Palette.dangerInk : Palette.yellowInk
             let kicker: String = isOverdue ? "已逾期" : "即将接种"
 
             Button(action: onOpen) {
                 HStack(spacing: 12) {
                     ZStack {
                         RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .fill(Color.white.opacity(0.6))
+                            .fill(Palette.card.opacity(0.6))
                         AppIcon.Syringe(size: 22, color: ink)
                     }
                     .frame(width: 42, height: 42)
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text("疫苗提醒 · \(kicker)")
-                            .font(.system(size: 11, weight: .heavy))
+                            .appFont(size: 11, weight: .heavy)
                             .tracking(0.66)
                             .textCase(.uppercase)
                             .foregroundStyle(ink)
                         Text(v.name)
-                            .font(.system(size: 15, weight: .heavy))
+                            .appFont(size: 15, weight: .heavy)
                             .tracking(-0.15)
                             .foregroundStyle(Palette.ink)
                         Text(reminderDetail(for: v))
-                            .font(.system(size: 12, weight: .semibold))
+                            .appFont(size: 12, weight: .semibold)
                             .foregroundStyle(Palette.ink3)
                     }
                     Spacer(minLength: 0)
@@ -678,19 +688,19 @@ private struct EditBabyScreen: View {
                     }
                     .frame(width: 96, height: 96)
                     .clipShape(Circle())
-                    .overlay(Circle().stroke(Color.white, lineWidth: 3))
+                    .overlay(Circle().stroke(Palette.card, lineWidth: 3))
                     .shadowCard()
 
                     ZStack {
                         Circle().fill(store.theme.primary)
                         Image(systemName: "camera.fill")
-                            .font(.system(size: 13, weight: .bold))
+                            .appFont(size: 13, weight: .bold)
                             .foregroundStyle(.white)
                     }
                     .frame(width: 30, height: 30)
                 }
                 Text("点击更换头像")
-                    .font(.system(size: 12, weight: .bold))
+                    .appFont(size: 12, weight: .bold)
                     .foregroundStyle(Palette.ink3)
             }
             .frame(maxWidth: .infinity)

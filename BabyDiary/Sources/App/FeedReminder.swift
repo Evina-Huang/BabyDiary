@@ -638,9 +638,41 @@ enum FeedReminderPlanner {
 
 }
 
+enum SleepReminderMode: String, Codable, CaseIterable, Hashable {
+    case awakeInterval
+    case schedule
+
+    var label: String {
+        switch self {
+        case .awakeInterval: return "清醒间隔"
+        case .schedule: return "固定时间段"
+        }
+    }
+}
+
+struct SleepReminderScheduleEntry: Identifiable, Equatable, Codable, Hashable {
+    var id: String
+    var minuteOfDay: Int
+
+    init(
+        id: String = "sleep_" + UUID().uuidString.prefix(6).lowercased(),
+        minuteOfDay: Int
+    ) {
+        self.id = id
+        self.minuteOfDay = minuteOfDay
+    }
+}
+
 struct SleepReminderSettings: Equatable, Codable {
     static let minAwakeIntervalMinutes = 30
     static let maxAwakeIntervalMinutes = 360
+    static let minScheduleEntries = 1
+    static let maxScheduleEntries = 6
+    static let defaultScheduleEntries: [SleepReminderScheduleEntry] = [
+        .init(id: "sleep_0930", minuteOfDay: 9 * 60 + 30),
+        .init(id: "sleep_1330", minuteOfDay: 13 * 60 + 30),
+        .init(id: "sleep_2000", minuteOfDay: 20 * 60),
+    ]
 
     var isEnabled: Bool = false
     var awakeIntervalMinutes: Int = 120
@@ -648,6 +680,8 @@ struct SleepReminderSettings: Equatable, Codable {
     var quietHoursEnabled: Bool = false
     var quietStartMinuteOfDay: Int = 22 * 60
     var quietEndMinuteOfDay: Int = 7 * 60
+    var mode: SleepReminderMode = .awakeInterval
+    var scheduleEntries: [SleepReminderScheduleEntry] = Self.defaultScheduleEntries
 
     init(
         isEnabled: Bool = false,
@@ -655,7 +689,9 @@ struct SleepReminderSettings: Equatable, Codable {
         anchorAt: Date? = nil,
         quietHoursEnabled: Bool = false,
         quietStartMinuteOfDay: Int = 22 * 60,
-        quietEndMinuteOfDay: Int = 7 * 60
+        quietEndMinuteOfDay: Int = 7 * 60,
+        mode: SleepReminderMode = .awakeInterval,
+        scheduleEntries: [SleepReminderScheduleEntry] = Self.defaultScheduleEntries
     ) {
         self.isEnabled = isEnabled
         self.awakeIntervalMinutes = awakeIntervalMinutes
@@ -663,6 +699,8 @@ struct SleepReminderSettings: Equatable, Codable {
         self.quietHoursEnabled = quietHoursEnabled
         self.quietStartMinuteOfDay = quietStartMinuteOfDay
         self.quietEndMinuteOfDay = quietEndMinuteOfDay
+        self.mode = mode
+        self.scheduleEntries = scheduleEntries
     }
 
     init(from decoder: Decoder) throws {
@@ -673,6 +711,11 @@ struct SleepReminderSettings: Equatable, Codable {
         quietHoursEnabled = try values.decodeIfPresent(Bool.self, forKey: .quietHoursEnabled) ?? false
         quietStartMinuteOfDay = try values.decodeIfPresent(Int.self, forKey: .quietStartMinuteOfDay) ?? 22 * 60
         quietEndMinuteOfDay = try values.decodeIfPresent(Int.self, forKey: .quietEndMinuteOfDay) ?? 7 * 60
+        mode = try values.decodeIfPresent(SleepReminderMode.self, forKey: .mode) ?? .awakeInterval
+        scheduleEntries = try values.decodeIfPresent(
+            [SleepReminderScheduleEntry].self,
+            forKey: .scheduleEntries
+        ) ?? Self.defaultScheduleEntries
     }
 
     var normalizedAwakeIntervalMinutes: Int {
@@ -699,6 +742,26 @@ struct SleepReminderSettings: Equatable, Codable {
         FeedReminderSettings.clampedMinuteOfDay(minute)
     }
 
+    var normalizedScheduleEntries: [SleepReminderScheduleEntry] {
+        let entries = scheduleEntries.isEmpty ? Self.defaultScheduleEntries : scheduleEntries
+        var normalized = entries.map { entry in
+            SleepReminderScheduleEntry(
+                id: entry.id,
+                minuteOfDay: Self.clampedMinuteOfDay(entry.minuteOfDay)
+            )
+        }
+        normalized.sort { lhs, rhs in
+            if lhs.minuteOfDay != rhs.minuteOfDay {
+                return lhs.minuteOfDay < rhs.minuteOfDay
+            }
+            return lhs.id < rhs.id
+        }
+        if normalized.count > Self.maxScheduleEntries {
+            normalized.removeLast(normalized.count - Self.maxScheduleEntries)
+        }
+        return normalized
+    }
+
     private enum CodingKeys: String, CodingKey {
         case isEnabled
         case awakeIntervalMinutes
@@ -706,6 +769,8 @@ struct SleepReminderSettings: Equatable, Codable {
         case quietHoursEnabled
         case quietStartMinuteOfDay
         case quietEndMinuteOfDay
+        case mode
+        case scheduleEntries
     }
 }
 
@@ -719,9 +784,14 @@ enum SleepReminderPlanner {
         now: Date = Date()
     ) -> Date? {
         guard settings.isEnabled, !isSleeping else { return nil }
-        let anchor = lastSleep?.occurredAt ?? settings.anchorAt ?? now
-        let rawDue = anchor.addingTimeInterval(settings.interval)
-        return nextAllowedDate(rawDue, settings: settings)
+        switch settings.mode {
+        case .awakeInterval:
+            let anchor = lastSleep?.occurredAt ?? settings.anchorAt ?? now
+            let rawDue = anchor.addingTimeInterval(settings.interval)
+            return nextAllowedDate(rawDue, settings: settings)
+        case .schedule:
+            return fixedScheduleDates(settings: settings, now: now, count: 1).first
+        }
     }
 
     static func scheduledDates(
@@ -732,6 +802,10 @@ enum SleepReminderPlanner {
         count: Int = 12
     ) -> [Date] {
         guard settings.isEnabled, !isSleeping, count > 0 else { return [] }
+        if settings.mode == .schedule {
+            return fixedScheduleDates(settings: settings, now: now, count: count)
+        }
+
         let interval = settings.interval
         var candidate = dueDate(settings: settings, lastSleep: lastSleep, isSleeping: isSleeping, now: now)
             ?? now.addingTimeInterval(interval)
@@ -755,6 +829,36 @@ enum SleepReminderPlanner {
                 )
             }
             attempts += 1
+        }
+        return dates
+    }
+
+    private static func fixedScheduleDates(
+        settings: SleepReminderSettings,
+        now: Date,
+        count: Int,
+        calendar: Calendar = .current
+    ) -> [Date] {
+        guard count > 0 else { return [] }
+        let entries = settings.normalizedScheduleEntries
+        var dates: [Date] = []
+        var dayOffset = 0
+        let maxDays = max(7, count * 3)
+
+        while dates.count < count && dayOffset < maxDays {
+            guard let day = calendar.date(byAdding: .day, value: dayOffset, to: now) else { break }
+            let dayStart = calendar.startOfDay(for: day)
+
+            for entry in entries where dates.count < count {
+                guard let candidate = calendar.date(
+                    byAdding: .minute,
+                    value: entry.minuteOfDay,
+                    to: dayStart
+                ), candidate > now else { continue }
+                guard !isInQuietHours(candidate, settings: settings) else { continue }
+                dates.append(candidate)
+            }
+            dayOffset += 1
         }
         return dates
     }
@@ -972,7 +1076,12 @@ enum SleepReminderNotificationController {
     }
 
     private static func bodyText(settings: SleepReminderSettings, babyName: String) -> String {
-        "\(babyName) 已经清醒 \(settings.normalizedAwakeIntervalMinutes) 分钟"
+        switch settings.mode {
+        case .awakeInterval:
+            return "\(babyName) 已经清醒 \(settings.normalizedAwakeIntervalMinutes) 分钟"
+        case .schedule:
+            return "\(babyName) 到计划的哄睡时间了"
+        }
     }
 }
 

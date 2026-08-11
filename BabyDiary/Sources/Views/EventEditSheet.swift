@@ -136,14 +136,25 @@ struct EventEditSheet: View {
         VStack(spacing: 0) {
             ScreenHeader(title: "编辑\(original.kind.label)", onBack: onCancel)
             ScreenBody {
-                Card {
-                    VStack(alignment: .leading, spacing: 18) {
+                recordSummary
+
+                if original.kind != .sleep {
+                    sectionLabel("记录内容")
+                        .padding(.top, 24)
+                    Card {
                         kindForm
-                        timeField(label: original.kind == .sleep ? "开始时间" : "时间",
+                    }
+                }
+
+                sectionLabel(original.kind == .sleep ? "睡眠时间" : "记录时间")
+                    .padding(.top, 24)
+                Card {
+                    VStack(alignment: .leading, spacing: 16) {
+                        timeField(label: original.kind == .sleep ? "开始" : "发生时间",
                                   binding: $at,
                                   field: .start)
                         if original.kind == .sleep {
-                            timeField(label: "结束时间",
+                            timeField(label: "结束",
                                       binding: $endAt,
                                       field: .end)
                             if endAt <= at {
@@ -154,37 +165,24 @@ struct EventEditSheet: View {
                         }
                     }
                 }
+
                 CTAButton(title: "保存",
                           variant: canSave ? .primary : .ghost,
                           theme: store.theme,
                           action: attemptSave)
-                    .padding(.top, 18)
+                    .padding(.top, 24)
                     .disabled(!canSave)
                 Button(action: onCancel) {
                     Text("取消")
-                        .font(.system(size: 14, weight: .heavy))
+                        .appFont(size: 15, weight: .semibold)
                         .foregroundStyle(Palette.ink2)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
+                        .frame(minHeight: 48)
                 }
                 .buttonStyle(PressableStyle())
 
-                Button { showDeleteConfirm = true } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "trash")
-                            .font(.system(size: 14, weight: .bold))
-                        Text("删除这条记录")
-                            .font(.system(size: 14, weight: .heavy))
-                            .tracking(-0.14)
-                    }
-                    .foregroundStyle(Color(hex: 0xFF7F64))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(Color(hex: 0xFF7F64).opacity(0.1),
-                                in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                }
-                .buttonStyle(PressableStyle())
-                .padding(.top, 18)
+                dangerZone
+                    .padding(.top, 24)
             }
         }
         .background(Palette.bg)
@@ -202,6 +200,77 @@ struct EventEditSheet: View {
         }
     }
 
+    private var recordSummary: some View {
+        let style = CategoryStyle.forKind(original.kind, iconSize: 29)
+        let display = recordDisplayText(for: original)
+
+        return HStack(spacing: 14) {
+            CategoryIcon(kind: original.kind, size: 52)
+            VStack(alignment: .leading, spacing: 4) {
+                MicroLabel(text: "当前记录")
+                Text(display.title)
+                    .appFont(size: 17, weight: .bold)
+                    .tracking(-0.2)
+                    .foregroundStyle(Palette.ink)
+                    .lineLimit(1)
+                Text("\(formatDateLabel(original.at)) · \(formatTime(original.at))")
+                    .appFont(size: 13, weight: .semibold)
+                    .foregroundStyle(style.ink)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(16)
+        .background(style.tint.opacity(0.62),
+                    in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(style.ink.opacity(0.08), lineWidth: 1)
+        }
+    }
+
+    private func sectionLabel(_ text: String) -> some View {
+        Text(text)
+            .appFont(size: 16, weight: .bold)
+            .tracking(-0.16)
+            .foregroundStyle(Palette.ink)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.bottom, 10)
+    }
+
+    private var dangerZone: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            MicroLabel(text: "删除记录")
+            Button { showDeleteConfirm = true } label: {
+                HStack {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("删除这条记录")
+                            .appFont(size: 15, weight: .bold)
+                            .foregroundStyle(Palette.pinkInk)
+                        Text("删除后无法恢复")
+                            .appFont(size: 12, weight: .semibold)
+                            .foregroundStyle(Palette.ink3)
+                    }
+                    Spacer(minLength: 12)
+                    Text("删除")
+                        .appFont(size: 13, weight: .bold)
+                        .foregroundStyle(Palette.pinkInk)
+                        .padding(.horizontal, 14)
+                        .frame(minHeight: 36)
+                        .background(Palette.pink, in: Capsule())
+                }
+                .padding(.horizontal, 16)
+                .frame(minHeight: 68)
+                .background(Palette.card,
+                            in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(Palette.pink.opacity(0.8), lineWidth: 1)
+                }
+            }
+            .buttonStyle(PressableStyle())
+        }
+    }
+
     // MARK: — Kind-specific forms
 
     @ViewBuilder
@@ -215,42 +284,32 @@ struct EventEditSheet: View {
     }
 
     private var diaperForm: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             FieldLabel(text: "类型")
-            ForEach(DiaperEventType.allCases, id: \.self) { o in
-                Button {
-                    dType = o
-                    if !o.allowsNote {
-                        diaperNote = ""
-                    }
-                } label: {
-                    HStack(spacing: 12) {
-                        Text(o.emoji).font(.system(size: 20))
-                            .frame(width: 36, height: 36)
-                            .background(.white, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(o.label)
-                                .font(.system(size: 14, weight: .heavy))
-                                .foregroundStyle(Palette.ink)
-                            if !o.subtitle.isEmpty {
-                                Text(o.subtitle)
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundStyle(Palette.ink3)
-                            }
+            HStack(spacing: 8) {
+                ForEach(DiaperEventType.allCases, id: \.self) { option in
+                    let selected = dType == option
+                    Button {
+                        dType = option
+                        if !option.allowsNote {
+                            diaperNote = ""
                         }
-                        Spacer(minLength: 0)
-                        Circle()
-                            .strokeBorder(dType == o ? store.theme.primary600 : Palette.line,
-                                          lineWidth: dType == o ? 6 : 2)
-                            .background(Circle().fill(Color.white))
-                            .frame(width: 22, height: 22)
+                    } label: {
+                        Text(option.label)
+                            .appFont(size: 13, weight: .bold)
+                            .foregroundStyle(selected ? Palette.blueInk : Palette.ink2)
+                            .frame(maxWidth: .infinity)
+                            .frame(minHeight: 46)
+                            .background(selected ? Palette.blue : Palette.bg2,
+                                        in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .stroke(selected ? Palette.blueInk.opacity(0.14) : Palette.line,
+                                            lineWidth: 1)
+                            }
                     }
-                    .padding(12)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(dType == o ? store.theme.primaryTint : Palette.bg2,
-                                in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .buttonStyle(PressableStyle())
                 }
-                .buttonStyle(PressableStyle())
             }
 
             if dType.allowsNote {
@@ -262,15 +321,16 @@ struct EventEditSheet: View {
 
     private var diaperNotePicker: some View {
         let noteOptions = DiaperNotePreset.options(including: diaperNote)
-        let columns = [GridItem(.adaptive(minimum: 84), spacing: 8)]
+        let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 3)
 
         return VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 FieldLabel(text: "备注")
                 if !diaperNote.isEmpty {
                     Button("清空") { diaperNote = "" }
-                        .font(.system(size: 12, weight: .bold))
+                        .appFont(size: 12, weight: .bold)
                         .foregroundStyle(Palette.ink3)
+                        .frame(minWidth: 44, minHeight: 44)
                         .buttonStyle(.plain)
                 }
             }
@@ -282,21 +342,21 @@ struct EventEditSheet: View {
                         diaperNote = on ? "" : note
                     } label: {
                         Text(note)
-                            .font(.system(size: 13, weight: .heavy))
+                            .appFont(size: 13, weight: .heavy)
                             .tracking(-0.13)
                             .foregroundStyle(on ? Palette.yellowInk : Palette.ink2)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 8)
-                            .background(on ? Palette.yellow : Palette.bg2, in: Capsule())
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .background(on ? Palette.yellow : Palette.bg2,
+                                        in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                     }
                     .buttonStyle(PressableStyle())
                 }
             }
 
             TextField("自己填写", text: $diaperNote)
-                .font(.system(size: 16, weight: .semibold))
+                .appFont(size: 16, weight: .semibold)
                 .padding(.horizontal, 14)
-                .padding(.vertical, 12)
+                .frame(minHeight: 48)
                 .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
     }
@@ -306,8 +366,12 @@ struct EventEditSheet: View {
             VStack(alignment: .leading, spacing: 6) {
                 FieldLabel(text: "方式")
                 Text(feedMode == .breast ? "母乳" : "奶粉")
-                    .font(.system(size: 14, weight: .heavy))
+                    .appFont(size: 15, weight: .bold)
                     .foregroundStyle(Palette.ink)
+                    .padding(.horizontal, 14)
+                    .frame(maxWidth: .infinity, minHeight: 46, alignment: .leading)
+                    .background(Palette.bg2,
+                                in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
             if feedMode == .breast {
                 VStack(alignment: .leading, spacing: 8) {
@@ -316,11 +380,11 @@ struct EventEditSheet: View {
                         ForEach(BreastSide.allCases, id: \.self) { s in
                             Button { breastSide = s } label: {
                                 Text(s.label)
-                                    .font(.system(size: 13, weight: .heavy))
+                                    .appFont(size: 13, weight: .heavy)
                                     .foregroundStyle(breastSide == s ? .white : Palette.ink2)
-                                    .padding(.horizontal, 14).padding(.vertical, 8)
+                                    .frame(maxWidth: .infinity, minHeight: 44)
                                     .background(breastSide == s ? store.theme.primary : Palette.bg2,
-                                                in: Capsule())
+                                                in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                             }
                             .buttonStyle(PressableStyle())
                         }
@@ -333,11 +397,11 @@ struct EventEditSheet: View {
                             ForEach(FirstSide.allCases, id: \.self) { f in
                                 Button { firstSide = f } label: {
                                     Text(f.label)
-                                        .font(.system(size: 13, weight: .heavy))
+                                        .appFont(size: 13, weight: .heavy)
                                         .foregroundStyle(firstSide == f ? .white : Palette.ink2)
-                                        .padding(.horizontal, 14).padding(.vertical, 8)
+                                        .frame(maxWidth: .infinity, minHeight: 44)
                                         .background(firstSide == f ? store.theme.primary : Palette.bg2,
-                                                    in: Capsule())
+                                                    in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                                 }
                                 .buttonStyle(PressableStyle())
                             }
@@ -378,8 +442,9 @@ struct EventEditSheet: View {
             VStack(alignment: .leading, spacing: 8) {
                 FieldLabel(text: "食物名称")
                 TextField("食物名称", text: $foodName)
-                    .font(.system(size: 16, weight: .semibold))
-                    .padding(.horizontal, 14).padding(.vertical, 12)
+                    .appFont(size: 16, weight: .semibold)
+                    .padding(.horizontal, 14)
+                    .frame(minHeight: 48)
                     .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
             VStack(alignment: .leading, spacing: 8) {
@@ -392,8 +457,9 @@ struct EventEditSheet: View {
             VStack(alignment: .leading, spacing: 8) {
                 FieldLabel(text: "备注 (可选)")
                 TextField("例如 第一次吃、过敏反应", text: $solidNote)
-                    .font(.system(size: 16, weight: .semibold))
-                    .padding(.horizontal, 14).padding(.vertical, 12)
+                    .appFont(size: 16, weight: .semibold)
+                    .padding(.horizontal, 14)
+                    .frame(minHeight: 48)
                     .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
         }
@@ -419,28 +485,28 @@ struct EventEditSheet: View {
                         VStack(alignment: .leading, spacing: 6) {
                             HStack(alignment: .firstTextBaseline, spacing: 8) {
                                 Text(hhmm(binding.wrappedValue))
-                                    .font(.system(size: 28, weight: .black))
+                                    .appFont(size: 28, weight: .black)
                                     .tracking(-0.72)
                                     .monospacedDigit()
                                     .foregroundStyle(Palette.ink)
                                 Text(formatDateLabel(binding.wrappedValue))
-                                    .font(.system(size: 14, weight: .heavy))
+                                    .appFont(size: 14, weight: .heavy)
                                     .foregroundStyle(accent.ink)
                                     .padding(.horizontal, 10)
                                     .padding(.vertical, 6)
                                     .background(accent.badge, in: Capsule())
                             }
                             Text(timeDetail(binding.wrappedValue))
-                                .font(.system(size: 12, weight: .semibold))
+                                .appFont(size: 12, weight: .semibold)
                                 .foregroundStyle(Palette.ink3)
                         }
                         Spacer(minLength: 0)
                         Text(isExpanded ? "收起" : "调整")
-                            .font(.system(size: 12, weight: .heavy))
+                            .appFont(size: 12, weight: .heavy)
                             .foregroundStyle(isExpanded ? accent.ink : Palette.ink2)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 7)
-                            .background(isExpanded ? accent.badge : Color.white.opacity(0.72),
+                            .background(isExpanded ? accent.badge : Palette.card.opacity(0.72),
                                         in: Capsule())
                     }
                     .contentShape(Rectangle())
@@ -450,18 +516,12 @@ struct EventEditSheet: View {
                 .padding(.horizontal, 14)
                 .padding(.top, 14)
                 .padding(.bottom, isExpanded ? 10 : 14)
-                .background(
-                    LinearGradient(colors: [
-                        isExpanded ? accent.surfaceStrong : accent.surfaceSoft,
-                        Color.white.opacity(isExpanded ? 0.92 : 0.7)
-                    ], startPoint: .topLeading, endPoint: .bottomTrailing),
-                    in: RoundedRectangle(cornerRadius: 18, style: .continuous)
-                )
+                .background(isExpanded ? accent.surfaceStrong : accent.surfaceSoft,
+                            in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                 .overlay {
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
                         .stroke(isExpanded ? accent.borderStrong : accent.borderSoft, lineWidth: 1)
                 }
-                .shadowSurface()
 
                 if isExpanded {
                     DatePicker("", selection: binding, displayedComponents: [.date, .hourAndMinute])
@@ -474,7 +534,7 @@ struct EventEditSheet: View {
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
                         .offset(y: -3)
-                        .background(accent.wheel,
+                        .background(Palette.bg2,
                                     in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                         .environment(\.locale, Locale(identifier: "zh_CN"))
                         .transition(
@@ -503,23 +563,23 @@ struct EventEditSheet: View {
         switch field {
         case .start:
             return (
-                Color(hex: 0xFFF4EE),
-                Color(hex: 0xFFE8DD).opacity(0.96),
-                Color(hex: 0xFFF7F0),
-                Color(hex: 0xFFFDFC).opacity(0.9),
-                Color(hex: 0xA46D5A),
-                Color.white.opacity(0.45),
-                Color(hex: 0xE6CABC)
+                Palette.bg2,
+                store.theme.primaryTint,
+                store.theme.primaryTint,
+                Palette.bg2,
+                store.theme.primary600,
+                Palette.line,
+                store.theme.primary.opacity(0.34)
             )
         case .end:
             return (
-                Color(hex: 0xEEF6F2),
-                Color(hex: 0xDFF0E9).opacity(0.98),
-                Color(hex: 0xF3FBF7),
-                Color(hex: 0xF8FDFC).opacity(0.92),
-                Color(hex: 0x5F8C79),
-                Color.white.opacity(0.45),
-                Color(hex: 0xC9E2D7)
+                Palette.bg2,
+                Palette.mint.opacity(0.72),
+                store.theme.primaryTint,
+                Palette.bg2,
+                store.theme.primary600,
+                Palette.line,
+                Palette.mint600.opacity(0.24)
             )
         }
     }
@@ -543,7 +603,7 @@ struct EventEditSheet: View {
             VStack(alignment: .leading, spacing: 3) {
                 MicroLabel(text: "睡眠时长")
                 Text(formatDur(endAt.timeIntervalSince(at)))
-                    .font(.system(size: 18, weight: .black))
+                    .appFont(size: 18, weight: .black)
                     .tracking(-0.36)
                     .foregroundStyle(Palette.ink)
             }
@@ -552,21 +612,21 @@ struct EventEditSheet: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
         .background(
-            LinearGradient(colors: [store.theme.primaryTint, Color.white],
+            LinearGradient(colors: [store.theme.primaryTint, Palette.card],
                            startPoint: .topLeading,
                            endPoint: .bottomTrailing),
             in: RoundedRectangle(cornerRadius: 16, style: .continuous)
         )
         .overlay {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color.white.opacity(0.6), lineWidth: 1)
+                .stroke(Palette.card.opacity(0.6), lineWidth: 1)
         }
     }
 
     private func hintText(_ s: String, warn: Bool = false) -> some View {
         Text(s)
-            .font(.system(size: 12, weight: .semibold))
-            .foregroundStyle(warn ? Color(hex: 0xFF7F64) : Palette.ink3)
+            .appFont(size: 12, weight: .semibold)
+            .foregroundStyle(warn ? Palette.pinkInk : Palette.ink3)
     }
 
     // MARK: — Validation + save

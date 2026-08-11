@@ -226,18 +226,15 @@ enum AppIcon {
             Canvas { ctx, _ in
                 let t = CGAffineTransform(scaleX: size/32, y: size/32)
                 var moon = Path()
-                moon.move(to: .init(x: 22, y: 20))
-                moon.addArc(center: .init(x: 12, y: 20), radius: 10,
+                // Optically center the complete moon-and-stars group on the 32×32 grid.
+                moon.move(to: .init(x: 24, y: 18))
+                moon.addArc(center: .init(x: 14, y: 18), radius: 10,
                             startAngle: .degrees(0), endAngle: .degrees(360), clockwise: false)
                 moon.closeSubpath()
-                var inner = Path()
-                inner.move(to: .init(x: 22, y: 20))
-                inner.addCurve(to: .init(x: 12, y: 4), control1: .init(x: 16, y: 16), control2: .init(x: 12, y: 12))
-                inner.addCurve(to: .init(x: 22, y: 20), control1: .init(x: 20, y: 4), control2: .init(x: 22, y: 14))
                 ctx.fill(moon.applying(t), with: .color(color.opacity(0.22)))
                 ctx.stroke(moon.applying(t), with: .color(color), style: StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round))
-                ctx.fill(Path(ellipseIn: CGRect(x: 21, y: 7, width: 2, height: 2)).applying(t), with: .color(color))
-                ctx.fill(Path(ellipseIn: CGRect(x: 25.4, y: 12.4, width: 1.6, height: 1.6)).applying(t), with: .color(color))
+                ctx.fill(Path(ellipseIn: CGRect(x: 23, y: 5, width: 2, height: 2)).applying(t), with: .color(color))
+                ctx.fill(Path(ellipseIn: CGRect(x: 27.4, y: 10.4, width: 1.6, height: 1.6)).applying(t), with: .color(color))
             }
             .frame(width: size, height: size)
         }
