@@ -5,20 +5,26 @@ struct RecipeListScreen: View {
     @Environment(AppStore.self) private var store
     @State private var editing: RecipeEditTarget? = nil
 
+    private var recipes: [Recipe] {
+        store.recipes.sorted { $0.createdAt > $1.createdAt }
+    }
+
+    private var uniqueFoodCount: Int {
+        Set(store.recipes.flatMap(\.foodNames)).count
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             ScreenHeader(title: "我的食谱", onBack: onBack)
             ScreenBody {
+                overview
+                    .padding(.top, 4)
+
                 newRecipeButton
-                if store.recipes.isEmpty {
-                    EmptyStateView(
-                        title: "还没有食谱",
-                        subtitle: "把常一起吃的食材组合成食谱，下次记录一键带出"
-                    )
-                    .padding(.top, 18)
-                } else {
-                    recipesCard.padding(.top, 18)
-                }
+                    .padding(.top, 14)
+
+                recipeCollection
+                    .padding(.top, 22)
             }
         }
         .background(Palette.bg)
@@ -40,66 +46,92 @@ struct RecipeListScreen: View {
                 }
             )
             .environment(store)
+            .presentationDetents([.large])
         }
+    }
+
+    private var overview: some View {
+        Card(padding: 18) {
+            HStack(alignment: .top, spacing: 14) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous)
+                        .fill(Palette.yellow)
+                    AppIcon.Bowl(size: 26, color: Palette.yellowInk)
+                }
+                .frame(width: 50, height: 50)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(store.recipes.isEmpty ? "把常吃的食材存成组合" : "已保存 \(store.recipes.count) 个食谱")
+                        .appText(.cardTitle)
+                        .foregroundStyle(Palette.ink)
+
+                    Text(overviewDescription)
+                        .appFont(size: 13, weight: .semibold)
+                        .foregroundStyle(Palette.ink3)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 0)
+            }
+        }
+    }
+
+    private var overviewDescription: String {
+        if store.recipes.isEmpty {
+            return "记录辅食时可一键带入，不用重复选择食材。"
+        }
+        return "共整理 \(uniqueFoodCount) 种食材，记录辅食时可一键带入。"
     }
 
     private var newRecipeButton: some View {
         Button {
             editing = RecipeEditTarget(recipe: nil)
         } label: {
-            HStack(spacing: 10) {
-                ZStack {
-                    Circle().fill(store.theme.primaryTint)
-                    AppIcon.Plus(size: 16, color: store.theme.primary600)
-                }
-                .frame(width: 36, height: 36)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("新建食谱")
-                        .font(.system(size: 15, weight: .heavy))
-                        .tracking(-0.15)
-                        .foregroundStyle(Palette.ink)
-                    Text("组合常用食材，方便下次一键记录")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Palette.ink3)
-                }
-                Spacer(minLength: 0)
-                AppIcon.Chevron(size: 14, color: Palette.ink3)
+            HStack(spacing: 8) {
+                AppIcon.Plus(size: 18, color: .white)
+                Text("新建食谱")
+                    .appFont(size: 15, weight: .heavy)
             }
-            .padding(.horizontal, 16).padding(.vertical, 12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Palette.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .shadowCard()
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity, minHeight: 56)
+            .background(
+                store.theme.primary,
+                in: RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous)
+            )
+            .shadowPill(tint: store.theme.primary600)
         }
         .buttonStyle(PressableStyle())
     }
 
-    private var recipesCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 7) {
-                Circle()
-                    .fill(store.theme.primary600)
-                    .frame(width: 8, height: 8)
-                Text("已保存")
-                    .font(.system(size: 13, weight: .heavy))
-                    .tracking(0.52)
-                    .foregroundStyle(Palette.ink2)
-                Text("\(store.recipes.count) 个")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Palette.ink3)
-            }
-            .padding(.horizontal, 4)
+    private var recipeCollection: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("常用组合")
+                    .appFont(size: 15, weight: .heavy)
+                    .foregroundStyle(Palette.ink)
 
-            Card(padding: 0) {
-                VStack(spacing: 0) {
-                    ForEach(Array(store.recipes.enumerated()), id: \.element.id) { i, recipe in
-                        RecipeRow(
+                Spacer()
+
+                if !recipes.isEmpty {
+                    Text("共 \(recipes.count) 个")
+                        .appFont(size: 12, weight: .bold)
+                        .foregroundStyle(Palette.ink3)
+                }
+            }
+
+            if recipes.isEmpty {
+                EmptyStateView(
+                    title: "还没有食谱",
+                    subtitle: "把常一起吃的食材组合起来，下次记录会更快"
+                )
+            } else {
+                VStack(spacing: 12) {
+                    ForEach(recipes) { recipe in
+                        RecipeCard(
                             recipe: recipe,
-                            last: i == store.recipes.count - 1,
                             theme: store.theme,
-                            onEdit: { editing = RecipeEditTarget(recipe: recipe) },
-                            onDelete: { store.deleteRecipe(recipe.id) }
+                            onEdit: { editing = RecipeEditTarget(recipe: recipe) }
                         )
-                        .padding(.horizontal, 16)
                     }
                 }
             }
@@ -112,57 +144,57 @@ struct RecipeEditTarget: Identifiable {
     var id: String { recipe?.id ?? "__new__" }
 }
 
-private struct RecipeRow: View {
+private struct RecipeCard: View {
     let recipe: Recipe
-    let last: Bool
     let theme: AppTheme
     let onEdit: () -> Void
-    let onDelete: () -> Void
 
     var body: some View {
-        Button(action: onEdit) {
-            VStack(spacing: 0) {
-                HStack(spacing: 12) {
-                    Circle()
-                        .fill(theme.primary600.opacity(0.65))
-                        .frame(width: 9, height: 9)
+        Card(padding: 18, onTap: onEdit) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    Text(recipe.name)
+                        .appText(.cardTitle)
+                        .foregroundStyle(Palette.ink)
+                        .frame(maxWidth: .infinity, alignment: .leading)
 
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(recipe.name)
-                            .font(.system(size: 15, weight: .bold))
-                            .tracking(-0.15)
-                            .foregroundStyle(Palette.ink)
-                        Text(foodPreview)
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(Palette.ink3)
-                            .lineLimit(1)
-                    }
-
-                    Spacer(minLength: 0)
-
-                    Text("\(recipe.foodNames.count) 种")
-                        .font(.system(size: 12, weight: .bold))
+                    Text("\(recipe.foodNames.count) 种食材")
+                        .appFont(size: 12, weight: .heavy)
                         .monospacedDigit()
                         .foregroundStyle(theme.primary600)
-                        .padding(.horizontal, 10).padding(.vertical, 5)
+                        .padding(.horizontal, 10)
+                        .frame(minHeight: 28)
                         .background(theme.primaryTint, in: Capsule())
                 }
-                .padding(.vertical, 14)
 
-                if !last {
-                    Rectangle().fill(Palette.line).frame(height: 1)
+                Text(foodPreview)
+                    .appFont(size: 13, weight: .semibold)
+                    .foregroundStyle(Palette.ink2)
+                    .lineSpacing(4)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack(alignment: .firstTextBaseline) {
+                    Text(createdLabel)
+                        .appFont(size: 11, weight: .semibold)
+                        .foregroundStyle(Palette.ink3)
+                    Spacer()
+                    Text("轻触编辑")
+                        .appFont(size: 11, weight: .bold)
+                        .foregroundStyle(Palette.ink3)
                 }
             }
-        }
-        .buttonStyle(PressableStyle())
-        .contextMenu {
-            Button("编辑食谱", action: onEdit)
-            Button("删除食谱", role: .destructive, action: onDelete)
         }
     }
 
     private var foodPreview: String {
-        recipe.foodNames.joined(separator: " · ")
+        recipe.foodNames.joined(separator: "  ·  ")
+    }
+
+    private var createdLabel: String {
+        let calendar = Calendar.current
+        let month = calendar.component(.month, from: recipe.createdAt)
+        let day = calendar.component(.day, from: recipe.createdAt)
+        return "\(month)月\(day)日创建"
     }
 }
 

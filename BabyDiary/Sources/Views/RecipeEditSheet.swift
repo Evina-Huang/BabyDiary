@@ -1,6 +1,5 @@
 import SwiftUI
 
-// 新增/编辑食谱。一个食谱 = 名字 + 一组食材名。
 struct RecipeEditSheet: View {
     let original: Recipe?
     let onCancel: () -> Void
@@ -12,6 +11,7 @@ struct RecipeEditSheet: View {
     @State private var name: String
     @State private var foodNames: [String]
     @State private var customInput: String = ""
+    @State private var showDeleteConfirm = false
 
     private let suggestionPool = [
         "米糊", "南瓜泥", "苹果泥", "胡萝卜", "香蕉", "鸡蛋黄",
@@ -33,7 +33,11 @@ struct RecipeEditSheet: View {
     }
 
     private var trimmedName: String {
-        name.trimmingCharacters(in: .whitespaces)
+        name.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var trimmedCustomInput: String {
+        customInput.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private var canSave: Bool {
@@ -41,146 +45,207 @@ struct RecipeEditSheet: View {
     }
 
     private var suggestions: [String] {
-        let known = Set(store.foods.map { $0.name }).union(foodNames)
-        let primary = suggestionPool.filter { !known.contains($0) }
-        let extras = store.foods.map { $0.name }.filter { !foodNames.contains($0) }
-        var combined: [String] = []
-        var seen = Set<String>()
-        for n in primary + extras where seen.insert(n).inserted {
-            combined.append(n)
+        var result: [String] = []
+        var seen = Set(foodNames)
+        let recordedFoods = store.foods.map(\.name)
+
+        for food in recordedFoods + suggestionPool where seen.insert(food).inserted {
+            result.append(food)
         }
-        return combined
+        return result
     }
 
     var body: some View {
         VStack(spacing: 0) {
-            ScreenHeader(title: original == nil ? "新增食谱" : "编辑食谱",
-                         onBack: onCancel)
+            ScreenHeader(
+                title: original == nil ? "新建食谱" : "编辑食谱",
+                onBack: onCancel
+            )
+
             ScreenBody {
-                Card {
-                    VStack(alignment: .leading, spacing: 18) {
-                        FormField(label: "食谱名") {
-                            TextField("例如：南瓜米糊", text: $name)
-                        }
+                recipeInfo
+                    .padding(.top, 4)
 
-                        VStack(alignment: .leading, spacing: 10) {
-                            FieldLabel(text: "食材")
-                            if foodNames.isEmpty {
-                                Text("还没有食材，点击下方添加")
-                                    .font(.system(size: 13, weight: .semibold))
-                                    .foregroundStyle(Palette.ink3)
-                            } else {
-                                selectedFoodsCard
-                            }
-                            customInputRow
-                            if !suggestions.isEmpty {
-                                Text("常用食材")
-                                    .font(.system(size: 11, weight: .heavy))
-                                    .tracking(0.66)
-                                    .textCase(.uppercase)
-                                    .foregroundStyle(Palette.ink3)
-                                    .padding(.top, 4)
-                                suggestionChips
-                            }
-                        }
-                    }
-                }
+                ingredientEditor
+                    .padding(.top, 22)
 
-                CTAButton(title: "保存",
-                          variant: canSave ? .primary : .ghost,
-                          theme: store.theme,
-                          action: save)
-                    .padding(.top, 18)
-                    .disabled(!canSave)
+                CTAButton(
+                    title: original == nil ? "保存食谱" : "保存修改",
+                    variant: canSave ? .primary : .ghost,
+                    theme: store.theme,
+                    action: save
+                )
+                .disabled(!canSave)
+                .opacity(canSave ? 1 : 0.55)
+                .padding(.top, 20)
 
-                if let id = original?.id, let onDelete {
-                    Button {
-                        onDelete(id)
-                    } label: {
+                if original != nil, onDelete != nil {
+                    Button { showDeleteConfirm = true } label: {
                         Text("删除这个食谱")
-                            .font(.system(size: 14, weight: .heavy))
-                            .foregroundStyle(Color(hex: 0xFF7F64))
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
+                            .appFont(size: 14, weight: .heavy)
+                            .foregroundStyle(Palette.pinkInk)
+                            .frame(maxWidth: .infinity, minHeight: 48)
+                            .background(
+                                Palette.pink,
+                                in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous)
+                            )
                     }
                     .buttonStyle(PressableStyle())
-                    .padding(.top, 4)
+                    .padding(.top, 10)
                 }
-
-                Button(action: onCancel) {
-                    Text("取消")
-                        .font(.system(size: 14, weight: .heavy))
-                        .foregroundStyle(Palette.ink2)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                }
-                .buttonStyle(PressableStyle())
             }
         }
         .background(Palette.bg)
+        .confirmationDialog(
+            "确定删除「\(original?.name ?? "这个食谱")」？",
+            isPresented: $showDeleteConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("删除食谱", role: .destructive) {
+                guard let id = original?.id, let onDelete else { return }
+                onDelete(id)
+            }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("删除后无法恢复，但不会影响已经保存的辅食记录。")
+        }
     }
 
-    private var selectedFoodsCard: some View {
-        VStack(spacing: 0) {
-            ForEach(Array(foodNames.enumerated()), id: \.element) { i, food in
-                HStack {
-                    Text(food)
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(Palette.ink)
-                    Spacer(minLength: 0)
-                    Button {
-                        withAnimation(.easeOut(duration: 0.16)) {
-                            foodNames.removeAll { $0 == food }
-                        }
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 17))
-                            .foregroundStyle(Palette.ink3)
-                    }
-                }
-                .padding(.horizontal, 16).padding(.vertical, 12)
-                if i < foodNames.count - 1 {
-                    Rectangle().fill(Palette.line).frame(height: 1).padding(.horizontal, 16)
+    private var recipeInfo: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("食谱信息")
+                .appFont(size: 15, weight: .heavy)
+                .foregroundStyle(Palette.ink)
+
+            Card {
+                FormField(label: "食谱名称") {
+                    TextField("例如：南瓜米糊", text: $name)
                 }
             }
         }
-        .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private var ingredientEditor: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("食材组合")
+                    .appFont(size: 15, weight: .heavy)
+                    .foregroundStyle(Palette.ink)
+                Spacer()
+                Text(foodNames.isEmpty ? "至少添加 1 种" : "已选 \(foodNames.count) 种")
+                    .appFont(size: 12, weight: .bold)
+                    .foregroundStyle(foodNames.isEmpty ? Palette.yellowInk : Palette.ink3)
+            }
+
+            Card {
+                VStack(alignment: .leading, spacing: 18) {
+                    selectedFoods
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        FieldLabel(text: "添加其他食材")
+                        customInputRow
+                    }
+
+                    if !suggestions.isEmpty {
+                        VStack(alignment: .leading, spacing: 10) {
+                            FieldLabel(text: "从常用食材添加")
+                            suggestionChips
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var selectedFoods: some View {
+        if foodNames.isEmpty {
+            Text("选择下方食材，或输入一个新的食材名称。")
+                .appFont(size: 13, weight: .semibold)
+                .foregroundStyle(Palette.ink3)
+                .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
+                .padding(.horizontal, 16)
+                .background(
+                    Palette.bg2,
+                    in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous)
+                )
+        } else {
+            VStack(spacing: 0) {
+                ForEach(Array(foodNames.enumerated()), id: \.element) { index, food in
+                    HStack(spacing: 12) {
+                        Text(food)
+                            .appFont(size: 14, weight: .bold)
+                            .foregroundStyle(Palette.ink)
+
+                        Spacer(minLength: 0)
+
+                        Button("移除") {
+                            withAnimation(.easeOut(duration: 0.16)) {
+                                foodNames.removeAll { $0 == food }
+                            }
+                        }
+                        .appFont(size: 12, weight: .heavy)
+                        .foregroundStyle(Palette.pinkInk)
+                        .frame(minWidth: 52, minHeight: 44)
+                    }
+                    .padding(.leading, 16)
+                    .padding(.trailing, 8)
+
+                    if index < foodNames.count - 1 {
+                        Rectangle()
+                            .fill(Palette.line)
+                            .frame(height: 1)
+                            .padding(.horizontal, 16)
+                    }
+                }
+            }
+            .background(
+                Palette.bg2,
+                in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous)
+            )
+        }
     }
 
     private var customInputRow: some View {
-        HStack(spacing: 10) {
-            TextField("输入其他食材", text: $customInput)
-                .font(.system(size: 16, weight: .semibold))
+        HStack(spacing: 8) {
+            TextField("输入食材名称", text: $customInput)
+                .appFont(size: 16, weight: .semibold)
                 .foregroundStyle(Palette.ink)
-                .onSubmit { addCustom() }
-            if !customInput.trimmingCharacters(in: .whitespaces).isEmpty {
-                Button("添加") { addCustom() }
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(store.theme.primary600)
-            }
+                .onSubmit(addCustom)
+
+            Button("添加", action: addCustom)
+                .appFont(size: 14, weight: .heavy)
+                .foregroundStyle(store.theme.primary600)
+                .frame(minWidth: 52, minHeight: 44)
+                .disabled(trimmedCustomInput.isEmpty)
+                .opacity(trimmedCustomInput.isEmpty ? 0.4 : 1)
         }
-        .padding(.horizontal, 16).padding(.vertical, 14)
-        .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .padding(.leading, 16)
+        .padding(.trailing, 8)
+        .frame(minHeight: 52)
+        .background(
+            Palette.bg2,
+            in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous)
+        )
     }
 
     private var suggestionChips: some View {
-        let columns = [GridItem(.adaptive(minimum: 84), spacing: 8)]
+        let columns = [GridItem(.adaptive(minimum: 88), spacing: 8)]
         return LazyVGrid(columns: columns, alignment: .leading, spacing: 8) {
-            ForEach(suggestions, id: \.self) { name in
+            ForEach(suggestions, id: \.self) { food in
                 Button {
                     withAnimation(.easeOut(duration: 0.16)) {
-                        foodNames.append(name)
+                        foodNames.append(food)
                     }
                 } label: {
-                    HStack(spacing: 4) {
-                        AppIcon.Plus(size: 11, color: Palette.ink2)
-                        Text(name)
-                            .font(.system(size: 13, weight: .heavy))
-                            .tracking(-0.13)
-                            .foregroundStyle(Palette.ink2)
-                    }
-                    .padding(.horizontal, 12).padding(.vertical, 8)
-                    .background(Palette.bg2, in: Capsule())
+                    Text(food)
+                        .appFont(size: 13, weight: .heavy)
+                        .foregroundStyle(Palette.ink2)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .background(
+                            Palette.bg2,
+                            in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous)
+                        )
                 }
                 .buttonStyle(PressableStyle())
             }
@@ -188,23 +253,24 @@ struct RecipeEditSheet: View {
     }
 
     private func addCustom() {
-        let trimmed = customInput.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty, !foodNames.contains(trimmed) else {
+        guard !trimmedCustomInput.isEmpty else { return }
+        guard !foodNames.contains(trimmedCustomInput) else {
             customInput = ""
             return
         }
+
         withAnimation(.easeOut(duration: 0.16)) {
-            foodNames.append(trimmed)
+            foodNames.append(trimmedCustomInput)
         }
         customInput = ""
     }
 
     private func save() {
         guard canSave else { return }
-        if var r = original {
-            r.name = trimmedName
-            r.foodNames = foodNames
-            onSave(r)
+        if var recipe = original {
+            recipe.name = trimmedName
+            recipe.foodNames = foodNames
+            onSave(recipe)
         } else {
             onSave(Recipe(name: trimmedName, foodNames: foodNames))
         }

@@ -13,6 +13,7 @@ final class AppStore {
     var teeth: [ToothRecord] = ToothPosition.all.map(ToothRecord.empty(for:))
     var milestones: [Milestone] = []
     var theme: AppTheme = .blossom
+    var appearance: AppAppearance = .system
     var activeTimer: RunningTimer? = nil
     var feedDraft: FeedDraft? = nil
     var feedReminder: FeedReminderSettings = .init()
@@ -23,6 +24,7 @@ final class AppStore {
     static let minFormulaMilliliters = 10
     static let maxFormulaMilliliters = 500
     static let defaultFormulaMilliliters = 270
+    static let formulaMilliliterPresets = [120, 150, 180, 210, 240, 270]
 
     init(seedDemoData: Bool = false) {
         baby = seedDemoData ? Self.demoBaby() : Self.defaultBaby()
@@ -55,6 +57,12 @@ final class AppStore {
             birthDate: Calendar.current.date(from: DateComponents(year: 2025, month: 10, day: 18)) ?? Date(),
             gender: .girl
         )
+    }
+
+    func updateAppearance(_ appearance: AppAppearance) {
+        guard self.appearance != appearance else { return }
+        self.appearance = appearance
+        persist()
     }
 
     static func screenshotTodayEvents(on date: Date = Date(), calendar cal: Calendar = .current) -> [Event] {
@@ -686,6 +694,50 @@ final class AppStore {
         refreshSleepReminderSchedule()
     }
 
+    func updateSleepReminderMode(_ mode: SleepReminderMode) {
+        guard sleepReminder.mode != mode else { return }
+        sleepReminder.mode = mode
+        if mode == .awakeInterval, mostRecentEvent(kind: .sleep) == nil {
+            sleepReminder.anchorAt = Date()
+        }
+        persist()
+        refreshSleepReminderSchedule()
+    }
+
+    func updateSleepReminderScheduleEntry(id: String, minuteOfDay: Int) {
+        if sleepReminder.scheduleEntries.firstIndex(where: { $0.id == id }) == nil {
+            sleepReminder.scheduleEntries = sleepReminder.normalizedScheduleEntries
+        }
+        guard let index = sleepReminder.scheduleEntries.firstIndex(where: { $0.id == id }) else { return }
+        let clamped = SleepReminderSettings.clampedMinuteOfDay(minuteOfDay)
+        guard sleepReminder.scheduleEntries[index].minuteOfDay != clamped else { return }
+        sleepReminder.scheduleEntries[index].minuteOfDay = clamped
+        persist()
+        refreshSleepReminderSchedule()
+    }
+
+    func addSleepReminderScheduleEntry() {
+        var entries = sleepReminder.normalizedScheduleEntries
+        guard entries.count < SleepReminderSettings.maxScheduleEntries else { return }
+        let nextMinute = SleepReminderSettings.clampedMinuteOfDay(
+            (entries.last?.minuteOfDay ?? 7 * 60) + 2 * 60
+        )
+        entries.append(.init(minuteOfDay: nextMinute))
+        sleepReminder.scheduleEntries = entries
+        persist()
+        refreshSleepReminderSchedule()
+    }
+
+    func deleteSleepReminderScheduleEntry(id: String) {
+        let entries = sleepReminder.normalizedScheduleEntries
+        guard entries.count > SleepReminderSettings.minScheduleEntries else { return }
+        let updated = entries.filter { $0.id != id }
+        guard updated.count != entries.count else { return }
+        sleepReminder.scheduleEntries = updated
+        persist()
+        refreshSleepReminderSchedule()
+    }
+
     func setSleepReminderQuietHoursEnabled(_ isEnabled: Bool) {
         guard sleepReminder.quietHoursEnabled != isEnabled else { return }
         sleepReminder.quietHoursEnabled = isEnabled
@@ -743,8 +795,20 @@ final class AppStore {
     /// 备选模板中尚未加入用户计划的那些。
     var availableVaccineTemplates: [VaccineTemplate] {
         VaccineCatalog.presets.filter { t in
-            !vaccines.contains { matchesTemplate($0, t) }
+            !hasVaccineTemplate(t)
         }
+    }
+
+    var availableVaccineTemplateGroups: [VaccineTemplateGroup] {
+        VaccineCatalog.groupedPresets.compactMap { group in
+            let available = group.templates.filter { !hasVaccineTemplate($0) }
+            guard !available.isEmpty else { return nil }
+            return VaccineTemplateGroup(id: group.id, name: group.name, templates: available)
+        }
+    }
+
+    func hasVaccineTemplate(_ template: VaccineTemplate) -> Bool {
+        vaccines.contains { matchesTemplate($0, template) }
     }
 
     func recommendedDate(forMonths months: Int) -> Date {
@@ -793,6 +857,13 @@ final class AppStore {
         } else {
             vaccines[idx].doneDate = Date()
         }
+        persist()
+    }
+
+    func completeVaccine(_ id: String, on date: Date) {
+        guard let idx = vaccines.firstIndex(where: { $0.id == id }) else { return }
+        vaccines[idx].doneDate = date
+        sortVaccines()
         persist()
     }
 
@@ -1222,15 +1293,14 @@ enum SubScreen: String, Identifiable {
 }
 
 enum MainTab: String, CaseIterable, Identifiable, Hashable {
-    case home, records, growth, health, stats
+    case home, records, growth, health
     var id: String { rawValue }
     var label: String {
         switch self {
-        case .home:    return "首页"
+        case .home:    return "今天"
         case .records: return "记录"
         case .growth:  return "成长"
         case .health:  return "健康"
-        case .stats:   return "统计"
         }
     }
 }

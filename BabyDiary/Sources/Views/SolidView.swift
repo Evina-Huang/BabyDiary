@@ -6,6 +6,8 @@ struct SolidScreen: View {
 
     enum Unit: String, Hashable { case g, ml }
 
+    static let defaultFoodPresets = ["米糊", "蛋黄", "南瓜泥", "胡萝卜泥", "香蕉泥", "苹果泥"]
+
     @State private var selectedNames: [String] = []
     @State private var observationDaysMap: [String: Int] = [:]
     @State private var customInput: String = ""
@@ -13,87 +15,256 @@ struct SolidScreen: View {
     @State private var unit: Unit = .g
     @State private var time: Date = .now
     @State private var notes: String = ""
+    @State private var showObservationDetails = false
+    @State private var showNotes = false
 
     var body: some View {
         VStack(spacing: 0) {
             ScreenHeader(title: "辅食记录", onBack: onBack)
             ScreenBody {
-                observationStrip
-                nameBlock.padding(.top, 8)
-                amountBlock.padding(.top, 22)
-                timePicker.padding(.top, 22)
-                notesBlock.padding(.top, 22)
-                selectionNotice.padding(.top, 18)
-                saveButton.padding(.top, 12)
+                lastSolidContext.padding(.top, 8)
+
+                observationOverview.padding(.top, 14)
+                foodSelectionCard.padding(.top, 18)
+
+                if !selectedNames.isEmpty {
+                    recordDetailsCard
+                        .padding(.top, 18)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                    selectionNotice.padding(.top, 12)
+                    notesCard.padding(.top, 12)
+                }
+
+                saveButton.padding(.top, 20)
             }
         }
         .background(Palette.bg)
     }
 
+    private var observingFoods: [FoodItem] {
+        store.foods.filter { $0.status == .observing }
+    }
+
     @ViewBuilder
-    private var observationStrip: some View {
-        let obs = store.foods.filter { $0.status == .observing }
-        if !obs.isEmpty {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(Palette.yellowInk)
-                        .frame(width: 7, height: 7)
-                    Text("排敏中")
-                        .font(.system(size: 12, weight: .heavy))
-                        .tracking(0.72)
-                        .textCase(.uppercase)
+    private var lastSolidContext: some View {
+        if let lastAt = store.mostRecentEvent(kind: .solid)?.occurredAt {
+            TimelineView(.periodic(from: .now, by: 60)) { context in
+                let seconds = max(0, Int(context.date.timeIntervalSince(lastAt)))
+                let hours = seconds / 3600
+                let minutes = (seconds % 3600) / 60
+                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                    Text("距上次辅食")
+                        .appFont(size: 13, weight: .bold)
+                        .foregroundStyle(Palette.yellowInk.opacity(0.78))
+                    Spacer(minLength: 8)
+                    Text(hours > 0 ? "\(hours)时\(minutes)分" : "\(minutes)分")
+                        .appFont(size: 20, weight: .black)
+                        .monospacedDigit()
                         .foregroundStyle(Palette.yellowInk)
                 }
-                VStack(spacing: 8) {
-                    ForEach(obs) { food in
-                        ObservationChip(food: food)
-                    }
-                }
+                .padding(.horizontal, 16)
+                .frame(maxWidth: .infinity, minHeight: 62)
+                .background(
+                    Palette.yellow.opacity(0.78),
+                    in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous)
+                )
+                .accessibilityElement(children: .combine)
             }
-            .padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Palette.yellow.opacity(0.55),
-                        in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .stroke(Palette.yellowInk.opacity(0.12), lineWidth: 1)
-            )
-            .padding(.top, 8)
         }
     }
 
-    private var nameBlock: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            FieldLabel(text: "食物名称（可多选）")
-            if !selectedNames.isEmpty {
-                selectedFoodsCard
+    private var frequentFoodNames: [String] {
+        let recentCustomNames = store.foods
+            .filter { $0.status != .allergic }
+            .sorted {
+                if $0.timesEaten == $1.timesEaten { return $0.name < $1.name }
+                return $0.timesEaten > $1.timesEaten
             }
-            HStack(spacing: 10) {
-                TextField("输入其他食物名称", text: $customInput)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(Palette.ink)
-                    .onSubmit { addCustom() }
-                if !customInput.trimmingCharacters(in: .whitespaces).isEmpty {
-                    Button("添加") { addCustom() }
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(store.theme.primary600)
+            .map(\.name)
+            .filter { !Self.defaultFoodPresets.contains($0) }
+        return Array(recentCustomNames.prefix(2)) + Self.defaultFoodPresets
+    }
+
+    private var amountPresets: [Int] {
+        switch unit {
+        case .g: return [10, 20, 30, 50]
+        case .ml: return [30, 60, 90, 120]
+        }
+    }
+
+    @ViewBuilder
+    private var observationOverview: some View {
+        if !observingFoods.isEmpty {
+            let dueCount = observingFoods.filter(\.isObservationDue).count
+            VStack(spacing: 0) {
+                Button {
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        showObservationDetails.toggle()
+                    }
+                } label: {
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("排敏进度")
+                                .appFont(size: 15, weight: .bold)
+                                .foregroundStyle(Palette.ink)
+                            Text(dueCount > 0
+                                 ? "有 \(dueCount) 种食材等待确认"
+                                 : "\(observingFoods.count) 种食材正在观察")
+                                .appFont(size: 12, weight: .semibold)
+                                .foregroundStyle(dueCount > 0 ? Palette.yellowInk : Palette.ink3)
+                        }
+
+                        Spacer(minLength: 8)
+
+                        Text(showObservationDetails ? "收起" : "查看")
+                            .appFont(size: 12, weight: .bold)
+                            .foregroundStyle(Palette.yellowInk)
+                        AppIcon.Chevron(size: 14, color: Palette.yellowInk)
+                            .rotationEffect(.degrees(showObservationDetails ? 90 : 0))
+                    }
+                    .padding(.horizontal, 16)
+                    .frame(maxWidth: .infinity, minHeight: 70)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(PressableStyle())
+                .accessibilityLabel("排敏进度，\(observingFoods.count) 种食材，\(dueCount) 种待确认")
+                .accessibilityValue(showObservationDetails ? "已展开" : "已收起")
+
+                if showObservationDetails {
+                    Rectangle()
+                        .fill(Palette.yellowInk.opacity(0.1))
+                        .frame(height: 1)
+                        .padding(.horizontal, 14)
+
+                    VStack(spacing: 8) {
+                        ForEach(observingFoods) { food in
+                            ObservationChip(food: food)
+                        }
+                    }
+                    .padding(14)
+                    .transition(.opacity)
                 }
             }
-            .padding(.horizontal, 16).padding(.vertical, 14)
-            .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            if !store.recipes.isEmpty {
-                recipeRow
+            .background(
+                Palette.yellow.opacity(0.52),
+                in: RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous)
+                    .stroke(Palette.yellowInk.opacity(0.12), lineWidth: 1)
             }
         }
+    }
+
+    private var foodSelectionCard: some View {
+        Card(padding: 16) {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(spacing: 12) {
+                    CategoryIcon(kind: .solid, size: 44)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("这次吃了什么？")
+                            .appFont(size: 17, weight: .bold)
+                            .foregroundStyle(Palette.ink)
+                        Text(selectedNames.isEmpty
+                             ? "可以选择多种食物"
+                             : "已选择 \(selectedNames.count) 种")
+                            .appFont(size: 12, weight: .medium)
+                            .foregroundStyle(Palette.ink3)
+                    }
+                    Spacer(minLength: 0)
+                }
+
+                if !selectedNames.isEmpty {
+                    selectedFoodsCard
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+
+                foodInput
+
+                quickFoods
+
+                if !store.recipes.isEmpty {
+                    recipeRow
+                }
+            }
+        }
+    }
+
+    private var foodInput: some View {
+        HStack(spacing: 10) {
+            TextField("输入食物名称", text: $customInput)
+                .appFont(size: 16, weight: .semibold)
+                .foregroundStyle(Palette.ink)
+                .submitLabel(.done)
+                .onSubmit(addCustom)
+
+            if !customInput.trimmingCharacters(in: .whitespaces).isEmpty {
+                Button("添加", action: addCustom)
+                    .appFont(size: 13, weight: .bold)
+                    .foregroundStyle(store.theme.primary600)
+                    .frame(minWidth: 52, minHeight: 44)
+                    .background(store.theme.primaryTint, in: Capsule())
+                    .buttonStyle(PressableStyle())
+            }
+        }
+        .padding(.leading, 14)
+        .padding(.trailing, 6)
+        .frame(minHeight: 52)
+        .background(Palette.bg2, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
+        .accessibilityElement(children: .contain)
+    }
+
+    private var quickFoods: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            Text("常用食物")
+                .appText(.micro)
+                .foregroundStyle(Palette.ink3)
+
+            let columns = [GridItem(.adaptive(minimum: 86), spacing: 8)]
+            LazyVGrid(columns: columns, alignment: .leading, spacing: 8) {
+                ForEach(frequentFoodNames, id: \.self) { foodName in
+                    quickFoodButton(foodName)
+                }
+            }
+        }
+    }
+
+    private func quickFoodButton(_ foodName: String) -> some View {
+        let isSelected = selectedNames.contains(foodName)
+        return Button {
+            withAnimation(.easeOut(duration: 0.18)) {
+                toggleFood(foodName)
+            }
+        } label: {
+            HStack(spacing: 6) {
+                if isSelected {
+                    AppIcon.Check(size: 13, color: Palette.yellowInk)
+                }
+                Text(foodName)
+                    .appFont(size: 13, weight: .bold)
+                    .foregroundStyle(isSelected ? Palette.yellowInk : Palette.ink2)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
+            }
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .padding(.horizontal, 10)
+            .background(
+                isSelected ? Palette.yellow : Palette.bg2,
+                in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous)
+                    .stroke(isSelected ? Palette.yellowInk.opacity(0.14) : .clear, lineWidth: 1)
+            }
+        }
+        .buttonStyle(PressableStyle())
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     private var recipeRow: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 9) {
             Text("我的食谱")
-                .font(.system(size: 11, weight: .heavy))
-                .tracking(0.66)
-                .textCase(.uppercase)
+                .appText(.micro)
                 .foregroundStyle(Palette.ink3)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
@@ -106,26 +277,314 @@ struct SolidScreen: View {
     }
 
     private func recipeChip(_ recipe: Recipe) -> some View {
-        let on = selectedNames.contains(allOf: recipe.foodNames)
+        let isSelected = selectedNames.contains(allOf: recipe.foodNames)
         return Button {
-            withAnimation(.easeOut(duration: 0.16)) {
+            withAnimation(.easeOut(duration: 0.18)) {
                 applyRecipe(recipe)
             }
         } label: {
             HStack(spacing: 6) {
+                if isSelected {
+                    AppIcon.Check(size: 13, color: .white)
+                }
                 Text(recipe.name)
-                    .font(.system(size: 13, weight: .heavy))
-                    .tracking(-0.13)
-                    .foregroundStyle(on ? .white : Palette.ink2)
-                Text("· \(recipe.foodNames.count)")
-                    .font(.system(size: 11, weight: .bold))
+                    .appFont(size: 13, weight: .bold)
+                    .foregroundStyle(isSelected ? .white : Palette.ink2)
+                Text("\(recipe.foodNames.count) 种")
+                    .appFont(size: 11, weight: .bold)
                     .monospacedDigit()
-                    .foregroundStyle(on ? .white.opacity(0.78) : Palette.ink3)
+                    .foregroundStyle(isSelected ? .white.opacity(0.78) : Palette.ink3)
             }
-            .padding(.horizontal, 14).padding(.vertical, 8)
-            .background(on ? store.theme.primary : Palette.bg2, in: Capsule())
+            .padding(.horizontal, 14)
+            .frame(minHeight: 44)
+            .background(isSelected ? store.theme.primary : Palette.bg2, in: Capsule())
         }
         .buttonStyle(PressableStyle())
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private var selectedFoodsCard: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(selectedNames.enumerated()), id: \.element) { index, foodName in
+                let existing = store.foods.first { $0.name == foodName }
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 8) {
+                        Text(foodName)
+                            .appFont(size: 14, weight: .bold)
+                            .foregroundStyle(Palette.ink)
+                        Spacer(minLength: 0)
+                        if let existing {
+                            statusBadge(for: existing)
+                        }
+                        Button {
+                            withAnimation(.easeOut(duration: 0.16)) {
+                                selectedNames.removeAll { $0 == foodName }
+                                observationDaysMap.removeValue(forKey: foodName)
+                            }
+                        } label: {
+                            AppIcon.Close(size: 14, color: Palette.ink3)
+                                .frame(width: 44, height: 44)
+                        }
+                        .buttonStyle(PressableStyle())
+                        .accessibilityLabel("移除\(foodName)")
+                    }
+
+                    if existing == nil {
+                        HStack(spacing: 10) {
+                            Text("排敏观察")
+                                .appFont(size: 12, weight: .semibold)
+                                .foregroundStyle(Palette.ink3)
+                            Spacer(minLength: 0)
+                            SegPill<Int>(
+                                selection: daysBinding(for: foodName),
+                                options: [(3, "3天"), (5, "5天"), (7, "7天")]
+                            )
+                            .frame(minHeight: 44)
+                        }
+                    }
+                }
+                .padding(.leading, 14)
+                .padding(.trailing, 4)
+                .padding(.vertical, 6)
+
+                if index < selectedNames.count - 1 {
+                    Rectangle()
+                        .fill(Palette.line)
+                        .frame(height: 1)
+                        .padding(.horizontal, 14)
+                }
+            }
+        }
+        .background(Palette.bg2, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
+    }
+
+    @ViewBuilder
+    private func statusBadge(for food: FoodItem) -> some View {
+        switch food.status {
+        case .observing:
+            Text(food.isObservationDue ? "待确认" : "排敏中")
+                .foregroundStyle(Palette.yellowInk)
+                .background(Palette.yellow, in: Capsule())
+                .modifier(FoodStatusBadgeStyle())
+        case .safe:
+            Text("已安全")
+                .foregroundStyle(Palette.mint600)
+                .background(Palette.mintTint, in: Capsule())
+                .modifier(FoodStatusBadgeStyle())
+        case .allergic:
+            Text("已过敏")
+                .foregroundStyle(Palette.pinkInk)
+                .background(Palette.pink, in: Capsule())
+                .modifier(FoodStatusBadgeStyle())
+        }
+    }
+
+    private var recordDetailsCard: some View {
+        Card(padding: 16) {
+            VStack(alignment: .leading, spacing: 18) {
+                Text("记录详情")
+                    .appFont(size: 16, weight: .bold)
+                    .foregroundStyle(Palette.ink)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 10) {
+                        FieldLabel(text: "份量")
+                        Spacer(minLength: 0)
+                        SegPill<Unit>(
+                            selection: $unit,
+                            options: [(.g, "克 g"), (.ml, "毫升 ml")]
+                        )
+                        .frame(minHeight: 44)
+                    }
+
+                    HStack(spacing: 8) {
+                        TextField("少量", text: $amount)
+                            .appFont(size: 17, weight: .semibold)
+                            .foregroundStyle(Palette.ink)
+                            .keyboardType(.numberPad)
+                        Text(unit.rawValue)
+                            .appFont(size: 14, weight: .bold)
+                            .foregroundStyle(Palette.ink3)
+                    }
+                    .padding(.horizontal, 14)
+                    .frame(minHeight: 50)
+                    .background(Palette.bg2, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
+
+                    HStack(spacing: 8) {
+                        amountPresetButton(nil)
+                        ForEach(amountPresets, id: \.self) { value in
+                            amountPresetButton(value)
+                        }
+                    }
+                }
+
+                InlineWheelTimePicker(time: $time, theme: store.theme)
+            }
+        }
+    }
+
+    private func amountPresetButton(_ value: Int?) -> some View {
+        let presetAmount = value.map(String.init) ?? ""
+        let isSelected = amount.trimmingCharacters(in: .whitespaces) == presetAmount
+        let label = value.map { "\($0)\(unit.rawValue)" } ?? "少量"
+
+        return Button {
+            amount = presetAmount
+        } label: {
+            Text(label)
+                .appFont(size: 12, weight: .bold)
+                .lineLimit(1)
+                .foregroundStyle(isSelected ? Palette.yellowInk : Palette.ink2)
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .background(
+                    isSelected ? Palette.yellow : Palette.bg2,
+                    in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous)
+                )
+        }
+        .buttonStyle(PressableStyle())
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    @ViewBuilder
+    private var selectionNotice: some View {
+        let needsObservation = selectedNames.filter { name in
+            if let food = store.foods.first(where: { $0.name == name }) {
+                return food.status == .observing
+            }
+            return true
+        }
+        let allergic = selectedNames.filter { name in
+            store.foods.first(where: { $0.name == name })?.status == .allergic
+        }
+
+        if !needsObservation.isEmpty || !allergic.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                if !needsObservation.isEmpty {
+                    warningLine(
+                        "\(needsObservation.joined(separator: "、"))仍在排敏观察",
+                        tint: Palette.yellow,
+                        ink: Palette.yellowInk
+                    )
+                }
+                if !allergic.isEmpty {
+                    warningLine(
+                        "含已过敏食材：\(allergic.joined(separator: "、"))",
+                        tint: Palette.pink,
+                        ink: Palette.pinkInk
+                    )
+                }
+            }
+        }
+    }
+
+    private func warningLine(_ text: String, tint: Color, ink: Color) -> some View {
+        HStack(alignment: .top, spacing: 9) {
+            Text("!")
+                .appText(.captionEmphasis)
+                .foregroundStyle(ink)
+                .frame(width: 22, height: 22)
+                .background(Palette.card.opacity(0.62), in: Circle())
+            Text(text)
+                .appFont(size: 12, weight: .bold)
+                .foregroundStyle(ink)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(12)
+        .background(tint.opacity(0.58), in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
+    }
+
+    private var notesCard: some View {
+        Card(padding: 0) {
+            VStack(spacing: 0) {
+                Button {
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        showNotes.toggle()
+                    }
+                } label: {
+                    HStack(spacing: 10) {
+                        AppIcon.Plus(size: 18, color: store.theme.primary600)
+                            .rotationEffect(.degrees(showNotes ? 45 : 0))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("添加备注")
+                                .appFont(size: 14, weight: .bold)
+                                .foregroundStyle(Palette.ink)
+                            Text("口味偏好、反应等，可选")
+                                .appFont(size: 11, weight: .medium)
+                                .foregroundStyle(Palette.ink3)
+                        }
+                        Spacer(minLength: 0)
+                        Text(showNotes ? "收起" : "填写")
+                            .appFont(size: 12, weight: .bold)
+                            .foregroundStyle(store.theme.primary600)
+                    }
+                    .padding(.horizontal, 16)
+                    .frame(maxWidth: .infinity, minHeight: 64)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(PressableStyle())
+                .accessibilityValue(showNotes ? "已展开" : "已收起")
+
+                if showNotes {
+                    TextField("例如：第一次吃南瓜，很喜欢", text: $notes, axis: .vertical)
+                        .lineLimit(2...4)
+                        .appFont(size: 16, weight: .semibold)
+                        .foregroundStyle(Palette.ink)
+                        .padding(14)
+                        .background(Palette.bg2, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 16)
+                        .transition(.opacity)
+                }
+            }
+        }
+    }
+
+    private var saveButton: some View {
+        let enabled = !selectedNames.isEmpty
+        let background: Color = enabled ? store.theme.primary : Palette.bg2
+        let foreground: Color = enabled ? .white : Palette.ink3
+        return Button(action: submit) {
+            HStack(spacing: 8) {
+                if enabled {
+                    AppIcon.Check(size: 18, color: foreground)
+                }
+                Text(enabled ? "保存辅食记录" : "请先选择食物")
+                    .appFont(size: 17, weight: .heavy)
+                    .foregroundStyle(foreground)
+            }
+            .frame(maxWidth: .infinity, minHeight: 56)
+            .background(background, in: RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous))
+            .shadowPill(tint: enabled ? background.opacity(0.9) : .clear)
+        }
+        .buttonStyle(PressableStyle())
+        .disabled(!enabled)
+    }
+
+    private func toggleFood(_ name: String) {
+        if selectedNames.contains(name) {
+            selectedNames.removeAll { $0 == name }
+            observationDaysMap.removeValue(forKey: name)
+        } else {
+            selectedNames.append(name)
+            if store.foods.first(where: { $0.name == name }) == nil {
+                observationDaysMap[name] = 3
+            }
+        }
+    }
+
+    private func addCustom() {
+        let trimmed = customInput.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+
+        if !selectedNames.contains(trimmed) {
+            withAnimation(.easeOut(duration: 0.18)) {
+                selectedNames.append(trimmed)
+                if store.foods.first(where: { $0.name == trimmed }) == nil {
+                    observationDaysMap[trimmed] = 3
+                }
+            }
+        }
+        customInput = ""
     }
 
     private func applyRecipe(_ recipe: Recipe) {
@@ -138,106 +597,10 @@ struct SolidScreen: View {
         } else {
             for name in recipe.foodNames where !selectedNames.contains(name) {
                 selectedNames.append(name)
-                observationDaysMap[name] = 3
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var selectionNotice: some View {
-        let needsObservation = selectedNames.filter { name in
-            if let f = store.foods.first(where: { $0.name == name }) {
-                return f.status == .observing
-            }
-            return true
-        }
-        let allergic = selectedNames.filter { name in
-            store.foods.first(where: { $0.name == name })?.status == .allergic
-        }
-        if !needsObservation.isEmpty || !allergic.isEmpty {
-            VStack(alignment: .leading, spacing: 6) {
-                if !needsObservation.isEmpty {
-                    Label("包含 \(needsObservation.count) 项未排敏食材：\(needsObservation.joined(separator: "、"))",
-                          systemImage: "exclamationmark.circle.fill")
-                        .font(.system(size: 12, weight: .heavy))
-                        .foregroundStyle(Palette.yellowInk)
-                }
-                if !allergic.isEmpty {
-                    Label("含已过敏食材：\(allergic.joined(separator: "、"))",
-                          systemImage: "exclamationmark.triangle.fill")
-                        .font(.system(size: 12, weight: .heavy))
-                        .foregroundStyle(Color(hex: 0xD44E3A))
+                if store.foods.first(where: { $0.name == name }) == nil {
+                    observationDaysMap[name] = 3
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 14).padding(.vertical, 10)
-            .background(Palette.yellow.opacity(0.45),
-                        in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        }
-    }
-
-    // Each selected food gets its own observation-days picker (only for new foods)
-    private var selectedFoodsCard: some View {
-        VStack(spacing: 0) {
-            ForEach(Array(selectedNames.enumerated()), id: \.element) { i, foodName in
-                let existing = store.foods.first { $0.name == foodName }
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text(foodName)
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(Palette.ink)
-                        Spacer(minLength: 0)
-                        if let existing {
-                            statusBadge(for: existing)
-                        }
-                        Button {
-                            withAnimation(.easeOut(duration: 0.16)) {
-                                selectedNames.removeAll { $0 == foodName }
-                                observationDaysMap.removeValue(forKey: foodName)
-                            }
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 17))
-                                .foregroundStyle(Palette.ink3)
-                        }
-                    }
-                    if existing == nil {
-                        SegPill<Int>(
-                            selection: daysBinding(for: foodName),
-                            options: [(3, "3天"), (5, "5天"), (7, "7天")]
-                        )
-                    }
-                }
-                .padding(.horizontal, 16).padding(.vertical, 12)
-                if i < selectedNames.count - 1 {
-                    Rectangle().fill(Palette.line).frame(height: 1).padding(.horizontal, 16)
-                }
-            }
-        }
-        .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-    }
-
-    @ViewBuilder
-    private func statusBadge(for food: FoodItem) -> some View {
-        switch food.status {
-        case .observing:
-            Text(food.isObservationDue ? "待确认" : "排敏中")
-                .font(.system(size: 11, weight: .heavy))
-                .foregroundStyle(Palette.yellowInk)
-                .padding(.horizontal, 8).padding(.vertical, 3)
-                .background(Palette.yellow, in: Capsule())
-        case .safe:
-            Text("已安全")
-                .font(.system(size: 11, weight: .heavy))
-                .foregroundStyle(Palette.mint600)
-                .padding(.horizontal, 8).padding(.vertical, 3)
-                .background(Palette.mintTint, in: Capsule())
-        case .allergic:
-            Text("已过敏")
-                .font(.system(size: 11, weight: .heavy))
-                .foregroundStyle(Color(hex: 0xD44E3A))
-                .padding(.horizontal, 8).padding(.vertical, 3)
-                .background(Color(hex: 0xFFDDD8), in: Capsule())
         }
     }
 
@@ -248,87 +611,32 @@ struct SolidScreen: View {
         )
     }
 
-    private var amountBlock: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .center) {
-                FieldLabel(text: "份量")
-                Spacer()
-                SegPill<Unit>(selection: $unit,
-                              options: [(.g, "克 (g)"), (.ml, "毫升 (ml)")])
-            }
-            HStack {
-                TextField("填入份量", text: $amount)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(Palette.ink)
-                    .keyboardType(.numberPad)
-                Text(unit.rawValue)
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(Palette.ink3)
-            }
-            .padding(.horizontal, 16).padding(.vertical, 14)
-            .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        }
-    }
-
-    private var timePicker: some View {
-        InlineWheelTimePicker(time: $time, theme: store.theme)
-    }
-
-    private var notesBlock: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            FieldLabel(text: "备注（可选）")
-            TextField("例如：第一次吃南瓜，很喜欢", text: $notes, axis: .vertical)
-                .lineLimit(3, reservesSpace: true)
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(Palette.ink)
-                .padding(.horizontal, 16).padding(.vertical, 14)
-                .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        }
-    }
-
-    private var saveButton: some View {
-        let enabled = !selectedNames.isEmpty
-        let bg: Color = enabled ? store.theme.primary : Palette.bg2
-        let fg: Color = enabled ? .white : Palette.ink3
-        return Button(action: submit) {
-            Text("保存记录")
-                .font(.system(size: 17, weight: .heavy))
-                .tracking(-0.17)
-                .foregroundStyle(fg)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 18)
-                .background(bg, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-                .shadowPill(tint: enabled ? bg.opacity(0.9) : .clear)
-        }
-        .buttonStyle(PressableStyle())
-        .disabled(!enabled)
-    }
-
-    private func addCustom() {
-        let trimmed = customInput.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty, !selectedNames.contains(trimmed) else {
-            customInput = ""
-            return
-        }
-        withAnimation(.easeOut(duration: 0.16)) {
-            selectedNames.append(trimmed)
-            observationDaysMap[trimmed] = 3
-        }
-        customInput = ""
-    }
-
     private func submit() {
         guard !selectedNames.isEmpty else { return }
-        let amt = amount.trimmingCharacters(in: .whitespaces)
-        let amountStr = amt.isEmpty ? "少量" : "\(amt)\(unit.rawValue)"
+        let trimmedAmount = amount.trimmingCharacters(in: .whitespaces)
+        let amountText = trimmedAmount.isEmpty ? "少量" : "\(trimmedAmount)\(unit.rawValue)"
         let trimmedNotes = notes.trimmingCharacters(in: .whitespaces)
-        let sub = trimmedNotes.isEmpty ? amountStr : "\(amountStr) · \(trimmedNotes)"
+        let subtitle = trimmedNotes.isEmpty ? amountText : "\(amountText) · \(trimmedNotes)"
         let title = selectedNames.joined(separator: " · ")
-        store.addEvent(.init(kind: .solid, at: time, title: title, sub: sub))
+
+        store.addEvent(.init(kind: .solid, at: time, title: title, sub: subtitle))
         for foodName in selectedNames {
-            store.recordSolidFood(foodName, at: time, observationDays: observationDaysMap[foodName] ?? 3)
+            store.recordSolidFood(
+                foodName,
+                at: time,
+                observationDays: observationDaysMap[foodName] ?? 3
+            )
         }
         onBack()
+    }
+}
+
+private struct FoodStatusBadgeStyle: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .appFont(size: 11, weight: .heavy)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
     }
 }
 
@@ -339,47 +647,75 @@ private extension Array where Element: Equatable {
     }
 }
 
-// MARK: — Observation chip inside the排敏 strip
-
 private struct ObservationChip: View {
     let food: FoodItem
     @Environment(AppStore.self) private var store
 
     var body: some View {
-        HStack(spacing: 10) {
-            Text(food.name)
-                .font(.system(size: 14, weight: .heavy))
-                .tracking(-0.14)
-                .foregroundStyle(Palette.yellowInk)
-            Spacer(minLength: 0)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Text(food.name)
+                    .appFont(size: 14, weight: .bold)
+                    .foregroundStyle(Palette.yellowInk)
+                Spacer(minLength: 0)
+                if food.isObservationDue {
+                    Text("待确认")
+                        .appFont(size: 11, weight: .heavy)
+                        .foregroundStyle(Palette.yellowInk)
+                } else {
+                    Text("还剩 \(food.daysRemaining) 天")
+                        .appFont(size: 12, weight: .bold)
+                        .monospacedDigit()
+                        .foregroundStyle(Palette.yellowInk.opacity(0.8))
+                }
+            }
+
             if food.isObservationDue {
                 HStack(spacing: 8) {
-                    chipButton("没有反应 → 安全", bg: Palette.mintTint, fg: Palette.mint600) {
+                    observationButton(
+                        "没有反应",
+                        suffix: "标记安全",
+                        background: Palette.mintTint,
+                        foreground: Palette.mint600
+                    ) {
                         withAnimation { store.updateFoodStatus(food.id, .safe) }
                     }
-                    chipButton("有反应 → 过敏", bg: Color(hex: 0xFFDDD8), fg: Color(hex: 0xD44E3A)) {
+                    observationButton(
+                        "出现反应",
+                        suffix: "标记过敏",
+                        background: Palette.pink,
+                        foreground: Palette.pinkInk
+                    ) {
                         withAnimation { store.updateFoodStatus(food.id, .allergic) }
                     }
                 }
-            } else {
-                Text("还剩 \(food.daysRemaining) 天")
-                    .font(.system(size: 12, weight: .bold))
-                    .monospacedDigit()
-                    .foregroundStyle(Palette.yellowInk.opacity(0.75))
             }
         }
-        .padding(.horizontal, 12).padding(.vertical, 9)
-        .background(Color.white.opacity(0.65),
-                    in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .padding(12)
+        .background(
+            Palette.card.opacity(0.68),
+            in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous)
+        )
     }
 
-    private func chipButton(_ label: String, bg: Color, fg: Color, action: @escaping () -> Void) -> some View {
+    private func observationButton(
+        _ title: String,
+        suffix: String,
+        background: Color,
+        foreground: Color,
+        action: @escaping () -> Void
+    ) -> some View {
         Button(action: action) {
-            Text(label)
-                .font(.system(size: 11, weight: .heavy))
-                .foregroundStyle(fg)
-                .padding(.horizontal, 10).padding(.vertical, 5)
-                .background(bg, in: Capsule())
+            VStack(spacing: 1) {
+                Text(title)
+                    .appFont(size: 12, weight: .bold)
+                Text(suffix)
+                    .appFont(size: 10, weight: .semibold)
+                    .opacity(0.8)
+            }
+            .foregroundStyle(foreground)
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .background(background, in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
         }
         .buttonStyle(PressableStyle())
     }

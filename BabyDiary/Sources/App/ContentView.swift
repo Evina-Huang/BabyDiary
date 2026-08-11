@@ -1,11 +1,11 @@
 import SwiftUI
 
 fileprivate enum FloatingDockMetrics {
-    static let width: CGFloat = 208
+    static let width: CGFloat = 228
     static let horizontalInset: CGFloat = 18
     static let topInset: CGFloat = 12
     static let bottomInset: CGFloat = 92
-    static let estimatedHeight: CGFloat = 56
+    static let estimatedHeight: CGFloat = 64
 }
 
 struct ContentView: View {
@@ -21,11 +21,11 @@ struct ContentView: View {
             case .records: RecordsView()
             case .growth:  GrowthView(onOpen: { sub = $0 }, onOpenHealth: { tab = .health })
             case .health:  HealthView(onOpen: { sub = $0 })
-            case .stats:   StatsView()
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Palette.bg.ignoresSafeArea())
+        .respectReduceMotion()
         .onAppear(perform: registerShortcutHandling)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             AppTabBar(tab: $tab)
@@ -159,38 +159,57 @@ private struct FloatingDockLayer: View {
 
     @ViewBuilder
     private var dockContent: some View {
-        VStack(alignment: .trailing, spacing: 10) {
-            if let feedDraft = store.feedDraft,
-               feedDraft.hasActiveState,
-               sub != .feed {
-                ActiveFeedDock(draft: feedDraft,
-                               theme: store.theme,
-                               onOpen: {
-                                   guard !suppressDockOpen else { return }
-                                   sub = .feed
-                               },
-                               onClose: { store.syncFeedDraft(nil) })
-                    .transition(.move(edge: .trailing).combined(with: .opacity))
-            }
-
-            if let timer = store.activeTimer,
-               timer.kind == .sleep,
-               sub != .sleep {
-                ActiveSleepDock(timer: timer,
-                                theme: store.theme,
-                                onOpen: {
-                                    guard !suppressDockOpen else { return }
-                                    sub = .sleep
-                                },
-                                onClose: { store.stopTimer() })
-                    .transition(.move(edge: .trailing).combined(with: .opacity))
-            }
+        switch activeDockItem {
+        case .feed(let draft):
+            ActiveFeedDock(draft: draft,
+                           onOpen: {
+                               guard !suppressDockOpen else { return }
+                               sub = .feed
+                           })
+                .transition(.move(edge: .trailing).combined(with: .opacity))
+        case .sleep(let timer):
+            ActiveSleepDock(timer: timer,
+                            onOpen: {
+                                guard !suppressDockOpen else { return }
+                                sub = .sleep
+                            })
+                .transition(.move(edge: .trailing).combined(with: .opacity))
+        case nil:
+            EmptyView()
         }
     }
 
     private var hasFloatingDock: Bool {
-        (store.feedDraft?.hasActiveState == true && sub != .feed) ||
-        ((store.activeTimer?.kind == .sleep) && sub != .sleep)
+        activeDockItem != nil
+    }
+
+    private var activeDockItem: FloatingDockItem? {
+        let feedDraft = store.feedDraft.flatMap { draft in
+            draft.hasActiveState && sub != .feed ? draft : nil
+        }
+        let sleepTimer = store.activeTimer.flatMap { timer in
+            timer.kind == .sleep && sub != .sleep ? timer : nil
+        }
+
+        switch (feedDraft, sleepTimer) {
+        case let (.some(feed), .some(sleep)):
+            return feedDraftStart(feed) >= sleep.startedAt ? .feed(feed) : .sleep(sleep)
+        case let (.some(feed), nil):
+            return .feed(feed)
+        case let (nil, .some(sleep)):
+            return .sleep(sleep)
+        case (nil, nil):
+            return nil
+        }
+    }
+
+    private func feedDraftStart(_ draft: FeedDraft) -> Date {
+        switch draft.mode {
+        case .breast:
+            return draft.breastSessionStart ?? draft.breastSegmentStart ?? .distantPast
+        case .formula:
+            return draft.formulaSessionStart ?? draft.formulaSegmentStart ?? .distantPast
+        }
     }
 
     private func displayedDockOrigin(in containerSize: CGSize) -> CGPoint {
@@ -327,11 +346,14 @@ private enum FloatingDockSide {
     case right
 }
 
+private enum FloatingDockItem {
+    case feed(FeedDraft)
+    case sleep(RunningTimer)
+}
+
 private struct ActiveSleepDock: View {
     let timer: RunningTimer
-    let theme: AppTheme
     let onOpen: () -> Void
-    let onClose: () -> Void
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { ctx in
@@ -344,14 +366,14 @@ private struct ActiveSleepDock: View {
         let title = timer.isRunning ? "睡觉中" : "已暂停"
         let duration = timer.isRunning ? timer.elapsed(at: date) : timer.accumulated
 
-        return ZStack(alignment: .topTrailing) {
+        return Button(action: onOpen) {
             HStack(spacing: 10) {
                 ZStack {
-                    Circle()
-                        .fill(Color.white.opacity(0.65))
-                    AppIcon.Moon(size: 18, color: accent)
+                    RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous)
+                        .fill(Palette.card.opacity(0.78))
+                    AppIcon.Moon(size: 20, color: accent)
                 }
-                .frame(width: 36, height: 36)
+                .frame(width: 42, height: 42)
 
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
@@ -359,60 +381,44 @@ private struct ActiveSleepDock: View {
                             DockPulseDot(color: accent)
                         }
                         Text(title)
-                            .font(.system(size: 11, weight: .heavy))
-                            .tracking(0.66)
-                            .textCase(.uppercase)
+                            .appFont(size: 12, weight: .bold)
                     }
                     .foregroundStyle(accent)
 
                     Text(formatDur(duration))
-                        .font(.system(size: 16, weight: .black))
-                        .tracking(-0.32)
+                        .appFont(size: 17, weight: .bold)
                         .monospacedDigit()
                         .foregroundStyle(Palette.ink)
                 }
 
-                Spacer(minLength: 14)
-                    .frame(width: 14)
-            }
-            .padding(.leading, 10)
-            .padding(.trailing, 36)
-            .padding(.vertical, 8)
-            .background(
-                LinearGradient(colors: [Color(hex: 0xE8DCF7), Color(hex: 0xF7F1FC)],
-                               startPoint: .topLeading,
-                               endPoint: .bottomTrailing),
-                in: Capsule()
-            )
-            .overlay(
-                Capsule()
-                    .stroke(Color.white.opacity(0.5), lineWidth: 1)
-            )
-            .shadow(color: theme.primary.opacity(0.12), radius: 18, x: 0, y: 10)
-            .frame(width: FloatingDockMetrics.width, alignment: .leading)
-            .contentShape(Capsule())
-            .onTapGesture(perform: onOpen)
+                Spacer(minLength: 6)
 
-            Button(action: onClose) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(Palette.ink3)
-                    .frame(width: 24, height: 24)
-                    .background(Color.white.opacity(0.78), in: Circle())
+                Text("继续")
+                    .appFont(size: 12, weight: .bold)
+                    .foregroundStyle(accent)
+                    .padding(.horizontal, 11)
+                    .frame(minHeight: 34)
+                    .background(Palette.card.opacity(0.78), in: Capsule())
             }
-            .buttonStyle(.plain)
-            .padding(.top, 7)
-            .padding(.trailing, 7)
+            .padding(.horizontal, 10)
+            .frame(width: FloatingDockMetrics.width, alignment: .leading)
+            .frame(minHeight: 64)
+            .background(Palette.lavender, in: Capsule())
+            .overlay {
+                Capsule().stroke(Palette.lavenderInk.opacity(0.12), lineWidth: 1)
+            }
+            .shadowCard()
+            .contentShape(Capsule())
         }
-        .frame(width: FloatingDockMetrics.width, alignment: .leading)
+        .buttonStyle(PressableStyle())
+        .accessibilityLabel("\(title)，\(formatDur(duration))")
+        .accessibilityHint("打开睡眠记录")
     }
 }
 
 private struct ActiveFeedDock: View {
     let draft: FeedDraft
-    let theme: AppTheme
     let onOpen: () -> Void
-    let onClose: () -> Void
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { ctx in
@@ -423,14 +429,14 @@ private struct ActiveFeedDock: View {
     private func content(at date: Date) -> some View {
         let status = feedDockStatus(at: date)
 
-        return ZStack(alignment: .topTrailing) {
+        return Button(action: onOpen) {
             HStack(spacing: 10) {
                 ZStack {
-                    Circle()
-                        .fill(Color.white.opacity(0.65))
-                    AppIcon.Bottle(size: 18, color: status.ink)
+                    RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous)
+                        .fill(Palette.card.opacity(0.78))
+                    AppIcon.Bottle(size: 20, color: status.ink)
                 }
-                .frame(width: 36, height: 36)
+                .frame(width: 42, height: 42)
 
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
@@ -438,52 +444,38 @@ private struct ActiveFeedDock: View {
                             DockPulseDot(color: status.ink)
                         }
                         Text(status.title)
-                            .font(.system(size: 11, weight: .heavy))
-                            .tracking(0.66)
-                            .textCase(.uppercase)
+                            .appFont(size: 12, weight: .bold)
                     }
                     .foregroundStyle(status.ink)
 
                     Text(formatDur(status.duration))
-                        .font(.system(size: 16, weight: .black))
-                        .tracking(-0.32)
+                        .appFont(size: 17, weight: .bold)
                         .monospacedDigit()
                         .foregroundStyle(Palette.ink)
                 }
 
-                Spacer(minLength: 14)
-                    .frame(width: 14)
-            }
-            .padding(.leading, 10)
-            .padding(.trailing, 36)
-            .padding(.vertical, 8)
-            .background(
-                LinearGradient(colors: [Color(hex: 0xFDE0EA), Color(hex: 0xFFF4F8)],
-                               startPoint: .topLeading,
-                               endPoint: .bottomTrailing),
-                in: Capsule()
-            )
-            .overlay(
-                Capsule()
-                    .stroke(Color.white.opacity(0.5), lineWidth: 1)
-            )
-            .shadow(color: theme.primary.opacity(0.12), radius: 18, x: 0, y: 10)
-            .frame(width: FloatingDockMetrics.width, alignment: .leading)
-            .contentShape(Capsule())
-            .onTapGesture(perform: onOpen)
+                Spacer(minLength: 6)
 
-            Button(action: onClose) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(Palette.ink3)
-                    .frame(width: 24, height: 24)
-                    .background(Color.white.opacity(0.78), in: Circle())
+                Text("继续")
+                    .appFont(size: 12, weight: .bold)
+                    .foregroundStyle(status.ink)
+                    .padding(.horizontal, 11)
+                    .frame(minHeight: 34)
+                    .background(Palette.card.opacity(0.78), in: Capsule())
             }
-            .buttonStyle(.plain)
-            .padding(.top, 7)
-            .padding(.trailing, 7)
+            .padding(.horizontal, 10)
+            .frame(width: FloatingDockMetrics.width, alignment: .leading)
+            .frame(minHeight: 64)
+            .background(Palette.pink, in: Capsule())
+            .overlay {
+                Capsule().stroke(Palette.pinkInk.opacity(0.12), lineWidth: 1)
+            }
+            .shadowCard()
+            .contentShape(Capsule())
         }
-        .frame(width: FloatingDockMetrics.width, alignment: .leading)
+        .buttonStyle(PressableStyle())
+        .accessibilityLabel("\(status.title)，\(formatDur(status.duration))")
+        .accessibilityHint("打开喂奶记录")
     }
 
     private func feedDockStatus(at now: Date) -> (title: String, duration: TimeInterval, running: Bool, ink: Color) {
@@ -518,16 +510,17 @@ private struct ActiveFeedDock: View {
 
 private struct DockPulseDot: View {
     let color: Color
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var on = false
 
     var body: some View {
         Circle()
             .fill(color)
             .frame(width: 8, height: 8)
-            .opacity(on ? 0.4 : 1.0)
-            .scaleEffect(on ? 0.8 : 1.0)
-            .animation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true), value: on)
-            .onAppear { on = true }
+            .opacity(reduceMotion ? 1 : (on ? 0.4 : 1.0))
+            .scaleEffect(reduceMotion ? 1 : (on ? 0.8 : 1.0))
+            .animation(reduceMotion ? nil : .easeInOut(duration: 1.4).repeatForever(autoreverses: true), value: on)
+            .onAppear { on = !reduceMotion }
     }
 }
 
@@ -578,17 +571,18 @@ struct AppTabBar: View {
             Button(action: action) {
                 VStack(spacing: 3) {
                     icon
-                        .scaleEffect(selected ? 1.06 : 1.0)
-                        .offset(y: selected ? -2 : 0)
-                        .animation(.spring(response: 0.32, dampingFraction: 0.7), value: selected)
+                        .frame(width: 36, height: 30)
+                        .background(selected ? theme.primaryTint : Color.clear,
+                                    in: Capsule())
                     Text(tab.label)
-                        .font(.system(size: 11, weight: .heavy))
+                        .appFont(size: 11, weight: .bold)
                         .foregroundStyle(selected ? theme.primary600 : Palette.ink3)
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.top, 6).padding(.bottom, 2)
+                .frame(minHeight: 52)
             }
             .buttonStyle(.plain)
+            .accessibilityAddTraits(selected ? .isSelected : [])
         }
 
         @ViewBuilder
@@ -600,7 +594,6 @@ struct AppTabBar: View {
             case .records: AppIcon.Book(size: 24, color: c, fill: f)
             case .growth:  AppIcon.Growth(size: 24, color: c, fill: f)
             case .health:  AppIcon.Shield(size: 24, color: c, fill: f)
-            case .stats:   AppIcon.Chart(size: 24, color: c)
             }
         }
     }

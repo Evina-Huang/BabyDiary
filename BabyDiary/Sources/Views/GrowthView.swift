@@ -115,14 +115,18 @@ struct GrowthView: View {
     var body: some View {
         VStack(spacing: 0) {
             ScreenBody {
+                pageHeader
+                    .padding(.bottom, 18)
+
                 sectionSwitcher
                     .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.bottom, 14)
+                    .padding(.bottom, 18)
                 switch section {
                 case .measure:
                     statCards
-                    chartCard.padding(.top, 14)
-                    addButton.padding(.top, 14)
+                    addButton
+                        .padding(.top, adding ? 12 : 0)
+                    chartCard.padding(.top, 16)
                     healthLink.padding(.top, 18)
                 case .teeth:
                     teethContent
@@ -183,18 +187,102 @@ struct GrowthView: View {
         }
     }
 
+    private var pageHeader: some View {
+        HStack(alignment: .bottom, spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text("成长")
+                    .appText(.pageTitle)
+                    .foregroundStyle(Palette.ink)
+                Text(sectionSubtitle)
+                    .appFont(size: 13, weight: .medium)
+                    .foregroundStyle(Palette.ink3)
+            }
+            Spacer(minLength: 8)
+            Text(sectionCountLabel)
+                .appFont(size: 13, weight: .semibold)
+                .monospacedDigit()
+                .foregroundStyle(store.theme.primary600)
+                .padding(.horizontal, 12)
+                .frame(height: 32)
+                .background(store.theme.primaryTint, in: Capsule())
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var sectionSubtitle: String {
+        switch section {
+        case .measure: return "查看最新测量与生长趋势"
+        case .teeth: return "记录每一颗乳牙"
+        case .milestones: return "收藏重要成长时刻"
+        }
+    }
+
+    private var sectionCountLabel: String {
+        switch section {
+        case .measure: return "\(store.growth.count) 次测量"
+        case .teeth: return "\(store.teeth.filter { $0.eruptedAt != nil }.count) / 20"
+        case .milestones: return "\(store.milestones.count) 个时刻"
+        }
+    }
+
     private var sectionSwitcher: some View {
         SegPill(selection: $section,
                 options: GrowthSection.allCases.map { ($0, $0.label) })
     }
 
-    // MARK: — Two stat cards (weight + height)
+    // MARK: — Latest measurement
 
     private var statCards: some View {
-        HStack(spacing: 10) {
-            statCard(.weight)
-            statCard(.height)
+        Card(padding: 0) {
+            VStack(spacing: 0) {
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("最新测量")
+                            .appFont(size: 16, weight: .bold)
+                            .foregroundStyle(Palette.ink)
+                        Text(latestMeasurementLabel)
+                            .appFont(size: 12, weight: .medium)
+                            .foregroundStyle(Palette.ink3)
+                    }
+                    Spacer(minLength: 8)
+                    Button {
+                        withAnimation(.spring()) { adding = true }
+                    } label: {
+                        HStack(spacing: 5) {
+                            AppIcon.Plus(size: 14, color: store.theme.primary600)
+                            Text("新测量")
+                                .appFont(size: 13, weight: .semibold)
+                        }
+                        .foregroundStyle(store.theme.primary600)
+                        .padding(.horizontal, 12)
+                        .frame(minHeight: 44)
+                        .background(store.theme.primaryTint, in: Capsule())
+                    }
+                    .buttonStyle(PressableStyle())
+                    .disabled(adding)
+                    .opacity(adding ? 0.5 : 1)
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 14)
+                .padding(.bottom, 12)
+
+                Rectangle()
+                    .fill(Palette.line)
+                    .frame(height: 1)
+
+                HStack(spacing: 10) {
+                    statCard(.weight)
+                    statCard(.height)
+                }
+                .padding(12)
+            }
         }
+    }
+
+    private var latestMeasurementLabel: String {
+        guard let latest else { return "还没有测量记录" }
+        let month = max(0, Int(latest.ageMonths.rounded(.down)))
+        return "\(formatDateLabel(latest.date)) · \(month) 月龄"
     }
 
     private func statCard(_ m: GrowthMetric) -> some View {
@@ -207,90 +295,95 @@ struct GrowthView: View {
         return Button { withAnimation(.easeOut(duration: 0.16)) { metric = m } } label: {
             VStack(alignment: .leading, spacing: 0) {
                 Text(m.label)
-                    .font(.system(size: 11, weight: .heavy))
-                    .tracking(0.66)
-                    .textCase(.uppercase)
-                    .foregroundStyle(m.accentInk.opacity(0.75))
+                    .appFont(size: 12, weight: .semibold)
+                    .foregroundStyle(on ? m.accentInk : Palette.ink3)
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text(value.map { String(format: "%.1f", $0) } ?? "—")
-                        .font(.system(size: 26, weight: .black))
-                        .tracking(-0.52)
+                        .appFont(size: 27, weight: .black)
                         .monospacedDigit()
-                        .foregroundStyle(m.accentInk)
+                        .foregroundStyle(Palette.ink)
                     Text(m.unit)
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(m.accentInk.opacity(0.7))
+                        .appFont(size: 12, weight: .semibold)
+                        .foregroundStyle(Palette.ink3)
                 }
                 .padding(.top, 6)
-                if let d = delta, d > 0 {
-                    Text("本月 +\(String(format: "%.1f", d)) \(m.unit)")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(m.accentInk.opacity(0.75))
-                        .padding(.top, 2)
-                }
+                Text(deltaLabel(delta, metric: m))
+                    .appFont(size: 11, weight: .medium)
+                    .foregroundStyle(on ? m.accentInk : Palette.ink3)
+                    .padding(.top, 3)
             }
-            .padding(.horizontal, 16).padding(.vertical, 14)
+            .padding(.horizontal, 14).padding(.vertical, 13)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(m.accentTint, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .frame(minHeight: 104)
+            .background(on ? m.accentTint : Palette.bg2,
+                        in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .strokeBorder(on ? m.accentInk : .clear, lineWidth: 2)
+                RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous)
+                    .strokeBorder(on ? m.accentInk.opacity(0.16) : Palette.line, lineWidth: 1)
             )
-            .shadow(color: on ? Color(hex: 0x2B2520).opacity(0.06) : .clear, radius: 12, x: 0, y: 4)
         }
         .buttonStyle(PressableStyle())
+        .accessibilityAddTraits(on ? .isSelected : [])
+    }
+
+    private func deltaLabel(_ delta: Double?, metric: GrowthMetric) -> String {
+        guard let delta else { return "暂无上次记录" }
+        if abs(delta) < 0.05 { return "与上次持平" }
+        return "较上次 \(delta > 0 ? "+" : "")\(String(format: "%.1f", delta)) \(metric.unit)"
     }
 
     // MARK: — Chart card
 
     private var chartCard: some View {
         Card(padding: 16) {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .center, spacing: 10) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("生长曲线 · \(metric.label)")
-                            .font(.system(size: 15, weight: .heavy))
-                            .tracking(-0.15)
-                        Text("0 - 12 月龄 · WHO 参考范围")
-                            .font(.system(size: 12, weight: .semibold))
+                        Text("\(metric.label)趋势")
+                            .appFont(size: 16, weight: .bold)
+                        Text("0–12 月龄 · WHO 参考区间")
+                            .appFont(size: 12, weight: .medium)
                             .foregroundStyle(Palette.ink3)
                     }
-                    Spacer(minLength: 0)
-                    if let p = percentileTag() {
-                        Text(p.label)
-                            .font(.system(size: 11, weight: .heavy))
-                            .tracking(-0.11)
-                            .foregroundStyle(p.ink)
-                            .padding(.horizontal, 10).padding(.vertical, 5)
-                            .background(metric.accentTint, in: Capsule())
+                    Spacer(minLength: 4)
+                    Button { historySheet = true } label: {
+                        HStack(spacing: 4) {
+                            Text("历史 \(store.growth.count)")
+                                .appFont(size: 13, weight: .semibold)
+                            AppIcon.Chevron(size: 11, color: Palette.ink2)
+                        }
+                        .foregroundStyle(Palette.ink2)
+                        .padding(.horizontal, 12)
+                        .frame(minHeight: 44)
+                        .background(Palette.bg2, in: Capsule())
                     }
+                    .buttonStyle(PressableStyle())
                 }
 
-                Button { historySheet = true } label: {
-                    HStack(spacing: 4) {
-                        Text("历史记录 · \(store.growth.count) 条")
-                            .font(.system(size: 12, weight: .heavy))
-                            .tracking(-0.12)
-                        AppIcon.Chevron(size: 11, color: Palette.ink2)
+                if let p = percentileTag() {
+                    HStack(spacing: 7) {
+                        Circle()
+                            .fill(p.ink)
+                            .frame(width: 6, height: 6)
+                        Text(p.label)
+                            .appFont(size: 12, weight: .semibold)
+                            .foregroundStyle(p.ink)
                     }
-                    .foregroundStyle(Palette.ink2)
-                    .padding(.horizontal, 10).padding(.vertical, 5)
-                    .background(Palette.bg2, in: Capsule())
+                    .padding(.horizontal, 10)
+                    .frame(height: 28)
+                    .background(metric.accentTint, in: Capsule())
                 }
-                .buttonStyle(PressableStyle())
-                .frame(maxWidth: .infinity, alignment: .trailing)
 
                 GrowthChartView(metric: metric, entries: sorted)
-                    .frame(height: 200)
+                    .frame(height: 184)
 
                 if let txt = peerText() {
                     Text(txt)
-                        .font(.system(size: 12, weight: .bold))
-                        .tracking(-0.12)
+                        .appFont(size: 12, weight: .bold)
                         .foregroundStyle(Palette.ink2)
-                        .padding(.horizontal, 12).padding(.vertical, 8)
+                        .padding(.horizontal, 12).padding(.vertical, 10)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .background(Palette.bg2, in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
                 }
 
                 legend
@@ -317,7 +410,7 @@ struct GrowthView: View {
         HStack(spacing: 6) {
             swatch
             Text(label)
-                .font(.system(size: 11, weight: .bold))
+                .appFont(size: 11, weight: .bold)
                 .foregroundStyle(Palette.ink2)
         }
     }
@@ -327,7 +420,7 @@ struct GrowthView: View {
         let ref = refFor(metric)
         guard let r = ref.first(where: { $0.m == Int(l.ageMonths) }) ?? ref.last else { return nil }
         let v = metric == .weight ? l.weightKg : l.heightCm
-        if v < r.p3 { return ("偏低", Color(hex: 0xFF7F64)) }
+        if v < r.p3 { return ("偏低", Palette.dangerInk) }
         if v > r.p97 { return ("偏高", Palette.yellowInk) }
         let pct: Double = v < r.p50
             ? 3 + (v - r.p3) / (r.p50 - r.p3) * 47
@@ -344,54 +437,36 @@ struct GrowthView: View {
             ? 3 + (v - r.p3) / (r.p50 - r.p3) * 47
             : 50 + (v - r.p50) / (r.p97 - r.p50) * 47
         pct = max(1, min(99, pct.rounded()))
-        return "\(store.baby.name)的\(metric.label)超过了同龄\(Int(pct))%的宝宝 ✨"
+        return "\(store.baby.name)的\(metric.label)超过了同龄 \(Int(pct))% 的宝宝"
     }
 
     // MARK: — Add measurement
 
     @ViewBuilder
     private var addButton: some View {
-        if !adding {
-            Button {
-                withAnimation(.spring()) { adding = true }
-            } label: {
-                HStack(spacing: 8) {
-                    AppIcon.Plus(size: 18, color: .white)
-                    Text("记录新测量")
-                        .font(.system(size: 15, weight: .heavy))
-                        .tracking(-0.15)
-                }
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(store.theme.primary, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-                .shadowPill(tint: store.theme.primary600)
-            }
-            .buttonStyle(PressableStyle())
-        } else {
+        if adding {
             Card {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("新测量")
-                        .font(.system(size: 15, weight: .heavy))
-                        .tracking(-0.15)
+                        .appFont(size: 15, weight: .heavy)
                     HStack(spacing: 10) {
                         VStack(alignment: .leading, spacing: 8) {
                             FieldLabel(text: "体重 (kg)")
                             TextField(latest.map { String(format: "%.1f", $0.weightKg) } ?? "0.0",
                                       text: $wInput)
                                 .keyboardType(.decimalPad)
-                                .font(.system(size: 16, weight: .semibold))
+                                .appFont(size: 16, weight: .semibold)
                                 .padding(.horizontal, 14).padding(.vertical, 12)
-                                .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                .background(Palette.bg2, in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
                         }
                         VStack(alignment: .leading, spacing: 8) {
                             FieldLabel(text: "身高 (cm)")
                             TextField(latest.map { String(format: "%.1f", $0.heightCm) } ?? "0.0",
                                       text: $hInput)
                                 .keyboardType(.decimalPad)
-                                .font(.system(size: 16, weight: .semibold))
+                                .appFont(size: 16, weight: .semibold)
                                 .padding(.horizontal, 14).padding(.vertical, 12)
-                                .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                .background(Palette.bg2, in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
                         }
                     }
                     HStack(spacing: 8) {
@@ -399,21 +474,21 @@ struct GrowthView: View {
                             withAnimation { adding = false; wInput = ""; hInput = "" }
                         } label: {
                             Text("取消")
-                                .font(.system(size: 14, weight: .heavy))
+                                .appFont(size: 14, weight: .heavy)
                                 .foregroundStyle(Palette.ink)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 14)
-                                .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                                .background(Palette.bg2, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
                         }
                         .buttonStyle(PressableStyle())
                         Button(action: submit) {
                             Text("保存")
-                                .font(.system(size: 14, weight: .heavy))
+                                .appFont(size: 14, weight: .heavy)
                                 .foregroundStyle(canSubmitMeasurement ? .white : Palette.ink3)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 14)
                                 .background(canSubmitMeasurement ? store.theme.primary : Palette.bg2,
-                                            in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                                            in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
                                 .shadowPill(tint: canSubmitMeasurement ? store.theme.primary600 : .clear)
                         }
                         .buttonStyle(PressableStyle())
@@ -466,11 +541,10 @@ struct GrowthView: View {
         return VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
                 Text("测量历史")
-                    .font(.system(size: 15, weight: .heavy))
-                    .tracking(-0.15)
+                    .appFont(size: 15, weight: .heavy)
                 Spacer()
                 Text("共 \(all.count) 条")
-                    .font(.system(size: 12, weight: .bold))
+                    .appFont(size: 12, weight: .bold)
                     .foregroundStyle(Palette.ink3)
             }
 
@@ -482,8 +556,7 @@ struct GrowthView: View {
                                 withAnimation(.easeOut(duration: 0.16)) { historyFilter = f }
                             } label: {
                                 Text(f.label)
-                                    .font(.system(size: 12, weight: .heavy))
-                                    .tracking(-0.12)
+                                    .appFont(size: 12, weight: .heavy)
                                     .foregroundStyle(historyFilter == f ? .white : Palette.ink2)
                                     .padding(.horizontal, 12).padding(.vertical, 6)
                                     .background(historyFilter == f ? store.theme.primary : Palette.bg2,
@@ -500,7 +573,7 @@ struct GrowthView: View {
                     VStack(spacing: 0) {
                         if visible.isEmpty {
                             Text("这段时间没有记录")
-                                .font(.system(size: 13, weight: .semibold))
+                                .appFont(size: 13, weight: .semibold)
                                 .foregroundStyle(Palette.ink3)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 20)
@@ -524,12 +597,11 @@ struct GrowthView: View {
             if !historyOpen {
                 Button { withAnimation(.spring()) { historyOpen = true } } label: {
                     Text(all.isEmpty ? "暂无记录" : "展开 \(all.count) 条记录")
-                        .font(.system(size: 13, weight: .heavy))
-                        .tracking(-0.13)
+                        .appFont(size: 13, weight: .heavy)
                         .foregroundStyle(Palette.ink2)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
-                        .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .background(Palette.bg2, in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
                 }
                 .buttonStyle(PressableStyle())
                 .disabled(all.isEmpty)
@@ -539,12 +611,11 @@ struct GrowthView: View {
                     withAnimation(.spring()) { historyOpen = false; historyFilter = .all }
                 } label: {
                     Text("收起")
-                        .font(.system(size: 13, weight: .heavy))
-                        .tracking(-0.13)
+                        .appFont(size: 13, weight: .heavy)
                         .foregroundStyle(Palette.ink2)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
-                        .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .background(Palette.bg2, in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
                 }
                 .buttonStyle(PressableStyle())
             }
@@ -555,13 +626,13 @@ struct GrowthView: View {
         VStack(spacing: 0) {
             HStack(spacing: 14) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Palette.mintTint)
+                    RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous).fill(Palette.mintTint)
                     HStack(alignment: .lastTextBaseline, spacing: 1) {
                         Text("\(Int(g.ageMonths))")
-                            .font(.system(size: 13, weight: .black))
+                            .appFont(size: 13, weight: .black)
                             .foregroundStyle(Palette.mint600)
                         Text("月")
-                            .font(.system(size: 9, weight: .bold))
+                            .appFont(size: 9, weight: .bold)
                             .foregroundStyle(Palette.mint600)
                     }
                 }
@@ -569,8 +640,7 @@ struct GrowthView: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("\(String(format: "%.1f", g.weightKg)) kg · \(String(format: "%.1f", g.heightCm)) cm")
-                        .font(.system(size: 15, weight: .heavy))
-                        .tracking(-0.15)
+                        .appFont(size: 15, weight: .heavy)
                         .monospacedDigit()
                         .foregroundStyle(Palette.ink)
                     let dateStr = isoDate(g.date)
@@ -581,7 +651,7 @@ struct GrowthView: View {
                                       g.heightCm - e.heightCm)
                     }()
                     Text("\(dateStr)\(deltaText)")
-                        .font(.system(size: 12, weight: .semibold))
+                        .appFont(size: 12, weight: .semibold)
                         .foregroundStyle(Palette.ink3)
                 }
                 Spacer(minLength: 0)
@@ -605,14 +675,13 @@ struct GrowthView: View {
         Button(action: onOpenHealth) {
             HStack(spacing: 6) {
                 Text("查看完整健康档案")
-                    .font(.system(size: 13, weight: .heavy))
-                    .tracking(-0.13)
+                    .appFont(size: 13, weight: .heavy)
                 AppIcon.Chevron(size: 12, color: Palette.ink2)
             }
             .foregroundStyle(Palette.ink2)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 12)
-            .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .background(Palette.bg2, in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
         }
         .buttonStyle(PressableStyle())
     }
@@ -642,28 +711,26 @@ struct GrowthView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack(alignment: .firstTextBaseline) {
                         Text("出牙进度")
-                            .font(.system(size: 15, weight: .heavy)).tracking(-0.15)
                         Spacer()
                         Text("\(erupted.count) / 20")
-                            .font(.system(size: 13, weight: .heavy))
+                            .appFont(size: 13, weight: .heavy)
                             .foregroundStyle(Palette.blueInk)
                             .padding(.horizontal, 10).padding(.vertical, 4)
                             .background(Palette.blue, in: Capsule())
                     }
                     Text(teethSubtitle)
-                        .font(.system(size: 12, weight: .semibold))
+                        .appFont(size: 12, weight: .semibold)
                         .foregroundStyle(Palette.ink3)
                     Button { onOpen(.teeth) } label: {
                         HStack(spacing: 8) {
                             AppIcon.Tooth(size: 16, color: .white)
                             Text("打开牙位图")
-                                .font(.system(size: 14, weight: .heavy)).tracking(-0.14)
                                 .foregroundStyle(.white)
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
                         .background(store.theme.primary,
-                                    in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                                    in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
                         .shadowPill(tint: store.theme.primary600)
                     }
                     .buttonStyle(PressableStyle())
@@ -688,16 +755,15 @@ struct GrowthView: View {
         VStack(spacing: 0) {
             HStack(spacing: 14) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Palette.blue)
+                    RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous).fill(Palette.blue)
                     AppIcon.Tooth(size: 18, color: Palette.blueInk)
                 }
                 .frame(width: 40, height: 40)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(rec.position.label)
-                        .font(.system(size: 15, weight: .heavy)).tracking(-0.15)
                         .foregroundStyle(Palette.ink)
                     Text(isoDate(date))
-                        .font(.system(size: 12, weight: .semibold))
+                        .appFont(size: 12, weight: .semibold)
                         .foregroundStyle(Palette.ink3)
                 }
                 Spacer(minLength: 0)
@@ -745,13 +811,12 @@ struct GrowthView: View {
                 HStack(spacing: 8) {
                     AppIcon.Plus(size: 18, color: .white)
                     Text("记录新里程碑")
-                        .font(.system(size: 15, weight: .heavy)).tracking(-0.15)
                 }
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
                 .background(store.theme.primary,
-                            in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                            in: RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous))
                 .shadowPill(tint: store.theme.primary600)
             }
             .buttonStyle(PressableStyle())
@@ -791,17 +856,16 @@ struct EntryCard<Icon: View>: View {
         Button(action: onTap) {
             HStack(spacing: 14) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous).fill(iconBg)
+                    RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous).fill(iconBg)
                     icon()
                 }
                 .frame(width: 44, height: 44)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
-                        .font(.system(size: 15, weight: .heavy))
-                        .tracking(-0.15)
+                        .appFont(size: 15, weight: .heavy)
                         .foregroundStyle(Palette.ink)
                     Text(subtitle)
-                        .font(.system(size: 12, weight: .semibold))
+                        .appFont(size: 12, weight: .semibold)
                         .foregroundStyle(Palette.ink3)
                 }
                 Spacer(minLength: 0)
@@ -809,7 +873,7 @@ struct EntryCard<Icon: View>: View {
             }
             .padding(.horizontal, 18).padding(.vertical, 14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Palette.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .background(Palette.card, in: RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous))
             .shadowCard()
         }
         .buttonStyle(PressableStyle())
@@ -860,16 +924,13 @@ private struct GrowthChartView: View {
             }
             ForEach(Array(entries.enumerated()), id: \.element.id) { i, e in
                 let v = metric == .weight ? e.weightKg : e.heightCm
+                let pointSize: CGFloat = i == entries.count - 1 ? 10 : 7
                 PointMark(
                     x: .value("月龄", e.ageMonths),
                     y: .value(metric.label, v)
                 )
                 .symbol {
-                    Circle()
-                        .stroke(accent, lineWidth: 2.5)
-                        .background(Circle().fill(.white))
-                        .frame(width: i == entries.count - 1 ? 10 : 7,
-                               height: i == entries.count - 1 ? 10 : 7)
+                    GrowthChartPoint(accent: accent, size: pointSize)
                 }
             }
             if let l = entries.last {
@@ -879,11 +940,7 @@ private struct GrowthChartView: View {
                     y: .value(metric.label, v)
                 )
                 .annotation(position: .top, alignment: .center, spacing: 4) {
-                    Text("\(String(format: "%.1f", v))\(metric.unit)")
-                        .font(.system(size: 10, weight: .heavy))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 8).padding(.vertical, 3)
-                        .background(accent, in: Capsule())
+                    GrowthChartValueLabel(value: v, unit: metric.unit, accent: accent)
                 }
                 .symbol { Circle().fill(.clear).frame(width: 0, height: 0) }
             }
@@ -894,7 +951,7 @@ private struct GrowthChartView: View {
                 AxisValueLabel {
                     if let m = v.as(Int.self) {
                         Text("\(m)月")
-                            .font(.system(size: 9, weight: .bold))
+                            .appFont(size: 9, weight: .bold)
                             .foregroundStyle(Palette.ink3)
                     }
                 }
@@ -904,10 +961,37 @@ private struct GrowthChartView: View {
             AxisMarks(position: .leading) { _ in
                 AxisGridLine().foregroundStyle(Palette.line)
                 AxisValueLabel()
-                    .font(.system(size: 9, weight: .bold))
+                    .font(.caption2.weight(.bold))
                     .foregroundStyle(Palette.ink3)
             }
         }
+    }
+}
+
+private struct GrowthChartPoint: View {
+    let accent: Color
+    let size: CGFloat
+
+    var body: some View {
+        Circle()
+            .stroke(accent, lineWidth: 2.5)
+            .background(Circle().fill(Palette.card))
+            .frame(width: size, height: size)
+    }
+}
+
+private struct GrowthChartValueLabel: View {
+    let value: Double
+    let unit: String
+    let accent: Color
+
+    var body: some View {
+        Text("\(String(format: "%.1f", value))\(unit)")
+            .appFont(size: 10, weight: .heavy)
+            .foregroundStyle(.white)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(accent, in: Capsule())
     }
 }
 
@@ -918,13 +1002,10 @@ struct TabTitleHeader: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(kicker)
-                .font(.system(size: 13, weight: .bold))
-                .tracking(1.04)
-                .textCase(.uppercase)
+                .appText(.captionEmphasis)
                 .foregroundStyle(Palette.ink3)
             Text(title)
-                .font(.system(size: 28, weight: .black))
-                .tracking(-0.84)
+                .appText(.pageTitle)
                 .foregroundStyle(Palette.ink)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -977,7 +1058,7 @@ private struct MilestoneTimelineRow: View {
                     Circle().fill(tint)
                     Circle().strokeBorder(ink.opacity(0.3), lineWidth: 1.5)
                     if let e = item.emoji, !e.isEmpty {
-                        Text(e).font(.system(size: 14))
+                        Text(e).appFont(size: 14)
                     } else {
                         Circle().fill(ink).frame(width: 8, height: 8)
                     }
@@ -999,13 +1080,10 @@ private struct MilestoneTimelineRow: View {
                     HStack(alignment: .top, spacing: 8) {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(dateStr)
-                                .font(.system(size: 11, weight: .heavy))
-                                .tracking(0.66)
-                                .textCase(.uppercase)
+                                .appText(.micro)
                                 .foregroundStyle(Palette.ink3)
                             Text(ageStr)
-                                .font(.system(size: 11, weight: .heavy))
-                                .tracking(-0.11)
+                                .appFont(size: 11, weight: .heavy)
                                 .foregroundStyle(ink)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 3)
@@ -1013,8 +1091,7 @@ private struct MilestoneTimelineRow: View {
                         }
                         if item.isFromEvent {
                             Text("来自记录")
-                                .font(.system(size: 10, weight: .heavy))
-                                .tracking(-0.1)
+                                .appFont(size: 10, weight: .heavy)
                                 .foregroundStyle(ink)
                                 .padding(.horizontal, 8).padding(.vertical, 2)
                                 .background(tint, in: Capsule())
@@ -1023,13 +1100,12 @@ private struct MilestoneTimelineRow: View {
                     }
                     VStack(alignment: .leading, spacing: 6) {
                         Text(item.title)
-                            .font(.system(size: 16, weight: .heavy))
-                            .tracking(-0.16)
+                            .appFont(size: 16, weight: .heavy)
                             .foregroundStyle(Palette.ink)
                             .multilineTextAlignment(.leading)
                         if let n = item.note, !n.isEmpty {
                             Text(n)
-                                .font(.system(size: 13, weight: .semibold))
+                                .appFont(size: 13, weight: .semibold)
                                 .foregroundStyle(Palette.ink2)
                                 .multilineTextAlignment(.leading)
                         }
@@ -1038,13 +1114,13 @@ private struct MilestoneTimelineRow: View {
                                 .resizable().scaledToFill()
                                 .frame(height: 180)
                                 .frame(maxWidth: .infinity)
-                                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                .clipShape(RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
                         }
                     }
                     .padding(14)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(Palette.card,
-                                in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                                in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
                     .shadowCard()
                 }
                 .contentShape(Rectangle())
@@ -1060,13 +1136,13 @@ struct MilestoneEmptyHint: View {
     let text: String
     var body: some View {
         Text(text)
-            .font(.system(size: 13, weight: .semibold))
+            .appFont(size: 13, weight: .semibold)
             .foregroundStyle(Palette.ink3)
             .multilineTextAlignment(.center)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 28).padding(.horizontal, 18)
             .background(Palette.bg2,
-                        in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                        in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
     }
 }
 

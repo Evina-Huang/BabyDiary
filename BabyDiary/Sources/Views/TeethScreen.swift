@@ -11,8 +11,8 @@ struct TeethScreen: View {
         VStack(spacing: 0) {
             ScreenHeader(title: "出牙记录", onBack: onBack)
             ScreenBody {
-                statCard
-                chartCard.padding(.top, 14)
+                statCard.padding(.top, 4)
+                chartCard.padding(.top, 22)
                 timelineBlock.padding(.top, 22)
             }
         }
@@ -54,28 +54,42 @@ struct TeethScreen: View {
             return "最近一颗 · \(days) 天前"
         }()
 
-        return Card(padding: 16) {
-            HStack(alignment: .center, spacing: 14) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("已出")
-                        .font(.system(size: 11, weight: .heavy))
-                        .tracking(0.66).textCase(.uppercase)
-                        .foregroundStyle(Palette.ink3)
-                    HStack(alignment: .firstTextBaseline, spacing: 3) {
-                        Text("\(count)").font(.system(size: 30, weight: .black))
-                            .monospacedDigit().foregroundStyle(store.theme.primary600)
-                        Text("/ 20").font(.system(size: 14, weight: .heavy))
+        return Card(padding: 18) {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .firstTextBaseline) {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text("乳牙进度")
+                            .appText(.cardTitle)
+                            .foregroundStyle(Palette.ink)
+                        Text(latestText)
+                            .appFont(size: 12, weight: .bold)
                             .foregroundStyle(Palette.ink3)
                     }
-                    Text(latestText)
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(Palette.ink2)
+
+                    Spacer(minLength: 12)
+
+                    HStack(alignment: .firstTextBaseline, spacing: 3) {
+                        Text("\(count)")
+                            .appFont(size: 30, weight: .black)
+                            .monospacedDigit()
+                            .foregroundStyle(store.theme.primary600)
+                        Text("/ 20 颗")
+                            .appFont(size: 13, weight: .heavy)
+                            .foregroundStyle(Palette.ink3)
+                    }
                 }
-                Spacer(minLength: 0)
-                ProgressRing(progress: Double(count) / 20.0,
-                             tint: store.theme.primary,
-                             ink: store.theme.primary600)
-                    .frame(width: 56, height: 56)
+
+                GeometryReader { proxy in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(store.theme.primaryTint)
+                        Capsule()
+                            .fill(store.theme.primary600)
+                            .frame(width: proxy.size.width * CGFloat(count) / 20)
+                    }
+                }
+                .frame(height: 9)
+                .accessibilityLabel("乳牙进度")
+                .accessibilityValue("已记录 \(count) 颗，共 20 颗")
             }
         }
     }
@@ -83,49 +97,42 @@ struct TeethScreen: View {
     // MARK: — 牙位图卡片
 
     private var chartCard: some View {
-        Card(padding: 14) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("牙位图")
-                    .font(.system(size: 15, weight: .heavy))
-                    .tracking(-0.15)
-                Text("点击任意一颗牙记录萌出日期")
-                    .font(.system(size: 12, weight: .semibold))
+        VStack(alignment: .leading, spacing: 11) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("乳牙牙位图")
+                    .appFont(size: 15, weight: .heavy)
+                    .foregroundStyle(Palette.ink)
+                Text("按照真实牙列排列，点击任意一颗牙记录")
+                    .appFont(size: 12, weight: .semibold)
                     .foregroundStyle(Palette.ink3)
+            }
 
-                ToothChart(
-                    store: store,
-                    onTap: { pos in editing = pos }
-                )
-                .frame(height: 180)
-                .padding(.top, 6)
+            Card(padding: 12) {
+                VStack(spacing: 12) {
+                    ToothChart(
+                        store: store,
+                        onTap: { pos in editing = pos }
+                    )
+                    .frame(height: 286)
 
-                legend.padding(.top, 4)
+                    HStack(spacing: 16) {
+                        legendItem("已萌出", color: store.theme.primary600)
+                        legendItem("该出了", color: Palette.yellowInk)
+                        legendItem("未萌出", color: Palette.ink3)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
             }
         }
     }
 
-    private var legend: some View {
-        HStack(spacing: 12) {
-            legendDot(stroke: store.theme.primary600, lineW: 2.2, dashed: false, label: "已出")
-            legendDot(stroke: Palette.yellowInk,      lineW: 1.8, dashed: true,  label: "该出了")
-            legendDot(stroke: Color(hex: 0xB88A8E).opacity(0.45), lineW: 1.2, dashed: false, label: "未出")
-            Spacer()
-        }
-    }
-
-    private func legendDot(stroke: Color, lineW: CGFloat, dashed: Bool, label: String) -> some View {
+    private func legendItem(_ label: String, color: Color) -> some View {
         HStack(spacing: 6) {
-            RoundedRectangle(cornerRadius: 4, style: .continuous)
-                .fill(.white)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 4, style: .continuous)
-                        .strokeBorder(stroke,
-                                      style: StrokeStyle(lineWidth: lineW,
-                                                         dash: dashed ? [2.5, 2] : []))
-                )
-                .frame(width: 14, height: 14)
+            Circle()
+                .fill(color)
+                .frame(width: 8, height: 8)
             Text(label)
-                .font(.system(size: 11, weight: .bold))
+                .appFont(size: 11, weight: .bold)
                 .foregroundStyle(Palette.ink2)
         }
     }
@@ -136,11 +143,10 @@ struct TeethScreen: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
                 Text("出牙时间线")
-                    .font(.system(size: 15, weight: .heavy))
-                    .tracking(-0.15)
+                    .appFont(size: 15, weight: .heavy)
                 Spacer()
                 Text("共 \(erupted.count) 颗")
-                    .font(.system(size: 12, weight: .bold))
+                    .appFont(size: 12, weight: .bold)
                     .foregroundStyle(Palette.ink3)
             }
 
@@ -148,10 +154,10 @@ struct TeethScreen: View {
                 if erupted.isEmpty {
                     VStack(spacing: 6) {
                         Text("还没有记录的牙")
-                            .font(.system(size: 14, weight: .heavy))
+                            .appFont(size: 14, weight: .heavy)
                             .foregroundStyle(Palette.ink2)
                         Text("点击上方牙位图记录第一颗")
-                            .font(.system(size: 12, weight: .semibold))
+                            .appFont(size: 12, weight: .semibold)
                             .foregroundStyle(Palette.ink3)
                     }
                     .frame(maxWidth: .infinity).padding(.vertical, 24)
@@ -173,31 +179,35 @@ struct TeethScreen: View {
 
     private func timelineRow(_ t: ToothRecord, index: Int, last: Bool) -> some View {
         let months = monthsSinceBirth(t.eruptedAt)
-        let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"
+        let df = DateFormatter(); df.dateFormat = "yyyy年M月d日"
         let dateStr = t.eruptedAt.map { df.string(from: $0) } ?? "—"
         return VStack(spacing: 0) {
-            HStack(spacing: 14) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous).fill(store.theme.primaryTint)
-                    Text("#\(index)")
-                        .font(.system(size: 12, weight: .black))
-                        .foregroundStyle(store.theme.primary600)
-                }
-                .frame(width: 40, height: 40)
-
-                VStack(alignment: .leading, spacing: 2) {
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text(t.position.label)
-                        .font(.system(size: 15, weight: .heavy))
-                        .tracking(-0.15)
+                        .appFont(size: 15, weight: .heavy)
                         .foregroundStyle(Palette.ink)
-                    Text(months.map { "\(dateStr) · \($0) 月龄" } ?? dateStr)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Palette.ink3)
+                    if let note = t.note?.trimmingCharacters(in: .whitespacesAndNewlines), !note.isEmpty {
+                        Text(note)
+                            .appFont(size: 12, weight: .semibold)
+                            .foregroundStyle(Palette.ink3)
+                            .lineLimit(1)
+                    }
                 }
-                Spacer(minLength: 0)
-                AppIcon.Chevron(size: 14, color: Palette.ink3)
+
+                Spacer(minLength: 8)
+
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text("第 \(index) 颗")
+                        .appFont(size: 11, weight: .heavy)
+                        .foregroundStyle(store.theme.primary600)
+                    Text(months.map { "\(dateStr) · \($0) 月龄" } ?? dateStr)
+                        .appFont(size: 12, weight: .semibold)
+                        .foregroundStyle(Palette.ink3)
+                        .lineLimit(1)
+                }
             }
-            .padding(.vertical, 12)
+            .frame(minHeight: 68)
             if !last { Rectangle().fill(Palette.line).frame(height: 1) }
         }
     }
@@ -213,62 +223,210 @@ struct TeethScreen: View {
 
 // MARK: — 牙位图 (Canvas + 可点击叠加层)
 
+private enum ToothVisualState {
+    case erupted, due, upcoming
+}
+
+private func toothVisualState(
+    position: ToothPosition,
+    record: ToothRecord,
+    babyAgeMonths: Int
+) -> ToothVisualState {
+    if record.eruptedAt != nil { return .erupted }
+    if babyAgeMonths >= position.kind.typicalMonths.lowerBound,
+       babyAgeMonths <= position.kind.typicalMonths.upperBound + 3 {
+        return .due
+    }
+    return .upcoming
+}
+
 private struct ToothChart: View {
     let store: AppStore
     let onTap: (ToothPosition) -> Void
 
     private var babyAgeMonths: Int {
-        max(0, Calendar.current.dateComponents([.month], from: store.baby.birthDate, to: Date()).month ?? 0)
+        max(0, Calendar.current.dateComponents(
+            [.month],
+            from: store.baby.birthDate,
+            to: Date()
+        ).month ?? 0)
     }
 
     var body: some View {
-        GeometryReader { geo in
-            let W = geo.size.width
-            let H = geo.size.height
+        GeometryReader { proxy in
+            let size = proxy.size
             ZStack {
-                // 上下颌分隔线
-                Rectangle()
-                    .fill(Palette.line)
-                    .frame(width: W * 0.7, height: 1)
-                    .position(x: W/2, y: H/2)
+                MouthCavityShape()
+                    .fill(Palette.pink.opacity(0.16))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 22)
 
-                ForEach(Array(ToothPosition.all.enumerated()), id: \.element.id) { _, pos in
-                    let layout = toothFrame(for: pos, in: CGSize(width: W, height: H))
-                    Button { onTap(pos) } label: {
-                        ToothGlyph(
-                            position: pos,
-                            record: store.tooth(at: pos),
-                            babyAgeMonths: babyAgeMonths,
-                            theme: store.theme
-                        )
-                        .frame(width: layout.size.width, height: layout.size.height)
+                GumArch(jaw: .upper)
+                    .fill(Palette.pink.opacity(0.72))
+                    .overlay {
+                        GumArch(jaw: .upper)
+                            .stroke(Palette.pinkInk.opacity(0.16), lineWidth: 1)
                     }
-                    .buttonStyle(PressableStyle())
-                    .position(layout.center)
+
+                GumArch(jaw: .lower)
+                    .fill(Palette.pink.opacity(0.72))
+                    .overlay {
+                        GumArch(jaw: .lower)
+                            .stroke(Palette.pinkInk.opacity(0.16), lineWidth: 1)
+                    }
+
+                Text("上颌")
+                    .appFont(size: 10, weight: .heavy)
+                    .foregroundStyle(Palette.pinkInk)
+                    .position(x: 25, y: 13)
+
+                Text("下颌")
+                    .appFont(size: 10, weight: .heavy)
+                    .foregroundStyle(Palette.pinkInk)
+                    .position(x: 25, y: size.height - 13)
+
+                ForEach(ToothPosition.all) { position in
+                    toothButton(position, in: size)
                 }
             }
-            .frame(width: W, height: H)
+            .frame(width: size.width, height: size.height)
         }
     }
 
-    /// 两排水平布局:上排居上,下排居下,每排 10 颗均匀分布
-    private func toothFrame(for pos: ToothPosition, in size: CGSize) -> (center: CGPoint, size: CGSize) {
-        let jawTeeth = ToothPosition.all.filter { $0.jaw == pos.jaw }
-        let idx = CGFloat(jawTeeth.firstIndex(of: pos) ?? 0)
+    private func toothButton(_ position: ToothPosition, in size: CGSize) -> some View {
+        let record = store.tooth(at: position)
+        let state = toothVisualState(
+            position: position,
+            record: record,
+            babyAgeMonths: babyAgeMonths
+        )
+        let layout = toothLayout(for: position, in: size)
 
-        let pad: CGFloat = 8
-        let innerW = size.width - pad * 2
-        let slot = innerW / 10.0                // 每颗牙的槽位宽
-        let x = pad + slot * (idx + 0.5)
+        return Button { onTap(position) } label: {
+            ToothGlyph(
+                position: position,
+                record: record,
+                babyAgeMonths: babyAgeMonths,
+                theme: store.theme
+            )
+            .frame(width: layout.toothSize.width, height: layout.toothSize.height)
+            .rotationEffect(.degrees(layout.rotation))
+            .padding(6)
+            .frame(width: layout.hitSize.width, height: layout.hitSize.height)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PressableStyle())
+        .position(layout.center)
+        .zIndex(layout.zIndex)
+        .accessibilityLabel(position.label)
+        .accessibilityValue(statusLabel(state, record: record))
+        .accessibilityHint("轻触编辑萌出记录")
+    }
 
-        // 上下行中心 y:尽量撑开,让牙齿显得大
-        let rowH = size.height * 0.48
-        let y = pos.jaw == .upper ? rowH * 0.5 : size.height - rowH * 0.5
+    private struct ToothLayout {
+        let center: CGPoint
+        let toothSize: CGSize
+        let hitSize: CGSize
+        let rotation: Double
+        let zIndex: Double
+    }
 
-        // 牙齿尺寸:在槽位内放大,高度吃满 rowH 的 80%
-        let w = min(slot * pos.kind.widthFactor, slot * 0.96)
-        let h = min(rowH * 0.86, w * 1.25)
-        return (CGPoint(x: x, y: y), CGSize(width: w, height: h))
+    private func toothLayout(for position: ToothPosition, in size: CGSize) -> ToothLayout {
+        let jawPositions = ToothPosition.all.filter { $0.jaw == position.jaw }
+        let index = jawPositions.firstIndex(of: position) ?? 0
+        let normalized = (Double(index) - 4.5) / 4.5
+        let distanceFromCenter = abs(normalized)
+        let x = size.width * (0.5 + CGFloat(normalized) * 0.425)
+
+        let y: CGFloat
+        if position.jaw == .upper {
+            y = size.height * (0.31 - CGFloat(distanceFromCenter) * 0.12)
+        } else {
+            y = size.height * (0.69 + CGFloat(distanceFromCenter) * 0.12)
+        }
+
+        let baseSize: CGSize
+        switch position.kind {
+        case .centralIncisor: baseSize = CGSize(width: 28, height: 42)
+        case .lateralIncisor: baseSize = CGSize(width: 25, height: 38)
+        case .canine: baseSize = CGSize(width: 27, height: 42)
+        case .firstMolar: baseSize = CGSize(width: 32, height: 38)
+        case .secondMolar: baseSize = CGSize(width: 35, height: 40)
+        }
+
+        let direction = position.jaw == .upper ? 1.0 : -1.0
+        let rotation = normalized * 16 * direction
+        return ToothLayout(
+            center: CGPoint(x: x, y: y),
+            toothSize: baseSize,
+            hitSize: CGSize(width: 40, height: 54),
+            rotation: rotation,
+            zIndex: 10 - distanceFromCenter
+        )
+    }
+
+    private func statusLabel(_ state: ToothVisualState, record: ToothRecord) -> String {
+        switch state {
+        case .erupted:
+            guard let date = record.eruptedAt else { return "已记录" }
+            let formatter = DateFormatter()
+            formatter.dateFormat = "M月d日"
+            return formatter.string(from: date)
+        case .due:
+            return "进入典型月龄"
+        case .upcoming:
+            return "尚未萌出"
+        }
+    }
+}
+
+private struct MouthCavityShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        Path(roundedRect: rect, cornerRadius: rect.height * 0.44)
+    }
+}
+
+private struct GumArch: Shape {
+    let jaw: ToothJaw
+
+    func path(in rect: CGRect) -> Path {
+        jaw == .upper ? upperPath(in: rect) : lowerPath(in: rect)
+    }
+
+    private func upperPath(in rect: CGRect) -> Path {
+        let w = rect.width, h = rect.height
+        var path = Path()
+        path.move(to: CGPoint(x: w * 0.045, y: h * 0.12))
+        path.addCurve(
+            to: CGPoint(x: w * 0.955, y: h * 0.12),
+            control1: CGPoint(x: w * 0.24, y: h * 0.04),
+            control2: CGPoint(x: w * 0.76, y: h * 0.04)
+        )
+        path.addCurve(
+            to: CGPoint(x: w * 0.045, y: h * 0.12),
+            control1: CGPoint(x: w * 0.76, y: h * 0.35),
+            control2: CGPoint(x: w * 0.24, y: h * 0.35)
+        )
+        path.closeSubpath()
+        return path
+    }
+
+    private func lowerPath(in rect: CGRect) -> Path {
+        let w = rect.width, h = rect.height
+        var path = Path()
+        path.move(to: CGPoint(x: w * 0.045, y: h * 0.88))
+        path.addCurve(
+            to: CGPoint(x: w * 0.955, y: h * 0.88),
+            control1: CGPoint(x: w * 0.24, y: h * 0.96),
+            control2: CGPoint(x: w * 0.76, y: h * 0.96)
+        )
+        path.addCurve(
+            to: CGPoint(x: w * 0.045, y: h * 0.88),
+            control1: CGPoint(x: w * 0.76, y: h * 0.65),
+            control2: CGPoint(x: w * 0.24, y: h * 0.65)
+        )
+        path.closeSubpath()
+        return path
     }
 }
 
@@ -278,15 +436,12 @@ private struct ToothGlyph: View {
     let babyAgeMonths: Int
     let theme: AppTheme
 
-    enum State { case erupted, due, upcoming }
-
-    private var state: State {
-        if record.eruptedAt != nil { return .erupted }
-        if babyAgeMonths >= position.kind.typicalMonths.lowerBound &&
-           babyAgeMonths <= position.kind.typicalMonths.upperBound + 3 {
-            return .due
-        }
-        return .upcoming
+    private var state: ToothVisualState {
+        toothVisualState(
+            position: position,
+            record: record,
+            babyAgeMonths: babyAgeMonths
+        )
     }
 
     var body: some View {
@@ -301,18 +456,7 @@ private struct ToothGlyph: View {
                 dash: state == .due ? [3, 2.5] : []
             ))
         }
-        // 下颌翻转:咬合面朝向舌头
         .scaleEffect(x: 1, y: position.jaw == .lower ? -1 : 1)
-        .overlay {
-            if state == .erupted, let m = monthLabel() {
-                Text(m)
-                    .font(.system(size: 8, weight: .heavy))
-                    .monospacedDigit()
-                    .foregroundStyle(theme.primary600)
-                    .lineLimit(1)
-                    .fixedSize()
-            }
-        }
     }
 
     private func styling() -> (Color, Color, CGFloat) {
@@ -322,14 +466,8 @@ private struct ToothGlyph: View {
         case .due:
             return (.white, Palette.yellowInk, 1.8)
         case .upcoming:
-            return (.white, Color(hex: 0xB88A8E).opacity(0.45), 1.2)
+            return (.white, Palette.ink3.opacity(0.42), 1.2)
         }
-    }
-
-    private func monthLabel() -> String? {
-        guard let d = record.eruptedAt else { return nil }
-        let f = DateFormatter(); f.dateFormat = "M/d"
-        return f.string(from: d)
     }
 }
 
@@ -408,29 +546,6 @@ private struct ToothShape: Shape {
     }
 }
 
-// MARK: — 进度圆环
-
-private struct ProgressRing: View {
-    let progress: Double
-    let tint: Color
-    let ink: Color
-
-    var body: some View {
-        ZStack {
-            Circle().stroke(tint.opacity(0.35), lineWidth: 6)
-            Circle()
-                .trim(from: 0, to: CGFloat(min(max(progress, 0), 1)))
-                .stroke(ink, style: StrokeStyle(lineWidth: 6, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-                .animation(.easeOut(duration: 0.4), value: progress)
-            Text("\(Int((progress * 100).rounded()))%")
-                .font(.system(size: 12, weight: .black))
-                .monospacedDigit()
-                .foregroundStyle(ink)
-        }
-    }
-}
-
 // MARK: — 编辑 Sheet
 
 private struct ToothEditSheet: View {
@@ -444,6 +559,7 @@ private struct ToothEditSheet: View {
     @State private var erupted: Bool
     @State private var date: Date
     @State private var note: String
+    @State private var showClearConfirm = false
 
     init(position: ToothPosition,
          initial: ToothRecord,
@@ -464,32 +580,31 @@ private struct ToothEditSheet: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
-                Text(position.label)
-                    .font(.system(size: 20, weight: .heavy)).tracking(-0.4)
-                Spacer()
-                Button(action: onCancel) {
-                    AppIcon.Close(size: 18, color: Palette.ink2)
-                        .frame(width: 36, height: 36)
-                        .background(Palette.bg2, in: Circle())
+            ScreenHeader(title: position.label, onBack: onCancel)
+
+            ScreenBody {
+                Card {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(position.kind.zh)
+                            .appText(.cardTitle)
+                            .foregroundStyle(Palette.ink)
+                        Text("典型萌出时间为 \(position.kind.typicalMonths.lowerBound)–\(position.kind.typicalMonths.upperBound) 月龄，每个宝宝会有个体差异。")
+                            .appFont(size: 13, weight: .semibold)
+                            .foregroundStyle(Palette.ink3)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
-                .buttonStyle(PressableStyle())
-            }
-            .padding(.horizontal, 20).padding(.top, 18).padding(.bottom, 10)
+                .padding(.top, 4)
 
-            Text("典型月龄 \(position.kind.typicalMonths.lowerBound)-\(position.kind.typicalMonths.upperBound) 月")
-                .font(.system(size: 12, weight: .bold))
-                .tracking(0.6).textCase(.uppercase)
-                .foregroundStyle(Palette.ink3)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 20)
+                VStack(alignment: .leading, spacing: 9) {
+                    FieldLabel(text: "当前状态")
+                    SegPill(selection: $erupted, options: [(false, "尚未萌出"), (true, "已经萌出")])
+                }
+                .padding(.top, 18)
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    SegPill(selection: $erupted, options: [(false, "未出"), (true, "已出")])
-                        .padding(.top, 12)
-
-                    if erupted {
+                if erupted {
+                    Card {
+                        VStack(spacing: 18) {
                         FormField(label: "萌出日期") {
                             DatePicker("", selection: $date, displayedComponents: .date)
                                 .labelsHidden()
@@ -497,45 +612,52 @@ private struct ToothEditSheet: View {
                                 .environment(\.locale, Locale(identifier: "zh_CN"))
                                 .tint(theme.primary600)
                         }
-                        FormField(label: "备注(可选)") {
-                            TextField("例如:下午洗澡时发现", text: $note, axis: .vertical)
+                        FormField(label: "备注（可选）") {
+                            TextField("例如：洗澡时发现", text: $note, axis: .vertical)
                                 .lineLimit(1...3)
                         }
                     }
-
-                    HStack(spacing: 8) {
-                        if initial.eruptedAt != nil {
-                            Button(action: onClear) {
-                                Text("清除记录")
-                                    .font(.system(size: 14, weight: .heavy))
-                                    .foregroundStyle(Palette.ink)
-                                    .frame(maxWidth: .infinity).padding(.vertical, 14)
-                                    .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                            }
-                            .buttonStyle(PressableStyle())
-                        }
-                        Button {
-                            if erupted {
-                                onSave(date, note.trimmingCharacters(in: .whitespaces).isEmpty ? nil : note)
-                            } else {
-                                onClear()
-                            }
-                        } label: {
-                            Text("保存")
-                                .font(.system(size: 14, weight: .heavy))
-                                .foregroundStyle(.white)
-                                .frame(maxWidth: .infinity).padding(.vertical, 14)
-                                .background(theme.primary, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                                .shadowPill(tint: theme.primary600)
-                        }
-                        .buttonStyle(PressableStyle())
                     }
-                    .padding(.top, 6)
+                    .padding(.top, 14)
                 }
-                .padding(.horizontal, 20).padding(.bottom, 24)
+
+                CTAButton(title: "保存记录", theme: theme) {
+                    if erupted {
+                        let trimmedNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
+                        onSave(date, trimmedNote.isEmpty ? nil : trimmedNote)
+                    } else {
+                        onClear()
+                    }
+                }
+                .padding(.top, 18)
+
+                if initial.eruptedAt != nil {
+                    Button { showClearConfirm = true } label: {
+                        Text("清除这颗牙的记录")
+                            .appFont(size: 14, weight: .heavy)
+                            .foregroundStyle(Palette.pinkInk)
+                            .frame(maxWidth: .infinity, minHeight: 48)
+                            .background(
+                                Palette.pink,
+                                in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous)
+                            )
+                        }
+                    .buttonStyle(PressableStyle())
+                    .padding(.top, 10)
+                }
             }
         }
         .background(Palette.bg.ignoresSafeArea())
+        .confirmationDialog(
+            "确定清除这颗牙的萌出记录？",
+            isPresented: $showClearConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("清除记录", role: .destructive, action: onClear)
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("萌出日期和备注将被删除。")
+        }
     }
 }
 

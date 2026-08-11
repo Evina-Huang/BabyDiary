@@ -3,23 +3,141 @@ import UserNotifications
 
 struct SettingsScreen: View {
     let onBack: () -> Void
+    @Environment(AppStore.self) private var store
+
+    private var enabledCount: Int {
+        (store.feedReminder.isEnabled ? 1 : 0) + (store.sleepReminder.isEnabled ? 1 : 0)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             ScreenHeader(title: "设置", onBack: onBack)
             ScreenBody {
+                appearanceSection
+                    .padding(.top, 4)
+
+                reminderOverview
+                    .padding(.top, 22)
+
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("提醒")
-                        .font(.system(size: 15, weight: .heavy))
-                        .tracking(-0.15)
-                        .foregroundStyle(Palette.ink)
+                    HStack(alignment: .firstTextBaseline) {
+                        Text("提醒项目")
+                            .appFont(size: 15, weight: .heavy)
+                            .foregroundStyle(Palette.ink)
+                        Spacer()
+                        Text("\(enabledCount) / 2 已开启")
+                            .appFont(size: 12, weight: .bold)
+                            .foregroundStyle(Palette.ink3)
+                    }
+
                     FeedReminderSettingsCard()
                     SleepReminderSettingsCard()
                 }
-                .padding(.top, 6)
+                .padding(.top, 22)
             }
         }
         .background(Palette.bg)
+    }
+
+    private var appearanceSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("显示")
+                    .appFont(size: 15, weight: .heavy)
+                    .foregroundStyle(Palette.ink)
+                Spacer()
+                Text("当前 · \(store.appearance.label)")
+                    .appFont(size: 12, weight: .bold)
+                    .foregroundStyle(Palette.ink3)
+            }
+
+            AppearanceSettingsCard()
+        }
+    }
+
+    private var reminderOverview: some View {
+        Card(padding: 18) {
+            HStack(alignment: .top, spacing: 14) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous)
+                        .fill(store.theme.primaryTint)
+                    AppIcon.Clock(size: 25, color: store.theme.primary600)
+                }
+                .frame(width: 50, height: 50)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(enabledCount == 0 ? "提醒尚未开启" : "已开启 \(enabledCount) 项提醒")
+                        .appText(.cardTitle)
+                        .foregroundStyle(Palette.ink)
+                    Text("根据最近一次记录安排下一次提醒，也可以设置夜间免打扰。")
+                        .appFont(size: 13, weight: .semibold)
+                        .foregroundStyle(Palette.ink3)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 0)
+            }
+        }
+    }
+}
+
+private struct AppearanceSettingsCard: View {
+    @Environment(AppStore.self) private var store
+
+    var body: some View {
+        Card(padding: 16) {
+            VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("应用外观")
+                        .appFont(size: 16, weight: .heavy)
+                        .foregroundStyle(Palette.ink)
+                    Text("跟随系统会随设备自动切换；文字大小继续使用 iOS 设置。")
+                        .appFont(size: 12, weight: .semibold)
+                        .foregroundStyle(Palette.ink3)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                HStack(spacing: 8) {
+                    ForEach(AppAppearance.allCases) { option in
+                        appearanceButton(option)
+                    }
+                }
+            }
+        }
+    }
+
+    private func appearanceButton(_ option: AppAppearance) -> some View {
+        let selected = store.appearance == option
+
+        return Button {
+            store.updateAppearance(option)
+        } label: {
+            HStack(spacing: 5) {
+                Text(option.label)
+                    .appText(.captionEmphasis)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
+
+                if selected {
+                    AppIcon.Check(size: 13, color: store.theme.primary600)
+                }
+            }
+            .foregroundStyle(selected ? store.theme.primary600 : Palette.ink2)
+            .frame(maxWidth: .infinity)
+            .frame(minHeight: 46)
+            .background(
+                selected ? store.theme.primaryTint : Palette.bg2,
+                in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous)
+                    .stroke(selected ? store.theme.primary600.opacity(0.34) : Palette.line, lineWidth: 1)
+            }
+            .contentShape(RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
+        }
+        .buttonStyle(PressableStyle())
+        .accessibilityLabel("外观，\(option.label)")
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
 
@@ -36,19 +154,18 @@ private struct FeedReminderSettingsCard: View {
                 VStack(spacing: 14) {
                     HStack(spacing: 12) {
                         ZStack {
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous)
                                 .fill(Palette.pink)
-                            AppIcon.Clock(size: 22, color: Palette.pinkInk)
+                            AppIcon.Bottle(size: 24, color: Palette.pinkInk)
                         }
-                        .frame(width: 42, height: 42)
+                        .frame(width: 46, height: 46)
 
                         VStack(alignment: .leading, spacing: 3) {
                             Text("喂养提醒")
-                                .font(.system(size: 15, weight: .heavy))
-                                .tracking(-0.15)
+                                .appFont(size: 15, weight: .heavy)
                                 .foregroundStyle(Palette.ink)
                             Text(statusText(settings: settings, now: ctx.date))
-                                .font(.system(size: 12, weight: .semibold))
+                                .appFont(size: 12, weight: .semibold)
                                 .foregroundStyle(statusColor(settings: settings, now: ctx.date))
                         }
 
@@ -59,6 +176,7 @@ private struct FeedReminderSettingsCard: View {
                             set: { setEnabled($0) }
                         ))
                         .labelsHidden()
+                        .accessibilityLabel("喂养提醒")
                         .tint(store.theme.primary600)
                         .disabled(requestingPermission)
                     }
@@ -91,7 +209,7 @@ private struct FeedReminderSettingsCard: View {
                                     FieldLabel(text: "免提醒时间段")
                                     if settings.quietHoursEnabled {
                                         Text("\(timeText(settings.normalizedQuietStartMinuteOfDay)) - \(timeText(settings.normalizedQuietEndMinuteOfDay)) 不提醒")
-                                            .font(.system(size: 12, weight: .semibold))
+                                            .appFont(size: 12, weight: .semibold)
                                             .foregroundStyle(Palette.ink3)
                                     }
                                 }
@@ -121,8 +239,8 @@ private struct FeedReminderSettingsCard: View {
                         }
                     } else if permissionDenied {
                         Text("系统通知未开启")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(Color(hex: 0xD44E3A))
+                            .appFont(size: 12, weight: .semibold)
+                            .foregroundStyle(Palette.pinkInk)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
@@ -136,11 +254,11 @@ private struct FeedReminderSettingsCard: View {
             store.updateFeedReminderInterval(hours: hours)
         } label: {
             Text("\(hours) 小时")
-                .font(.system(size: 12, weight: .heavy))
+                .appFont(size: 12, weight: .heavy)
                 .monospacedDigit()
                 .foregroundStyle(store.feedReminder.normalizedIntervalHours == hours ? .white : Palette.ink2)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 9)
+                .frame(minHeight: 44)
                 .background(
                     store.feedReminder.normalizedIntervalHours == hours ? store.theme.primary : Palette.bg2,
                     in: Capsule()
@@ -155,7 +273,7 @@ private struct FeedReminderSettingsCard: View {
             FieldLabel(text: "提醒间隔")
             Spacer()
             Text("\(settings.normalizedIntervalHours) 小时")
-                .font(.system(size: 13, weight: .heavy))
+                .appFont(size: 13, weight: .heavy)
                 .monospacedDigit()
                 .foregroundStyle(Palette.pinkInk)
         }
@@ -185,12 +303,12 @@ private struct FeedReminderSettingsCard: View {
                 VStack(alignment: .leading, spacing: 3) {
                     FieldLabel(text: "作息表")
                     Text("按设置的时间提醒；刚喝过奶时，下一顿喝奶最多顺延 30 分钟")
-                        .font(.system(size: 12, weight: .semibold))
+                        .appFont(size: 12, weight: .semibold)
                         .foregroundStyle(Palette.ink3)
                 }
                 Spacer()
                 Text("\(settings.normalizedScheduleEntries.count) 餐")
-                    .font(.system(size: 12, weight: .heavy))
+                    .appFont(size: 12, weight: .heavy)
                     .foregroundStyle(Palette.pinkInk)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
@@ -209,14 +327,14 @@ private struct FeedReminderSettingsCard: View {
                 } label: {
                     HStack(spacing: 7) {
                         Text("+")
-                            .font(.system(size: 16, weight: .black))
+                            .appFont(size: 16, weight: .black)
                         Text("添加一餐")
-                            .font(.system(size: 12, weight: .heavy))
+                            .appFont(size: 12, weight: .heavy)
                     }
                     .foregroundStyle(Palette.ink2)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
-                    .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .frame(minHeight: 44)
+                    .background(Palette.bg2, in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
                 }
                 .buttonStyle(PressableStyle())
             }
@@ -242,7 +360,7 @@ private struct FeedReminderSettingsCard: View {
                 }
             } label: {
                 Text(entry.kind.label)
-                    .font(.system(size: 12, weight: .heavy))
+                    .appFont(size: 12, weight: .heavy)
                     .foregroundStyle(entry.kind == .feed ? Palette.pinkInk : Palette.yellowInk)
                     .frame(width: 46)
                     .padding(.vertical, 8)
@@ -273,16 +391,19 @@ private struct FeedReminderSettingsCard: View {
                 store.deleteFeedReminderScheduleEntry(id: entry.id)
             } label: {
                 AppIcon.Close(size: 15, color: Palette.ink3)
-                    .frame(width: 40, height: 40)
-                    .background(.white, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    .shadow(color: .black.opacity(0.04), radius: 1, x: 0, y: 1)
+                    .frame(width: 44, height: 44)
+                    .background(.white, in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous)
+                            .stroke(Palette.line, lineWidth: 1)
+                    }
             }
             .buttonStyle(PressableStyle())
             .disabled(settings.normalizedScheduleEntries.count <= FeedReminderSettings.minScheduleEntries)
             .opacity(settings.normalizedScheduleEntries.count <= FeedReminderSettings.minScheduleEntries ? 0.35 : 1)
         }
         .padding(8)
-        .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Palette.bg2, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
     }
 
     private func scheduleTimePicker(
@@ -294,7 +415,7 @@ private struct FeedReminderSettingsCard: View {
             VStack(alignment: .leading, spacing: 3) {
                 FieldLabel(text: title)
                 Text("超过这个时间，当天不再补提醒")
-                    .font(.system(size: 12, weight: .semibold))
+                    .appFont(size: 12, weight: .semibold)
                     .foregroundStyle(Palette.ink3)
             }
 
@@ -313,7 +434,7 @@ private struct FeedReminderSettingsCard: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(Palette.bg2, in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
     }
 
     private func quietTimePicker(
@@ -337,7 +458,7 @@ private struct FeedReminderSettingsCard: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(Palette.bg2, in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
     }
 
     private func setEnabled(_ isEnabled: Bool) {
@@ -409,7 +530,7 @@ private struct FeedReminderSettingsCard: View {
         if settings.quietHoursEnabled, FeedReminderPlanner.isInQuietHours(now, settings: settings) {
             return Palette.ink3
         }
-        return due <= now ? Color(hex: 0xD44E3A) : Palette.ink3
+        return due <= now ? Palette.pinkInk : Palette.ink3
     }
 
     private func dateLabel(_ date: Date, now: Date) -> String {
@@ -448,19 +569,18 @@ private struct SleepReminderSettingsCard: View {
                 VStack(spacing: 14) {
                     HStack(spacing: 12) {
                         ZStack {
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous)
                                 .fill(Palette.lavender)
                             AppIcon.Moon(size: 24, color: Palette.lavenderInk)
                         }
-                        .frame(width: 42, height: 42)
+                        .frame(width: 46, height: 46)
 
                         VStack(alignment: .leading, spacing: 3) {
                             Text("哄睡提醒")
-                                .font(.system(size: 15, weight: .heavy))
-                                .tracking(-0.15)
+                                .appFont(size: 15, weight: .heavy)
                                 .foregroundStyle(Palette.ink)
                             Text(statusText(settings: settings, now: ctx.date))
-                                .font(.system(size: 12, weight: .semibold))
+                                .appFont(size: 12, weight: .semibold)
                                 .foregroundStyle(statusColor(settings: settings, now: ctx.date))
                         }
 
@@ -471,36 +591,28 @@ private struct SleepReminderSettingsCard: View {
                             set: { setEnabled($0) }
                         ))
                         .labelsHidden()
+                        .accessibilityLabel("哄睡提醒")
                         .tint(store.theme.primary600)
                         .disabled(requestingPermission)
                     }
 
                     if settings.isEnabled {
                         VStack(alignment: .leading, spacing: 10) {
-                            HStack {
-                                FieldLabel(text: "清醒间隔")
-                                Spacer()
-                                Text(intervalText(settings.normalizedAwakeIntervalMinutes))
-                                    .font(.system(size: 13, weight: .heavy))
-                                    .monospacedDigit()
-                                    .foregroundStyle(Palette.lavenderInk)
-                            }
-
-                            StepperInput(
-                                value: Binding(
-                                    get: { store.sleepReminder.normalizedAwakeIntervalMinutes },
-                                    set: { store.updateSleepReminderAwakeInterval(minutes: $0) }
+                            FieldLabel(text: "提醒方式")
+                            SegPill<SleepReminderMode>(
+                                selection: Binding(
+                                    get: { store.sleepReminder.mode },
+                                    set: { store.updateSleepReminderMode($0) }
                                 ),
-                                step: 15,
-                                min: SleepReminderSettings.minAwakeIntervalMinutes,
-                                max: SleepReminderSettings.maxAwakeIntervalMinutes,
-                                suffix: "分钟"
+                                options: SleepReminderMode.allCases.map { ($0, $0.label) }
                             )
+                            .frame(minHeight: 44)
 
-                            HStack(spacing: 8) {
-                                ForEach([90, 120, 180], id: \.self) { minutes in
-                                    intervalPreset(minutes)
-                                }
+                            switch settings.mode {
+                            case .awakeInterval:
+                                sleepIntervalSettings(settings: settings)
+                            case .schedule:
+                                sleepScheduleSettings(settings: settings)
                             }
 
                             Rectangle()
@@ -513,7 +625,7 @@ private struct SleepReminderSettingsCard: View {
                                     FieldLabel(text: "静默时间段")
                                     if settings.quietHoursEnabled {
                                         Text("\(timeText(settings.normalizedQuietStartMinuteOfDay)) - \(timeText(settings.normalizedQuietEndMinuteOfDay)) 不提醒")
-                                            .font(.system(size: 12, weight: .semibold))
+                                            .appFont(size: 12, weight: .semibold)
                                             .foregroundStyle(Palette.ink3)
                                     }
                                 }
@@ -543,8 +655,8 @@ private struct SleepReminderSettingsCard: View {
                         }
                     } else if permissionDenied {
                         Text("系统通知未开启")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(Color(hex: 0xD44E3A))
+                            .appFont(size: 12, weight: .semibold)
+                            .foregroundStyle(Palette.pinkInk)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
@@ -553,16 +665,125 @@ private struct SleepReminderSettingsCard: View {
         .onAppear(perform: refreshPermissionStatus)
     }
 
+    @ViewBuilder
+    private func sleepIntervalSettings(settings: SleepReminderSettings) -> some View {
+        HStack {
+            FieldLabel(text: "清醒间隔")
+            Spacer()
+            Text(intervalText(settings.normalizedAwakeIntervalMinutes))
+                .appFont(size: 13, weight: .heavy)
+                .monospacedDigit()
+                .foregroundStyle(Palette.lavenderInk)
+        }
+
+        StepperInput(
+            value: Binding(
+                get: { store.sleepReminder.normalizedAwakeIntervalMinutes },
+                set: { store.updateSleepReminderAwakeInterval(minutes: $0) }
+            ),
+            step: 15,
+            min: SleepReminderSettings.minAwakeIntervalMinutes,
+            max: SleepReminderSettings.maxAwakeIntervalMinutes,
+            suffix: "分钟"
+        )
+
+        HStack(spacing: 8) {
+            ForEach([90, 120, 180], id: \.self) { minutes in
+                intervalPreset(minutes)
+            }
+        }
+    }
+
+    private func sleepScheduleSettings(settings: SleepReminderSettings) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    FieldLabel(text: "每日哄睡时间")
+                    Text("到点提醒，可设置午睡和晚间入睡")
+                        .appFont(size: 12, weight: .semibold)
+                        .foregroundStyle(Palette.ink3)
+                }
+                Spacer(minLength: 8)
+                Text("\(settings.normalizedScheduleEntries.count) 个")
+                    .appFont(size: 12, weight: .heavy)
+                    .foregroundStyle(Palette.lavenderInk)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Palette.lavender, in: Capsule())
+            }
+
+            VStack(spacing: 8) {
+                ForEach(settings.normalizedScheduleEntries) { entry in
+                    sleepScheduleEntryRow(entry, settings: settings)
+                }
+            }
+
+            if settings.normalizedScheduleEntries.count < SleepReminderSettings.maxScheduleEntries {
+                Button {
+                    store.addSleepReminderScheduleEntry()
+                } label: {
+                    HStack(spacing: 7) {
+                        AppIcon.Plus(size: 15, color: Palette.ink2)
+                        Text("添加哄睡时间")
+                            .appFont(size: 12, weight: .heavy)
+                    }
+                    .foregroundStyle(Palette.ink2)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .background(Palette.bg2, in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
+                }
+                .buttonStyle(PressableStyle())
+            }
+        }
+    }
+
+    private func sleepScheduleEntryRow(
+        _ entry: SleepReminderScheduleEntry,
+        settings: SleepReminderSettings
+    ) -> some View {
+        HStack(spacing: 10) {
+            DatePicker(
+                "",
+                selection: Binding(
+                    get: { dateForMinute(entry.minuteOfDay) },
+                    set: {
+                        store.updateSleepReminderScheduleEntry(
+                            id: entry.id,
+                            minuteOfDay: minuteOfDay($0)
+                        )
+                    }
+                ),
+                displayedComponents: .hourAndMinute
+            )
+            .labelsHidden()
+            .datePickerStyle(.compact)
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Button {
+                store.deleteSleepReminderScheduleEntry(id: entry.id)
+            } label: {
+                AppIcon.Close(size: 15, color: Palette.ink3)
+                    .frame(width: 44, height: 44)
+                    .background(Palette.card, in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
+            }
+            .buttonStyle(PressableStyle())
+            .disabled(settings.normalizedScheduleEntries.count <= SleepReminderSettings.minScheduleEntries)
+            .opacity(settings.normalizedScheduleEntries.count <= SleepReminderSettings.minScheduleEntries ? 0.35 : 1)
+            .accessibilityLabel("删除这个哄睡时间")
+        }
+        .padding(8)
+        .background(Palette.bg2, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
+    }
+
     private func intervalPreset(_ minutes: Int) -> some View {
         Button {
             store.updateSleepReminderAwakeInterval(minutes: minutes)
         } label: {
             Text(intervalText(minutes))
-                .font(.system(size: 12, weight: .heavy))
+                .appFont(size: 12, weight: .heavy)
                 .monospacedDigit()
                 .foregroundStyle(store.sleepReminder.normalizedAwakeIntervalMinutes == minutes ? .white : Palette.ink2)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 9)
+                .frame(minHeight: 44)
                 .background(
                     store.sleepReminder.normalizedAwakeIntervalMinutes == minutes ? store.theme.primary : Palette.bg2,
                     in: Capsule()
@@ -592,7 +813,7 @@ private struct SleepReminderSettingsCard: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(Palette.bg2, in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
     }
 
     private func setEnabled(_ isEnabled: Bool) {
@@ -672,7 +893,7 @@ private struct SleepReminderSettingsCard: View {
         if settings.quietHoursEnabled, SleepReminderPlanner.isInQuietHours(now, settings: settings) {
             return Palette.ink3
         }
-        return due <= now ? Color(hex: 0xD44E3A) : Palette.ink3
+        return due <= now ? Palette.pinkInk : Palette.ink3
     }
 
     private func dateLabel(_ date: Date, now: Date) -> String {
