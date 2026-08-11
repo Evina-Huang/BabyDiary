@@ -210,7 +210,6 @@ struct EventEditSheet: View {
                 MicroLabel(text: "当前记录")
                 Text(display.title)
                     .appFont(size: 17, weight: .bold)
-                    .tracking(-0.2)
                     .foregroundStyle(Palette.ink)
                     .lineLimit(1)
                 Text("\(formatDateLabel(original.at)) · \(formatTime(original.at))")
@@ -221,9 +220,9 @@ struct EventEditSheet: View {
         }
         .padding(16)
         .background(style.tint.opacity(0.62),
-                    in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    in: RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
+            RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous)
                 .stroke(style.ink.opacity(0.08), lineWidth: 1)
         }
     }
@@ -231,7 +230,6 @@ struct EventEditSheet: View {
     private func sectionLabel(_ text: String) -> some View {
         Text(text)
             .appFont(size: 16, weight: .bold)
-            .tracking(-0.16)
             .foregroundStyle(Palette.ink)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.bottom, 10)
@@ -261,9 +259,9 @@ struct EventEditSheet: View {
                 .padding(.horizontal, 16)
                 .frame(minHeight: 68)
                 .background(Palette.card,
-                            in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                            in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
                 .overlay {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous)
                         .stroke(Palette.pink.opacity(0.8), lineWidth: 1)
                 }
             }
@@ -301,9 +299,9 @@ struct EventEditSheet: View {
                             .frame(maxWidth: .infinity)
                             .frame(minHeight: 46)
                             .background(selected ? Palette.blue : Palette.bg2,
-                                        in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                        in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
                             .overlay {
-                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous)
                                     .stroke(selected ? Palette.blueInk.opacity(0.14) : Palette.line,
                                             lineWidth: 1)
                             }
@@ -343,11 +341,10 @@ struct EventEditSheet: View {
                     } label: {
                         Text(note)
                             .appFont(size: 13, weight: .heavy)
-                            .tracking(-0.13)
                             .foregroundStyle(on ? Palette.yellowInk : Palette.ink2)
                             .frame(maxWidth: .infinity, minHeight: 44)
                             .background(on ? Palette.yellow : Palette.bg2,
-                                        in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                        in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
                     }
                     .buttonStyle(PressableStyle())
                 }
@@ -357,7 +354,7 @@ struct EventEditSheet: View {
                 .appFont(size: 16, weight: .semibold)
                 .padding(.horizontal, 14)
                 .frame(minHeight: 48)
-                .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .background(Palette.bg2, in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
         }
     }
 
@@ -371,7 +368,7 @@ struct EventEditSheet: View {
                     .padding(.horizontal, 14)
                     .frame(maxWidth: .infinity, minHeight: 46, alignment: .leading)
                     .background(Palette.bg2,
-                                in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
             }
             if feedMode == .breast {
                 VStack(alignment: .leading, spacing: 8) {
@@ -384,7 +381,7 @@ struct EventEditSheet: View {
                                     .foregroundStyle(breastSide == s ? .white : Palette.ink2)
                                     .frame(maxWidth: .infinity, minHeight: 44)
                                     .background(breastSide == s ? store.theme.primary : Palette.bg2,
-                                                in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                                in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
                             }
                             .buttonStyle(PressableStyle())
                         }
@@ -401,7 +398,7 @@ struct EventEditSheet: View {
                                         .foregroundStyle(firstSide == f ? .white : Palette.ink2)
                                         .frame(maxWidth: .infinity, minHeight: 44)
                                         .background(firstSide == f ? store.theme.primary : Palette.bg2,
-                                                    in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                                    in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
                                 }
                                 .buttonStyle(PressableStyle())
                             }
@@ -445,7 +442,7 @@ struct EventEditSheet: View {
                     .appFont(size: 16, weight: .semibold)
                     .padding(.horizontal, 14)
                     .frame(minHeight: 48)
-                    .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .background(Palette.bg2, in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
             }
             VStack(alignment: .leading, spacing: 8) {
                 FieldLabel(text: "份量")
@@ -460,7 +457,7 @@ struct EventEditSheet: View {
                     .appFont(size: 16, weight: .semibold)
                     .padding(.horizontal, 14)
                     .frame(minHeight: 48)
-                    .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .background(Palette.bg2, in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
             }
         }
     }
@@ -486,7 +483,6 @@ struct EventEditSheet: View {
                             HStack(alignment: .firstTextBaseline, spacing: 8) {
                                 Text(hhmm(binding.wrappedValue))
                                     .appFont(size: 28, weight: .black)
-                                    .tracking(-0.72)
                                     .monospacedDigit()
                                     .foregroundStyle(Palette.ink)
                                 Text(formatDateLabel(binding.wrappedValue))
@@ -517,9 +513,9 @@ struct EventEditSheet: View {
                 .padding(.top, 14)
                 .padding(.bottom, isExpanded ? 10 : 14)
                 .background(isExpanded ? accent.surfaceStrong : accent.surfaceSoft,
-                            in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                            in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
                 .overlay {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous)
                         .stroke(isExpanded ? accent.borderStrong : accent.borderSoft, lineWidth: 1)
                 }
 
@@ -535,7 +531,7 @@ struct EventEditSheet: View {
                         .padding(.vertical, 4)
                         .offset(y: -3)
                         .background(Palette.bg2,
-                                    in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                    in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
                         .environment(\.locale, Locale(identifier: "zh_CN"))
                         .transition(
                             .asymmetric(
@@ -604,7 +600,6 @@ struct EventEditSheet: View {
                 MicroLabel(text: "睡眠时长")
                 Text(formatDur(endAt.timeIntervalSince(at)))
                     .appFont(size: 18, weight: .black)
-                    .tracking(-0.36)
                     .foregroundStyle(Palette.ink)
             }
             Spacer(minLength: 0)
@@ -615,10 +610,10 @@ struct EventEditSheet: View {
             LinearGradient(colors: [store.theme.primaryTint, Palette.card],
                            startPoint: .topLeading,
                            endPoint: .bottomTrailing),
-            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+            in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous)
         )
         .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous)
                 .stroke(Palette.card.opacity(0.6), lineWidth: 1)
         }
     }

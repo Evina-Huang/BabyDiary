@@ -59,7 +59,6 @@ struct SolidScreen: View {
                     Spacer(minLength: 8)
                     Text(hours > 0 ? "\(hours)时\(minutes)分" : "\(minutes)分")
                         .appFont(size: 20, weight: .black)
-                        .tracking(-0.3)
                         .monospacedDigit()
                         .foregroundStyle(Palette.yellowInk)
                 }
@@ -67,7 +66,7 @@ struct SolidScreen: View {
                 .frame(maxWidth: .infinity, minHeight: 62)
                 .background(
                     Palette.yellow.opacity(0.78),
-                    in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous)
                 )
                 .accessibilityElement(children: .combine)
             }
@@ -148,10 +147,10 @@ struct SolidScreen: View {
             }
             .background(
                 Palette.yellow.opacity(0.52),
-                in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+                in: RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous)
             )
             .overlay {
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous)
                     .stroke(Palette.yellowInk.opacity(0.12), lineWidth: 1)
             }
         }
@@ -165,7 +164,6 @@ struct SolidScreen: View {
                     VStack(alignment: .leading, spacing: 3) {
                         Text("这次吃了什么？")
                             .appFont(size: 17, weight: .bold)
-                            .tracking(-0.2)
                             .foregroundStyle(Palette.ink)
                         Text(selectedNames.isEmpty
                              ? "可以选择多种食物"
@@ -212,16 +210,14 @@ struct SolidScreen: View {
         .padding(.leading, 14)
         .padding(.trailing, 6)
         .frame(minHeight: 52)
-        .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Palette.bg2, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
         .accessibilityElement(children: .contain)
     }
 
     private var quickFoods: some View {
         VStack(alignment: .leading, spacing: 9) {
             Text("常用食物")
-                .appFont(size: 11, weight: .heavy)
-                .tracking(0.66)
-                .textCase(.uppercase)
+                .appText(.micro)
                 .foregroundStyle(Palette.ink3)
 
             let columns = [GridItem(.adaptive(minimum: 86), spacing: 8)]
@@ -247,17 +243,17 @@ struct SolidScreen: View {
                 Text(foodName)
                     .appFont(size: 13, weight: .bold)
                     .foregroundStyle(isSelected ? Palette.yellowInk : Palette.ink2)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
             }
             .frame(maxWidth: .infinity, minHeight: 44)
             .padding(.horizontal, 10)
             .background(
                 isSelected ? Palette.yellow : Palette.bg2,
-                in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous)
             )
             .overlay {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous)
                     .stroke(isSelected ? Palette.yellowInk.opacity(0.14) : .clear, lineWidth: 1)
             }
         }
@@ -268,9 +264,7 @@ struct SolidScreen: View {
     private var recipeRow: some View {
         VStack(alignment: .leading, spacing: 9) {
             Text("我的食谱")
-                .appFont(size: 11, weight: .heavy)
-                .tracking(0.66)
-                .textCase(.uppercase)
+                .appText(.micro)
                 .foregroundStyle(Palette.ink3)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
@@ -361,7 +355,7 @@ struct SolidScreen: View {
                 }
             }
         }
-        .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Palette.bg2, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
     }
 
     @ViewBuilder
@@ -414,7 +408,7 @@ struct SolidScreen: View {
                     }
                     .padding(.horizontal, 14)
                     .frame(minHeight: 50)
-                    .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+                    .background(Palette.bg2, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
 
                     HStack(spacing: 8) {
                         amountPresetButton(nil)
@@ -440,12 +434,11 @@ struct SolidScreen: View {
             Text(label)
                 .appFont(size: 12, weight: .bold)
                 .lineLimit(1)
-                .minimumScaleFactor(0.76)
                 .foregroundStyle(isSelected ? Palette.yellowInk : Palette.ink2)
                 .frame(maxWidth: .infinity, minHeight: 44)
                 .background(
                     isSelected ? Palette.yellow : Palette.bg2,
-                    in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous)
                 )
         }
         .buttonStyle(PressableStyle())
@@ -487,7 +480,7 @@ struct SolidScreen: View {
     private func warningLine(_ text: String, tint: Color, ink: Color) -> some View {
         HStack(alignment: .top, spacing: 9) {
             Text("!")
-                .appFont(size: 12, weight: .black)
+                .appText(.captionEmphasis)
                 .foregroundStyle(ink)
                 .frame(width: 22, height: 22)
                 .background(Palette.card.opacity(0.62), in: Circle())
@@ -497,7 +490,7 @@ struct SolidScreen: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(12)
-        .background(tint.opacity(0.58), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(tint.opacity(0.58), in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
     }
 
     private var notesCard: some View {
@@ -537,7 +530,7 @@ struct SolidScreen: View {
                         .appFont(size: 16, weight: .semibold)
                         .foregroundStyle(Palette.ink)
                         .padding(14)
-                        .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+                        .background(Palette.bg2, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
                         .padding(.horizontal, 16)
                         .padding(.bottom, 16)
                         .transition(.opacity)
@@ -557,11 +550,10 @@ struct SolidScreen: View {
                 }
                 Text(enabled ? "保存辅食记录" : "请先选择食物")
                     .appFont(size: 17, weight: .heavy)
-                    .tracking(-0.17)
                     .foregroundStyle(foreground)
             }
             .frame(maxWidth: .infinity, minHeight: 56)
-            .background(background, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .background(background, in: RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous))
             .shadowPill(tint: enabled ? background.opacity(0.9) : .clear)
         }
         .buttonStyle(PressableStyle())
@@ -702,7 +694,7 @@ private struct ObservationChip: View {
         .padding(12)
         .background(
             Palette.card.opacity(0.68),
-            in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+            in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous)
         )
     }
 
@@ -723,7 +715,7 @@ private struct ObservationChip: View {
             }
             .foregroundStyle(foreground)
             .frame(maxWidth: .infinity, minHeight: 44)
-            .background(background, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .background(background, in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
         }
         .buttonStyle(PressableStyle())
     }

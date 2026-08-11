@@ -60,8 +60,7 @@ struct HealthView: View {
         HStack(alignment: .bottom, spacing: 12) {
             VStack(alignment: .leading, spacing: 3) {
                 Text("健康")
-                    .appFont(size: 28, weight: .bold)
-                    .tracking(-0.7)
+                    .appText(.pageTitle)
                     .foregroundStyle(Palette.ink)
                 Text("集中查看需要留意的健康事项")
                     .appFont(size: 13, weight: .medium)
@@ -81,12 +80,12 @@ struct HealthView: View {
 
     private var vaccineFocusCard: some View {
         let style = vaccineAttentionStyle
-        return Card(padding: 0, onTap: { onOpen(.vaccine) }) {
+        return Button { onOpen(.vaccine) } label: {
             VStack(spacing: 0) {
                 HStack(spacing: 12) {
                     ZStack {
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .fill(style.tint)
+                        RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous)
+                            .fill(Palette.card.opacity(0.68))
                         AppIcon.Shield(size: 24, color: style.ink)
                     }
                     .frame(width: 44, height: 44)
@@ -97,7 +96,6 @@ struct HealthView: View {
                             .foregroundStyle(Palette.ink3)
                         Text(vaccineFocusTitle)
                             .appFont(size: 16, weight: .bold)
-                            .tracking(-0.2)
                             .foregroundStyle(Palette.ink)
                             .lineLimit(2)
                     }
@@ -107,14 +105,14 @@ struct HealthView: View {
                         .foregroundStyle(style.ink)
                         .padding(.horizontal, 10)
                         .frame(height: 28)
-                        .background(style.tint, in: Capsule())
+                        .background(Palette.card.opacity(0.68), in: Capsule())
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 16)
                 .padding(.bottom, 14)
 
                 Rectangle()
-                    .fill(Palette.line)
+                    .fill(style.ink.opacity(0.12))
                     .frame(height: 1)
 
                 HStack(spacing: 8) {
@@ -130,7 +128,15 @@ struct HealthView: View {
                 .padding(.horizontal, 16)
                 .frame(minHeight: 48)
             }
+            .background(style.tint, in: RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous)
+                    .stroke(style.ink.opacity(0.12), lineWidth: 1)
+            }
+            .contentShape(RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous))
         }
+        .buttonStyle(PressableStyle())
+        .accessibilityHint("查看接种计划")
     }
 
     private var vaccineAttentionStyle: (label: String, tint: Color, ink: Color) {
@@ -170,35 +176,32 @@ struct HealthView: View {
     }
 
     private var latestMeasureCard: some View {
-        Card(padding: 16) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text("最近测量")
-                        .appFont(size: 15, weight: .bold)
-                        .tracking(-0.15)
-                        .foregroundStyle(Palette.ink)
-                    Spacer(minLength: 8)
-                    Text(latestMeasureDateLabel)
-                        .appFont(size: 12, weight: .medium)
-                        .foregroundStyle(Palette.ink3)
-                }
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text("最近测量")
+                    .appFont(size: 15, weight: .bold)
+                    .foregroundStyle(Palette.ink)
+                Spacer(minLength: 8)
+                Text(latestMeasureDateLabel)
+                    .appFont(size: 12, weight: .medium)
+                    .foregroundStyle(Palette.ink3)
+            }
 
-                HStack(spacing: 10) {
-                    measureCell(
-                        label: "体重",
-                        value: latestGrowth.map { String(format: "%.1f", $0.weightKg) } ?? "—",
-                        unit: "kg",
-                        tint: Palette.pink,
-                        ink: Palette.pinkInk
-                    )
-                    measureCell(
-                        label: "身高",
-                        value: latestGrowth.map { String(format: "%.1f", $0.heightCm) } ?? "—",
-                        unit: "cm",
-                        tint: Palette.blue,
-                        ink: Palette.blueInk
-                    )
-                }
+            HStack(spacing: 10) {
+                measureCell(
+                    label: "体重",
+                    value: latestGrowth.map { String(format: "%.1f", $0.weightKg) } ?? "—",
+                    unit: "kg",
+                    tint: Palette.pink,
+                    ink: Palette.pinkInk
+                )
+                measureCell(
+                    label: "身高",
+                    value: latestGrowth.map { String(format: "%.1f", $0.heightCm) } ?? "—",
+                    unit: "cm",
+                    tint: Palette.blue,
+                    ink: Palette.blueInk
+                )
             }
         }
     }
@@ -216,8 +219,7 @@ struct HealthView: View {
                 .foregroundStyle(ink)
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text(value)
-                    .appFont(size: 22, weight: .bold)
-                    .tracking(-0.45)
+                    .appFont(size: 22, weight: .black)
                     .monospacedDigit()
                     .foregroundStyle(Palette.ink)
                 Text(unit)
@@ -228,7 +230,7 @@ struct HealthView: View {
         .padding(.horizontal, 13)
         .padding(.vertical, 11)
         .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
-        .background(tint, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(tint, in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
     }
 
     private var latestMeasureDateLabel: String {
@@ -240,7 +242,6 @@ struct HealthView: View {
         HStack(alignment: .firstTextBaseline) {
             Text("健康记录")
                 .appFont(size: 16, weight: .bold)
-                .tracking(-0.2)
                 .foregroundStyle(Palette.ink)
             Spacer()
             Text("3 个入口")
@@ -250,32 +251,32 @@ struct HealthView: View {
     }
 
     private var recordDirectory: some View {
-        Card(padding: 0) {
-            VStack(spacing: 0) {
-                healthRecordRow(
-                    title: "用药记录",
-                    subtitle: medicationSubtitle,
-                    tint: Palette.blue,
-                    icon: { AppIcon.Pill(size: 21, color: Palette.blueInk) },
-                    onTap: { onOpen(.medication) }
-                )
-                directoryDivider
-                healthRecordRow(
-                    title: "食物与过敏",
-                    subtitle: foodSubtitle,
-                    tint: Palette.yellow,
-                    icon: { AppIcon.Bowl(size: 21, color: Palette.yellowInk) },
-                    onTap: { onOpen(.foodList) }
-                )
-                directoryDivider
-                healthRecordRow(
-                    title: "我的食谱",
-                    subtitle: recipeSubtitle,
-                    tint: Palette.pink,
-                    icon: { AppIcon.Bowl(size: 21, color: Palette.pinkInk) },
-                    onTap: { onOpen(.recipeList) }
-                )
-            }
+        VStack(spacing: 0) {
+            Rectangle().fill(Palette.line).frame(height: 1)
+            healthRecordRow(
+                title: "用药记录",
+                subtitle: medicationSubtitle,
+                tint: Palette.blue,
+                icon: { AppIcon.Pill(size: 21, color: Palette.blueInk) },
+                onTap: { onOpen(.medication) }
+            )
+            directoryDivider
+            healthRecordRow(
+                title: "食物与过敏",
+                subtitle: foodSubtitle,
+                tint: Palette.yellow,
+                icon: { AppIcon.Bowl(size: 21, color: Palette.yellowInk) },
+                onTap: { onOpen(.foodList) }
+            )
+            directoryDivider
+            healthRecordRow(
+                title: "我的食谱",
+                subtitle: recipeSubtitle,
+                tint: Palette.pink,
+                icon: { AppIcon.Bowl(size: 21, color: Palette.pinkInk) },
+                onTap: { onOpen(.recipeList) }
+            )
+            Rectangle().fill(Palette.line).frame(height: 1)
         }
     }
 
@@ -289,7 +290,7 @@ struct HealthView: View {
         Button(action: onTap) {
             HStack(spacing: 12) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous)
                         .fill(tint)
                     icon()
                 }

@@ -54,7 +54,7 @@ struct RecipeListScreen: View {
         Card(padding: 18) {
             HStack(alignment: .top, spacing: 14) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous)
                         .fill(Palette.yellow)
                     AppIcon.Bowl(size: 26, color: Palette.yellowInk)
                 }
@@ -62,8 +62,7 @@ struct RecipeListScreen: View {
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text(store.recipes.isEmpty ? "把常吃的食材存成组合" : "已保存 \(store.recipes.count) 个食谱")
-                        .appFont(size: 17, weight: .black)
-                        .tracking(-0.18)
+                        .appText(.cardTitle)
                         .foregroundStyle(Palette.ink)
 
                     Text(overviewDescription)
@@ -92,13 +91,12 @@ struct RecipeListScreen: View {
                 AppIcon.Plus(size: 18, color: .white)
                 Text("新建食谱")
                     .appFont(size: 15, weight: .heavy)
-                    .tracking(-0.15)
             }
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity, minHeight: 56)
             .background(
                 store.theme.primary,
-                in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+                in: RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous)
             )
             .shadowPill(tint: store.theme.primary600)
         }
@@ -110,7 +108,6 @@ struct RecipeListScreen: View {
             HStack(alignment: .firstTextBaseline) {
                 Text("常用组合")
                     .appFont(size: 15, weight: .heavy)
-                    .tracking(-0.15)
                     .foregroundStyle(Palette.ink)
 
                 Spacer()
@@ -157,8 +154,7 @@ private struct RecipeCard: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .firstTextBaseline, spacing: 10) {
                     Text(recipe.name)
-                        .appFont(size: 17, weight: .black)
-                        .tracking(-0.18)
+                        .appText(.cardTitle)
                         .foregroundStyle(Palette.ink)
                         .frame(maxWidth: .infinity, alignment: .leading)
 

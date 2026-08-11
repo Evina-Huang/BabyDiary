@@ -87,7 +87,7 @@ struct RecipeEditSheet: View {
                             .frame(maxWidth: .infinity, minHeight: 48)
                             .background(
                                 Palette.pink,
-                                in: RoundedRectangle(cornerRadius: 17, style: .continuous)
+                                in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous)
                             )
                     }
                     .buttonStyle(PressableStyle())
@@ -115,7 +115,6 @@ struct RecipeEditSheet: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("食谱信息")
                 .appFont(size: 15, weight: .heavy)
-                .tracking(-0.15)
                 .foregroundStyle(Palette.ink)
 
             Card {
@@ -131,7 +130,6 @@ struct RecipeEditSheet: View {
             HStack(alignment: .firstTextBaseline) {
                 Text("食材组合")
                     .appFont(size: 15, weight: .heavy)
-                    .tracking(-0.15)
                     .foregroundStyle(Palette.ink)
                 Spacer()
                 Text(foodNames.isEmpty ? "至少添加 1 种" : "已选 \(foodNames.count) 种")
@@ -169,7 +167,7 @@ struct RecipeEditSheet: View {
                 .padding(.horizontal, 16)
                 .background(
                     Palette.bg2,
-                    in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous)
                 )
         } else {
             VStack(spacing: 0) {
@@ -203,7 +201,7 @@ struct RecipeEditSheet: View {
             }
             .background(
                 Palette.bg2,
-                in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+                in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous)
             )
         }
     }
@@ -227,7 +225,7 @@ struct RecipeEditSheet: View {
         .frame(minHeight: 52)
         .background(
             Palette.bg2,
-            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+            in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous)
         )
     }
 
@@ -242,12 +240,11 @@ struct RecipeEditSheet: View {
                 } label: {
                     Text(food)
                         .appFont(size: 13, weight: .heavy)
-                        .tracking(-0.13)
                         .foregroundStyle(Palette.ink2)
                         .frame(maxWidth: .infinity, minHeight: 44)
                         .background(
                             Palette.bg2,
-                            in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous)
                         )
                 }
                 .buttonStyle(PressableStyle())

@@ -21,7 +21,6 @@ struct ContentView: View {
             case .records: RecordsView()
             case .growth:  GrowthView(onOpen: { sub = $0 }, onOpenHealth: { tab = .health })
             case .health:  HealthView(onOpen: { sub = $0 })
-            case .stats:   StatsView()
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -370,7 +369,7 @@ private struct ActiveSleepDock: View {
         return Button(action: onOpen) {
             HStack(spacing: 10) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 13, style: .continuous)
+                    RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous)
                         .fill(Palette.card.opacity(0.78))
                     AppIcon.Moon(size: 20, color: accent)
                 }
@@ -388,7 +387,6 @@ private struct ActiveSleepDock: View {
 
                     Text(formatDur(duration))
                         .appFont(size: 17, weight: .bold)
-                        .tracking(-0.32)
                         .monospacedDigit()
                         .foregroundStyle(Palette.ink)
                 }
@@ -434,7 +432,7 @@ private struct ActiveFeedDock: View {
         return Button(action: onOpen) {
             HStack(spacing: 10) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 13, style: .continuous)
+                    RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous)
                         .fill(Palette.card.opacity(0.78))
                     AppIcon.Bottle(size: 20, color: status.ink)
                 }
@@ -452,7 +450,6 @@ private struct ActiveFeedDock: View {
 
                     Text(formatDur(status.duration))
                         .appFont(size: 17, weight: .bold)
-                        .tracking(-0.32)
                         .monospacedDigit()
                         .foregroundStyle(Palette.ink)
                 }
@@ -597,7 +594,6 @@ struct AppTabBar: View {
             case .records: AppIcon.Book(size: 24, color: c, fill: f)
             case .growth:  AppIcon.Growth(size: 24, color: c, fill: f)
             case .health:  AppIcon.Shield(size: 24, color: c, fill: f)
-            case .stats:   AppIcon.Chart(size: 24, color: c)
             }
         }
     }

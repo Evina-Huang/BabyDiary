@@ -45,7 +45,7 @@ struct MedicationScreen: View {
         return Card(padding: 18) {
             HStack(alignment: .top, spacing: 14) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous)
                         .fill(allergic.isEmpty ? Palette.mintTint : Palette.pink)
                     AppIcon.Pill(
                         size: 26,
@@ -56,8 +56,7 @@ struct MedicationScreen: View {
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text(allergic.isEmpty ? "暂无药物过敏记录" : "疑似药物过敏 \(allergic.count) 项")
-                        .appFont(size: 17, weight: .black)
-                        .tracking(-0.18)
+                        .appText(.cardTitle)
                         .foregroundStyle(Palette.ink)
 
                     if allergic.isEmpty {
@@ -86,12 +85,11 @@ struct MedicationScreen: View {
                 AppIcon.Plus(size: 18, color: .white)
                 Text("新增用药记录")
                     .appFont(size: 15, weight: .heavy)
-                    .tracking(-0.15)
             }
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity, minHeight: 56)
             .background(store.theme.primary,
-                        in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                        in: RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous))
             .shadowPill(tint: store.theme.primary600)
         }
         .buttonStyle(PressableStyle())
@@ -102,7 +100,6 @@ struct MedicationScreen: View {
             HStack(alignment: .firstTextBaseline) {
                 Text("最近用药")
                     .appFont(size: 15, weight: .heavy)
-                    .tracking(-0.15)
                 Spacer()
                 Text("\(records.count) 条")
                     .appFont(size: 12, weight: .bold)
@@ -152,7 +149,6 @@ private struct MedicationRow: View {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(record.name)
                             .appFont(size: 15, weight: .heavy)
-                            .tracking(-0.15)
                             .foregroundStyle(Palette.ink)
                         Text(detailLine)
                             .appFont(size: 12, weight: .semibold)
@@ -321,7 +317,7 @@ private struct MedicationEditSheet: View {
                                     .appFont(size: 16, weight: .semibold)
                                     .foregroundStyle(Palette.ink)
                                     .padding(14)
-                                    .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+                                    .background(Palette.bg2, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
                                     .padding(.horizontal, 16)
                                     .padding(.bottom, 16)
                                     .transition(.opacity)
@@ -338,10 +334,9 @@ private struct MedicationEditSheet: View {
                         Button { showDeleteConfirm = true } label: {
                             Text("删除此用药记录")
                                 .appFont(size: 14, weight: .heavy)
-                                .tracking(-0.14)
                                 .foregroundStyle(Palette.pinkInk)
                                 .frame(maxWidth: .infinity, minHeight: 50)
-                                .background(Palette.pink, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                                .background(Palette.pink, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
                         }
                         .buttonStyle(PressableStyle())
                     }

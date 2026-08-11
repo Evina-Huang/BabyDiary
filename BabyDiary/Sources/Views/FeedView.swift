@@ -188,8 +188,8 @@ struct FeedScreen: View {
         } label: {
             Text(title)
                 .appFont(size: 13, weight: .heavy)
-                .lineLimit(1)
-                .minimumScaleFactor(0.84)
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
                 .foregroundStyle(bManualFirstSide == side ? .white : Palette.ink2)
                 .frame(maxWidth: .infinity)
                 .padding(.horizontal, 10)
@@ -222,8 +222,7 @@ struct FeedScreen: View {
                     .foregroundStyle(Palette.ink3)
             } else {
                 Text(String(format: "共 %d 分 %d 秒", Int(total / 60), Int(total) % 60))
-                    .appFont(size: 13, weight: .heavy)
-                    .tracking(0.52)
+                    .appText(.captionEmphasis)
                     .foregroundStyle(Palette.ink3)
             }
 
@@ -262,8 +261,7 @@ struct FeedScreen: View {
                         .appFont(size: 14, weight: .semibold)
                         .foregroundStyle(active ? accent : sideInk)
                     Text(formatMMSS(ms))
-                        .appFont(size: 32, weight: .bold)
-                        .tracking(-0.5)
+                        .appFont(size: 32, weight: .black)
                         .monospacedDigit()
                         .foregroundStyle(active ? accent : Palette.ink)
                     statusLabel(accent: accent)
@@ -272,9 +270,9 @@ struct FeedScreen: View {
                 .frame(maxWidth: .infinity, minHeight: 124)
                 .padding(.vertical, 20).padding(.horizontal, 14)
                 .background(background,
-                            in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                            in: RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous)
                         .stroke(border, lineWidth: active ? 2.5 : 1.5)
                 )
             }
@@ -287,27 +285,20 @@ struct FeedScreen: View {
                 HStack(spacing: 5) {
                     Circle().fill(accent).frame(width: 6, height: 6)
                     Text("计时中")
-                        .appFont(size: 10, weight: .heavy)
-                        .tracking(0.6)
-                        .textCase(.uppercase)
+                        .appText(.micro)
                 }
                 .foregroundStyle(accent)
             } else if active, phase == .paused {
                 Text("已暂停")
-                    .appFont(size: 10, weight: .heavy)
-                    .tracking(0.6)
-                    .textCase(.uppercase)
+                    .appText(.micro)
                     .foregroundStyle(Palette.yellowInk)
             } else if showsLastEndedHint {
                 Text("上次从\(side == .L ? "左" : "右")边结束")
                     .appFont(size: 10, weight: .heavy)
-                    .tracking(0.2)
                     .foregroundStyle(accent.opacity(0.78))
             } else {
                 Text("计时中")
-                    .appFont(size: 10, weight: .heavy)
-                    .tracking(0.6)
-                    .textCase(.uppercase)
+                    .appText(.micro)
                     .foregroundStyle(.clear)
             }
         }
@@ -329,24 +320,19 @@ struct FeedScreen: View {
                 VStack(spacing: 14) {
                     VStack(spacing: 4) {
                         Text(formatMMSS(live))
-                            .appFont(size: 44, weight: .bold)
-                            .tracking(-1.1)
+                            .appText(.timer)
                             .monospacedDigit()
                             .foregroundStyle(timerInk(for: fPhase))
                         if fPhase == .running {
                             HStack(spacing: 6) {
                                 Circle().fill(Palette.pinkInk).frame(width: 6, height: 6)
                                 Text("计时中")
-                                    .appFont(size: 11, weight: .heavy)
-                                    .tracking(0.66)
-                                    .textCase(.uppercase)
+                                    .appText(.micro)
                             }
                             .foregroundStyle(Palette.pinkInk)
                         } else if fPhase == .paused {
                             Text("已暂停")
-                                .appFont(size: 11, weight: .heavy)
-                                .tracking(0.66)
-                                .textCase(.uppercase)
+                                .appText(.micro)
                                 .foregroundStyle(Palette.yellowInk)
                         } else if fPhase == .stopped, let s = fSessionStart, let e = fSessionEnd {
                             Text("\(hhmm(s)) - \(hhmm(e))")
@@ -358,7 +344,7 @@ struct FeedScreen: View {
                     .frame(maxWidth: .infinity)
                     .padding(.horizontal, 16).padding(.vertical, 22)
                     .background(timerTint(for: fPhase),
-                                in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                                in: RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous))
 
                     formulaActionRow
                 }
@@ -436,9 +422,9 @@ struct FeedScreen: View {
         }
         .padding(.horizontal, 14)
         .frame(minHeight: 60)
-        .background(Palette.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Palette.card, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
+            RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous)
                 .stroke(Palette.line, lineWidth: 1)
         }
         .accessibilityElement(children: .combine)
@@ -474,9 +460,9 @@ struct FeedScreen: View {
             }
             .padding(.horizontal, 14)
             .frame(minHeight: 56)
-            .background(Palette.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .background(Palette.card, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous)
                     .stroke(Palette.line, lineWidth: 1)
             }
         }
@@ -495,8 +481,7 @@ struct FeedScreen: View {
                 suffix: "ml"
             )
             Text("常用奶量")
-                .appFont(size: 11, weight: .heavy)
-                .tracking(0.66)
+                .appText(.micro)
                 .foregroundStyle(Palette.ink3)
 
             let columns = [GridItem(.adaptive(minimum: 72), spacing: 8)]
@@ -520,7 +505,6 @@ struct FeedScreen: View {
                 Text("\(value) ml")
                     .appFont(size: 13, weight: .bold)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.84)
             }
             .foregroundStyle(isSelected ? .white : Palette.ink2)
             .frame(maxWidth: .infinity, minHeight: 44)
@@ -795,7 +779,6 @@ struct StepperInput: View {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text("\(value)")
                     .appFont(size: 30, weight: .black)
-                    .tracking(-0.6)
                     .monospacedDigit()
                     .foregroundStyle(Palette.ink)
                 if let suffix {
@@ -808,7 +791,7 @@ struct StepperInput: View {
             StepBtn(symbol: "+") { value = Swift.min(max, value + step) }
         }
         .padding(6)
-        .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(Palette.bg2, in: RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous))
     }
 
     private struct StepBtn: View {
@@ -820,8 +803,11 @@ struct StepperInput: View {
                     .appFont(size: 22, weight: .bold)
                     .foregroundStyle(Palette.ink)
                     .frame(width: 48, height: 48)
-                    .background(.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    .shadow(color: .black.opacity(0.06), radius: 1, x: 0, y: 1)
+                    .background(.white, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous)
+                            .stroke(Palette.line, lineWidth: 1)
+                    }
             }
             .buttonStyle(PressableStyle())
         }

@@ -42,16 +42,16 @@ private struct HomeSectionHeader: View {
     let detail: String
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline) {
+        HStack(alignment: .top) {
             Text(title)
-                .appFont(size: 17, weight: .bold)
+                .appText(.sectionTitle)
                 .foregroundStyle(Palette.ink)
             Spacer(minLength: 8)
             Text(detail)
-                .appFont(size: 12, weight: .medium)
+                .appText(.caption)
                 .foregroundStyle(Palette.ink3)
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
+                .lineLimit(2)
+                .multilineTextAlignment(.trailing)
         }
     }
 }
@@ -64,11 +64,9 @@ private struct HomeHeader: View {
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 3) {
                 Text(dateLine())
-                    .appFont(size: 15, weight: .semibold)
+                    .appText(.bodyEmphasis)
                     .foregroundStyle(Palette.ink2)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.86)
-                    .allowsTightening(true)
+                    .lineLimit(2)
 
                 if let greeting = specialGreeting(for: store.baby) {
                     Text(greeting.text)
@@ -232,9 +230,9 @@ private struct BabyBadge: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
-        .background(Palette.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(Palette.card, in: RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
+            RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous)
                 .stroke(Palette.line, lineWidth: 1)
         }
         .sheet(isPresented: $editing) {
@@ -283,7 +281,7 @@ private struct QuickTile: View {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack(alignment: .top) {
                         ZStack {
-                            RoundedRectangle(cornerRadius: 13, style: .continuous)
+                            RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous)
                                 .fill(Palette.card.opacity(0.72))
                             style.icon
                         }
@@ -296,20 +294,21 @@ private struct QuickTile: View {
 
                     VStack(alignment: .leading, spacing: 3) {
                         Text(style.label)
-                            .appFont(size: 17, weight: .bold)
+                            .appText(.cardTitle)
                             .foregroundStyle(style.ink)
                         Text(statusText(at: context.date))
-                            .appFont(size: 12, weight: .medium)
+                            .appText(.caption)
                             .monospacedDigit()
                             .foregroundStyle(style.ink.opacity(0.78))
-                            .lineLimit(1)
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 .padding(14)
                 .frame(maxWidth: .infinity, minHeight: 118, alignment: .topLeading)
-                .background(style.tint, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .background(style.tint, in: RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous))
                 .overlay {
-                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous)
                         .stroke(style.ink.opacity(0.08), lineWidth: 1)
                 }
             }
@@ -348,7 +347,7 @@ private struct TimerBanner: View {
 
             HStack(spacing: 12) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous)
                         .fill(Palette.card.opacity(0.6))
                     AppIcon.Moon(size: 26, color: ink)
                 }
@@ -360,21 +359,18 @@ private struct TimerBanner: View {
                             PulseDot(color: ink)
                         }
                         Text(running ? "正在睡觉" : "已暂停")
-                            .appFont(size: 12, weight: .heavy)
-                            .tracking(0.72)
-                            .textCase(.uppercase)
+                            .appText(.captionEmphasis)
                             .foregroundStyle(ink)
                     }
                     Text(formatDur(dur))
                         .appFont(size: 22, weight: .black)
-                        .tracking(-0.44)
                         .monospacedDigit()
                         .foregroundStyle(ink)
                 }
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, 16).padding(.vertical, 14)
-            .background(tint, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .background(tint, in: RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous))
         }
     }
 }
@@ -402,7 +398,7 @@ private struct DailySummaryStrip: View {
         TimelineView(.periodic(from: .now, by: 30)) { ctx in
             let summary = store.dailySummary(on: ctx.date, now: ctx.date)
 
-            Card(padding: 16, cornerRadius: 20) {
+            Card(padding: 16, cornerRadius: AppRadius.surface) {
                 VStack(alignment: .leading, spacing: 14) {
                     HStack(alignment: .firstTextBaseline) {
                         Text("今天")
@@ -484,9 +480,7 @@ private struct SinceLastRow: View {
             if !items.isEmpty {
                 HStack(alignment: .center, spacing: 10) {
                     Text("距上次")
-                        .appFont(size: 10, weight: .heavy)
-                        .tracking(0.6)
-                        .textCase(.uppercase)
+                        .appText(.micro)
                     HStack(spacing: 8) {
                         ForEach(Array(items.enumerated()), id: \.offset) { _, it in
                             HStack(spacing: 4) {
@@ -503,7 +497,7 @@ private struct SinceLastRow: View {
                             .padding(.horizontal, 10)
                             .padding(.vertical, 6)
                             .background(Palette.card.opacity(0.72),
-                                        in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                        in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -551,7 +545,7 @@ private struct VaccineReminderBanner: View {
             Button(action: onOpen) {
                 HStack(spacing: 12) {
                     ZStack {
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous)
                             .fill(Palette.card.opacity(0.6))
                         AppIcon.Syringe(size: 22, color: ink)
                     }
@@ -559,13 +553,10 @@ private struct VaccineReminderBanner: View {
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text("疫苗提醒 · \(kicker)")
-                            .appFont(size: 11, weight: .heavy)
-                            .tracking(0.66)
-                            .textCase(.uppercase)
+                            .appText(.micro)
                             .foregroundStyle(ink)
                         Text(v.name)
                             .appFont(size: 15, weight: .heavy)
-                            .tracking(-0.15)
                             .foregroundStyle(Palette.ink)
                         Text(reminderDetail(for: v))
                             .appFont(size: 12, weight: .semibold)
@@ -575,7 +566,7 @@ private struct VaccineReminderBanner: View {
                     AppIcon.Chevron(size: 16, color: Palette.ink3)
                 }
                 .padding(.horizontal, 14).padding(.vertical, 12)
-                .background(tint, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .background(tint, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
             }
             .buttonStyle(PressableStyle())
         }
@@ -633,7 +624,7 @@ private struct EditBabyScreen: View {
                             .environment(\.locale, Locale(identifier: "zh_CN"))
                             .padding(.horizontal, 12).padding(.vertical, 8)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                            .background(Palette.bg2, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
                     }
 
                     VStack(alignment: .leading, spacing: 8) {

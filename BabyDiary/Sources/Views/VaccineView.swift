@@ -16,7 +16,6 @@ struct VaccineScreen: View {
                         AppIcon.Plus(size: 15, color: store.theme.primary600)
                         Text("添加")
                             .appFont(size: 14, weight: .heavy)
-                            .tracking(-0.14)
                     }
                     .foregroundStyle(store.theme.primary600)
                     .padding(.horizontal, 14)
@@ -51,7 +50,6 @@ struct VaccineScreen: View {
                         VStack(alignment: .leading, spacing: 12) {
                             Text(plan.isEmpty ? "还没有接种计划" : "待接种已清空")
                                 .appFont(size: 16, weight: .heavy)
-                                .tracking(-0.16)
                                 .foregroundStyle(Palette.ink)
                             Text(plan.isEmpty ? "从右上角「添加」进入，先选疫苗名称，再选择具体剂次。" : "可以继续添加后续月龄的疫苗，或查看下方已完成记录。")
                                 .appFont(size: 13, weight: .semibold)
@@ -65,7 +63,7 @@ struct VaccineScreen: View {
                                 .foregroundStyle(.white)
                                 .padding(.horizontal, 16)
                                 .frame(height: 44)
-                                .background(store.theme.primary, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                                .background(store.theme.primary, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
                                 .shadowPill(tint: store.theme.primary600)
                             }
                             .buttonStyle(PressableStyle())
@@ -155,33 +153,28 @@ struct VaccineScreen: View {
         }()
 
         return ZStack {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
+            RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous)
                 .fill(heroTint)
             VStack(alignment: .leading, spacing: 14) {
                 HStack(spacing: 14) {
                     ZStack {
-                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous)
                             .fill(Palette.card.opacity(0.7))
                         AppIcon.Shield(size: 32, color: heroInk)
                     }
                     .frame(width: 60, height: 60)
                     VStack(alignment: .leading, spacing: 4) {
                         Text(alert ? "需要处理" : "接种提醒")
-                            .appFont(size: 12, weight: .heavy)
-                            .tracking(0.72)
-                            .textCase(.uppercase)
+                            .appText(.captionEmphasis)
                             .foregroundStyle(heroInk)
                         Text(title)
-                            .appFont(size: 21, weight: .black)
-                            .tracking(-0.42)
+                            .appText(.heroTitle)
                             .foregroundStyle(Palette.ink)
                             .lineLimit(2)
-                            .minimumScaleFactor(0.82)
                         Text(subtitle)
-                            .appFont(size: 13, weight: .bold)
+                            .appText(.caption)
                             .foregroundStyle(Palette.ink2)
-                            .lineLimit(2)
-                            .minimumScaleFactor(0.82)
+                            .lineLimit(3)
                     }
                     .layoutPriority(1)
                     Spacer(minLength: 0)
@@ -207,7 +200,6 @@ struct VaccineScreen: View {
                     Circle().fill(ink).frame(width: 8, height: 8)
                     Text(title)
                         .appFont(size: 13, weight: .heavy)
-                        .tracking(-0.13)
                         .foregroundStyle(Palette.ink)
                     Text("\(vaccines.count) 项")
                         .appFont(size: 11, weight: .heavy)
@@ -232,7 +224,6 @@ struct VaccineScreen: View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             Text(title)
                 .appFont(size: 15, weight: .heavy)
-                .tracking(-0.15)
             Text(countLabel)
                 .appFont(size: 11, weight: .heavy)
                 .foregroundStyle(ink)
@@ -264,7 +255,7 @@ private struct VaccineCard: View {
 
         return HStack(spacing: 14) {
             ZStack {
-                RoundedRectangle(cornerRadius: 14, style: .continuous).fill(iconBg)
+                RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous).fill(iconBg)
                 AppIcon.Syringe(size: 22, color: iconColor)
             }
             .frame(width: 44, height: 44)
@@ -272,7 +263,6 @@ private struct VaccineCard: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(vaccine.name)
                     .appFont(size: 15, weight: .heavy)
-                    .tracking(-0.15)
                     .foregroundStyle(Palette.ink)
                 HStack(spacing: 6) {
                     if let d = vaccine.scheduledDate {
@@ -297,12 +287,10 @@ private struct VaccineCard: View {
                         AppIcon.Check(size: 14, color: .white)
                         Text("记录")
                             .appFont(size: 13, weight: .heavy)
-                            .tracking(-0.13)
                     }
                     .foregroundStyle(.white)
                     .padding(.horizontal, 14).padding(.vertical, 10)
-                    .background(Palette.mint, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    .shadow(color: Palette.mint600.opacity(0.35), radius: 8, x: 0, y: 2)
+                    .background(Palette.mint, in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
                 }
                 .buttonStyle(PressableStyle())
 
@@ -317,16 +305,14 @@ private struct VaccineCard: View {
             }
         }
         .padding(16)
-        .background(bg, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(bg, in: RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous))
         .shadowCard()
         .contentShape(Rectangle())
     }
 
     private func tag(text: String, tint: Color) -> some View {
         Text(text)
-            .appFont(size: 10, weight: .heavy)
-            .tracking(0.4)
-            .textCase(.uppercase)
+            .appText(.micro)
             .foregroundStyle(tint)
             .padding(.horizontal, 8).padding(.vertical, 2)
             .background(Palette.card, in: Capsule())
@@ -418,14 +404,13 @@ private struct VaccineAddPlanSheet: View {
             Card {
                 HStack(spacing: 14) {
                     ZStack {
-                        RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Palette.mintTint)
+                        RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous).fill(Palette.mintTint)
                         AppIcon.Shield(size: 26, color: Palette.mint600)
                     }
                     .frame(width: 50, height: 50)
                     VStack(alignment: .leading, spacing: 4) {
                         Text("\(store.baby.name) 约 \(vaccineAgeLabel(months: currentAgeMonths))")
-                            .appFont(size: 17, weight: .black)
-                            .tracking(-0.34)
+                            .appText(.cardTitle)
                             .foregroundStyle(Palette.ink)
                         Text("默认展示当前月龄附近、还没加入计划的疫苗。")
                             .appFont(size: 13, weight: .semibold)
@@ -463,14 +448,13 @@ private struct VaccineAddPlanSheet: View {
             Button { showAddCustom = true } label: {
                 HStack(spacing: 10) {
                     ZStack {
-                        RoundedRectangle(cornerRadius: 14, style: .continuous).fill(store.theme.primaryTint)
+                        RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous).fill(store.theme.primaryTint)
                         AppIcon.Plus(size: 18, color: store.theme.primary600)
                     }
                     .frame(width: 42, height: 42)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("没有找到？新增自定义疫苗")
                             .appFont(size: 15, weight: .heavy)
-                            .tracking(-0.15)
                             .foregroundStyle(Palette.ink)
                         Text("用于医生单独安排或本地计划外项目")
                             .appFont(size: 12, weight: .semibold)
@@ -480,7 +464,7 @@ private struct VaccineAddPlanSheet: View {
                     AppIcon.Chevron(size: 14, color: Palette.ink3)
                 }
                 .padding(16)
-                .background(Palette.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .background(Palette.card, in: RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous))
                 .shadowCard()
             }
             .buttonStyle(PressableStyle())
@@ -506,9 +490,9 @@ private struct VaccineAddPlanSheet: View {
         }
         .padding(.horizontal, 14)
         .frame(height: 48)
-        .background(Palette.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Palette.card, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
+            RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous)
                 .stroke(Palette.line, lineWidth: 1)
         )
         .shadowCard()
@@ -533,8 +517,7 @@ private struct VaccineAddPlanSheet: View {
                             .background(Palette.bg2, in: Capsule())
                     }
                     Text("选择需要加入计划的剂次")
-                        .appFont(size: 18, weight: .black)
-                        .tracking(-0.36)
+                        .appText(.sectionTitle)
                         .foregroundStyle(Palette.ink)
                     Text("每一针都会按宝宝生日自动推算推荐日期，也可以稍后在接种表中编辑。")
                         .appFont(size: 13, weight: .semibold)
@@ -614,7 +597,7 @@ private struct VaccineTemplateGroupRow: View {
         Button(action: onTap) {
             HStack(spacing: 14) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous).fill(iconTint)
+                    RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous).fill(iconTint)
                     AppIcon.Syringe(size: 22, color: iconInk)
                 }
                 .frame(width: 44, height: 44)
@@ -622,7 +605,6 @@ private struct VaccineTemplateGroupRow: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(group.name)
                         .appFont(size: 16, weight: .heavy)
-                        .tracking(-0.16)
                         .foregroundStyle(Palette.ink)
                         .lineLimit(2)
                     HStack(spacing: 6) {
@@ -639,7 +621,7 @@ private struct VaccineTemplateGroupRow: View {
                 AppIcon.Chevron(size: 15, color: Palette.ink3)
             }
             .padding(16)
-            .background(Palette.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .background(Palette.card, in: RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous))
             .shadowCard()
         }
         .buttonStyle(PressableStyle())
@@ -662,7 +644,6 @@ private struct VaccineTemplateGroupRow: View {
     private func chip(_ text: String, ink: Color, bg: Color) -> some View {
         Text(text)
             .appFont(size: 10, weight: .heavy)
-            .tracking(0.2)
             .foregroundStyle(ink)
             .padding(.horizontal, 7)
             .padding(.vertical, 2)
@@ -685,11 +666,9 @@ private struct VaccineDoseTemplateRow: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 6) {
                     Text(template.name)
-                        .appFont(size: 16, weight: .heavy)
-                        .tracking(-0.16)
+                        .appText(.cardTitle)
                         .foregroundStyle(Palette.ink)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.82)
+                        .lineLimit(3)
                     if let dose = template.doseIndex {
                         chip("第 \(dose) 剂", ink: Palette.ink3, bg: Palette.bg2)
                     } else if let label = template.doseKindLabel {
@@ -708,19 +687,18 @@ private struct VaccineDoseTemplateRow: View {
             Button(action: onAdd) {
                 Text(joined ? "已加入" : "加入")
                     .appFont(size: 13, weight: .heavy)
-                    .tracking(-0.13)
                     .foregroundStyle(joined ? Palette.ink3 : store.theme.primary600)
                     .padding(.horizontal, 13)
                     .frame(height: 38)
-                    .background(joined ? Palette.bg2 : store.theme.primaryTint, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+                    .background(joined ? Palette.bg2 : store.theme.primaryTint, in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
             }
             .buttonStyle(PressableStyle())
             .disabled(joined)
         }
         .padding(16)
-        .background(Palette.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(Palette.card, in: RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
+            RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous)
                 .strokeBorder(joined ? Palette.line : Color.clear, lineWidth: 1)
         )
         .shadowCard()
@@ -729,7 +707,6 @@ private struct VaccineDoseTemplateRow: View {
     private func chip(_ text: String, ink: Color, bg: Color) -> some View {
         Text(text)
             .appFont(size: 10, weight: .heavy)
-            .tracking(0.2)
             .foregroundStyle(ink)
             .padding(.horizontal, 7)
             .padding(.vertical, 2)
@@ -755,7 +732,6 @@ private struct CompletedRow: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(vaccine.name)
                             .appFont(size: 15, weight: .heavy)
-                            .tracking(-0.15)
                             .foregroundStyle(Palette.ink)
                         if let dd = vaccine.doneDate {
                             Text("\(vaccine.ageLabel) · 已于 \(formatDate(dd)) 接种")
@@ -797,15 +773,14 @@ private struct VaccineCompleteSheet: View {
                 Card {
                     HStack(spacing: 14) {
                         ZStack {
-                            RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Palette.mintTint)
+                            RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous).fill(Palette.mintTint)
                             AppIcon.Syringe(size: 24, color: Palette.mint600)
                         }
                         .frame(width: 50, height: 50)
 
                         VStack(alignment: .leading, spacing: 4) {
                             Text(vaccine.name)
-                                .appFont(size: 17, weight: .black)
-                                .tracking(-0.34)
+                                .appText(.cardTitle)
                                 .foregroundStyle(Palette.ink)
                                 .lineLimit(2)
                             Text("计划 \(vaccine.scheduledDate.map { formatDate($0) } ?? vaccine.ageLabel)")
@@ -825,7 +800,7 @@ private struct VaccineCompleteSheet: View {
                             .environment(\.locale, Locale(identifier: "zh_CN"))
                             .datePickerStyle(.graphical)
                             .padding(8)
-                            .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                            .background(Palette.bg2, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
                     }
                 }
                 .padding(.top, 14)
@@ -882,7 +857,7 @@ private struct CompletedVaccineEditor: View {
                                         .padding(.horizontal, 16)
                                         .padding(.vertical, 14)
                                         .frame(maxWidth: .infinity, alignment: .leading)
-                                        .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                                        .background(Palette.bg2, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
                                 }
 
                                 VStack(alignment: .leading, spacing: 8) {
@@ -893,7 +868,7 @@ private struct CompletedVaccineEditor: View {
                                         .datePickerStyle(.graphical)
                                         .padding(10)
                                         .frame(maxWidth: .infinity)
-                                        .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                                        .background(Palette.bg2, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
                                 }
                             }
                         }
@@ -913,12 +888,11 @@ private struct CompletedVaccineEditor: View {
                                     .appFont(size: 13, weight: .bold)
                                 Text(vaccine.isCustom ? "删除此疫苗" : "从我的计划中移除")
                                     .appFont(size: 14, weight: .heavy)
-                                    .tracking(-0.14)
                             }
                             .foregroundStyle(Palette.dangerInk)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 14)
-                            .background(Palette.dangerTint, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                            .background(Palette.dangerTint, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
                         }
                         .buttonStyle(PressableStyle())
                     }
@@ -927,7 +901,7 @@ private struct CompletedVaccineEditor: View {
             }
             .frame(maxWidth: 560)
             .background(Palette.bg)
-            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous))
             .shadowSurface()
             .padding(.horizontal, 16)
             .padding(.vertical, 28)
@@ -965,7 +939,6 @@ private struct VaccineConfirmDialog: View {
             VStack(spacing: 14) {
                 Text(title)
                     .appFont(size: 17, weight: .heavy)
-                    .tracking(-0.17)
                     .foregroundStyle(Palette.ink)
                     .multilineTextAlignment(.center)
                 Text(message)
@@ -980,7 +953,7 @@ private struct VaccineConfirmDialog: View {
                             .foregroundStyle(Palette.ink2)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 14)
-                            .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                            .background(Palette.bg2, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
                     }
                     .buttonStyle(PressableStyle())
 
@@ -990,14 +963,14 @@ private struct VaccineConfirmDialog: View {
                             .foregroundStyle(.white)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 14)
-                            .background(Palette.dangerInk, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                            .background(Palette.dangerInk, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
                     }
                     .buttonStyle(PressableStyle())
                 }
                 .padding(.top, 4)
             }
             .padding(20)
-            .background(Palette.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .background(Palette.card, in: RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous))
             .shadowCard()
             .padding(.horizontal, 40)
         }

@@ -92,7 +92,7 @@ struct SleepScreen: View {
         let moonColor = paused ? Palette.ink2 : isRunning ? Palette.lavenderInk : store.theme.primary
 
         return ZStack(alignment: .topTrailing) {
-            RoundedRectangle(cornerRadius: 24, style: .continuous).fill(gradient)
+            RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous).fill(gradient)
             AppIcon.Moon(size: 88, color: moonColor)
                 .opacity(0.28)
                 .padding(.top, 16)
@@ -111,12 +111,21 @@ struct SleepScreen: View {
                 .padding(.horizontal, 12).padding(.vertical, 6)
                 .background(Palette.card.opacity(0.6), in: Capsule())
 
-                Text(timer == nil ? "00分 00秒" : formatDur(displayDuration(at: now)))
-                    .appFont(size: 48, weight: .bold)
-                    .tracking(-1.2)
-                    .monospacedDigit()
-                    .foregroundStyle(isRunning ? Palette.lavenderInk : Palette.ink)
-                    .padding(.top, 16)
+                ViewThatFits(in: .horizontal) {
+                    Text(timerDurationText(at: now))
+                        .appText(.timer)
+                        .monospacedDigit()
+                        .fixedSize(horizontal: true, vertical: false)
+
+                    Text(compactTimerDurationText(at: now))
+                        .appText(.timer)
+                        .monospacedDigit()
+                        .fixedSize(horizontal: true, vertical: false)
+                }
+                .foregroundStyle(isRunning ? Palette.lavenderInk : Palette.ink)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(timerDurationText(at: now))
+                .padding(.top, 16)
 
                 Text(statusText())
                     .appFont(size: 14, weight: .medium)
@@ -145,7 +154,7 @@ struct SleepScreen: View {
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 11)
                             .background(Palette.card.opacity(0.55),
-                                        in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                        in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
                     }
                     .buttonStyle(PressableStyle())
                     .padding(.top, 10)
@@ -159,9 +168,9 @@ struct SleepScreen: View {
             .padding(.horizontal, 20).padding(.vertical, 22)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
+            RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous)
                 .stroke(accent.opacity(0.1), lineWidth: 1)
         }
         .shadowCard()
@@ -193,9 +202,9 @@ struct SleepScreen: View {
             }
             .padding(.horizontal, 16)
             .frame(minHeight: 56)
-            .background(Palette.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .background(Palette.card, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous)
                     .stroke(Palette.line, lineWidth: 1)
             }
         }
@@ -209,7 +218,6 @@ struct SleepScreen: View {
             VStack(alignment: .leading, spacing: 14) {
                 Text("手动输入睡眠")
                     .appFont(size: 15, weight: .heavy)
-                    .tracking(-0.15)
 
                 CompactDateTimeField(time: $draftStart,
                                      theme: store.theme,
@@ -243,7 +251,7 @@ struct SleepScreen: View {
                 .padding(.horizontal, 14)
                 .padding(.vertical, 12)
                 .background(Palette.lavender.opacity(0.7),
-                            in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
 
                 CTAButton(title: "保存记录",
                           variant: .primary,
@@ -261,7 +269,6 @@ struct SleepScreen: View {
             VStack(alignment: .leading, spacing: 14) {
                 Text("手动调整时间")
                     .appFont(size: 15, weight: .heavy)
-                    .tracking(-0.15)
 
                 CompactDateTimeField(time: $draftStart,
                                      theme: store.theme,
@@ -298,7 +305,7 @@ struct SleepScreen: View {
         let (wakings, longest) = lastNightStats()
         return Group {
             if wakings > 0 || longest > 0 {
-                Card(padding: 16, cornerRadius: 20) {
+                Card(padding: 16, cornerRadius: AppRadius.surface) {
                     HStack(spacing: 0) {
                         nightStat(label: "昨夜夜醒", value: "\(wakings) 次")
                         Rectangle()
@@ -318,7 +325,7 @@ struct SleepScreen: View {
                 .appFont(size: 12, weight: .medium)
                 .foregroundStyle(Palette.ink3)
             Text(value)
-                .appFont(size: 20, weight: .bold)
+                .appFont(size: 20, weight: .black)
                 .monospacedDigit()
                 .foregroundStyle(Palette.ink)
         }
@@ -437,6 +444,21 @@ struct SleepScreen: View {
         return "已暂停在 \(formatTime(draftEnd))，可手动调整醒来时间后保存"
     }
 
+    private func timerDurationText(at now: Date) -> String {
+        timer == nil ? "00分 00秒" : formatDur(displayDuration(at: now))
+    }
+
+    private func compactTimerDurationText(at now: Date) -> String {
+        let totalSeconds = max(0, Int(displayDuration(at: now)))
+        let hours = totalSeconds / 3600
+        let minutes = (totalSeconds % 3600) / 60
+        let seconds = totalSeconds % 60
+        if hours > 0 {
+            return String(format: "%02d:%02d:%02d", hours, minutes, seconds)
+        }
+        return String(format: "%02d:%02d", minutes, seconds)
+    }
+
     private func binding(for picker: SleepPicker) -> Binding<Date> {
         switch picker {
         case .startDate, .startTime:
@@ -490,7 +512,7 @@ private struct CompactDateTimeField: View {
                 .minimumScaleFactor(style.minimumScale)
                 .padding(.horizontal, 14)
                 .padding(.vertical, style.verticalPadding)
-                .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .background(Palette.bg2, in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
         }
         .buttonStyle(PressableStyle())
     }
@@ -552,13 +574,10 @@ private struct SleepPickerSheet: View {
             VStack(spacing: 18) {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(picker.label)
-                        .appFont(size: 12, weight: .bold)
-                        .tracking(0.72)
-                        .textCase(.uppercase)
+                        .appText(.captionEmphasis)
                         .foregroundStyle(Palette.ink3)
                     Text(picker.isDate ? sleepDateText(time) : formatTime(time))
                         .appFont(size: 28, weight: .black)
-                        .tracking(-0.56)
                         .monospacedDigit()
                         .foregroundStyle(Palette.ink)
                 }
@@ -568,11 +587,11 @@ private struct SleepPickerSheet: View {
                     LinearGradient(colors: [theme.primaryTint, Palette.card.opacity(0.92)],
                                    startPoint: .topLeading,
                                    endPoint: .bottomTrailing),
-                    in: RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    in: RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous)
                 )
                 .shadowCard()
 
-                Card(padding: 14, cornerRadius: 22) {
+                Card(padding: 14, cornerRadius: AppRadius.surface) {
                     if picker.isDate {
                         if let minimumDate {
                             DatePicker("", selection: $time, in: minimumDate...Date().addingTimeInterval(365 * 24 * 3600), displayedComponents: .date)
@@ -587,13 +606,13 @@ private struct SleepPickerSheet: View {
                                 .datePickerStyle(.wheel)
                                 .frame(height: 180)
                                 .clipped()
-                                .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                                .background(Palette.bg2, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
                         } else {
                             DatePicker("", selection: $time, displayedComponents: .hourAndMinute)
                                 .datePickerStyle(.wheel)
                                 .frame(height: 180)
                                 .clipped()
-                                .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                                .background(Palette.bg2, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
                         }
                     }
                 }
@@ -646,7 +665,6 @@ private struct SleepRow: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(event.duration.map(formatDurShort) ?? event.title)
                         .appFont(size: 15, weight: .heavy)
-                        .tracking(-0.15)
                         .foregroundStyle(Palette.ink)
                     if let endAt = event.endAt {
                         Text("\(formatTime(event.at)) - \(formatTime(endAt))")

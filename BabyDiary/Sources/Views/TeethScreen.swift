@@ -59,8 +59,7 @@ struct TeethScreen: View {
                 HStack(alignment: .firstTextBaseline) {
                     VStack(alignment: .leading, spacing: 5) {
                         Text("乳牙进度")
-                            .appFont(size: 17, weight: .black)
-                            .tracking(-0.18)
+                            .appText(.cardTitle)
                             .foregroundStyle(Palette.ink)
                         Text(latestText)
                             .appFont(size: 12, weight: .bold)
@@ -102,7 +101,6 @@ struct TeethScreen: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("乳牙牙位图")
                     .appFont(size: 15, weight: .heavy)
-                    .tracking(-0.15)
                     .foregroundStyle(Palette.ink)
                 Text("按照真实牙列排列，点击任意一颗牙记录")
                     .appFont(size: 12, weight: .semibold)
@@ -146,7 +144,6 @@ struct TeethScreen: View {
             HStack(alignment: .firstTextBaseline) {
                 Text("出牙时间线")
                     .appFont(size: 15, weight: .heavy)
-                    .tracking(-0.15)
                 Spacer()
                 Text("共 \(erupted.count) 颗")
                     .appFont(size: 12, weight: .bold)
@@ -189,7 +186,6 @@ struct TeethScreen: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(t.position.label)
                         .appFont(size: 15, weight: .heavy)
-                        .tracking(-0.15)
                         .foregroundStyle(Palette.ink)
                     if let note = t.note?.trimmingCharacters(in: .whitespacesAndNewlines), !note.isEmpty {
                         Text(note)
@@ -460,7 +456,6 @@ private struct ToothGlyph: View {
                 dash: state == .due ? [3, 2.5] : []
             ))
         }
-        .shadow(color: Palette.ink.opacity(0.08), radius: 1.5, x: 0, y: 1)
         .scaleEffect(x: 1, y: position.jaw == .lower ? -1 : 1)
     }
 
@@ -591,8 +586,7 @@ private struct ToothEditSheet: View {
                 Card {
                     VStack(alignment: .leading, spacing: 5) {
                         Text(position.kind.zh)
-                            .appFont(size: 17, weight: .black)
-                            .tracking(-0.18)
+                            .appText(.cardTitle)
                             .foregroundStyle(Palette.ink)
                         Text("典型萌出时间为 \(position.kind.typicalMonths.lowerBound)–\(position.kind.typicalMonths.upperBound) 月龄，每个宝宝会有个体差异。")
                             .appFont(size: 13, weight: .semibold)
@@ -645,7 +639,7 @@ private struct ToothEditSheet: View {
                             .frame(maxWidth: .infinity, minHeight: 48)
                             .background(
                                 Palette.pink,
-                                in: RoundedRectangle(cornerRadius: 17, style: .continuous)
+                                in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous)
                             )
                         }
                     .buttonStyle(PressableStyle())

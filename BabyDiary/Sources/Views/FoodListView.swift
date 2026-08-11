@@ -64,7 +64,6 @@ struct FoodListScreen: View {
             HStack(alignment: .firstTextBaseline) {
                 Text("需要确认")
                     .appFont(size: 15, weight: .heavy)
-                    .tracking(-0.15)
                     .foregroundStyle(Palette.ink)
                 Spacer()
                 Text("\(dueFoods.count) 种待处理")
@@ -76,7 +75,7 @@ struct FoodListScreen: View {
                 VStack(alignment: .leading, spacing: 16) {
                     HStack(alignment: .top, spacing: 14) {
                         ZStack {
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous)
                                 .fill(Palette.yellow)
                             AppIcon.Bowl(size: 26, color: Palette.yellowInk)
                         }
@@ -84,8 +83,7 @@ struct FoodListScreen: View {
 
                         VStack(alignment: .leading, spacing: 5) {
                             Text("观察期已经结束")
-                                .appFont(size: 17, weight: .black)
-                                .tracking(-0.18)
+                                .appText(.cardTitle)
                                 .foregroundStyle(Palette.ink)
                             Text("根据这几天的情况，为食材标记最终结果。")
                                 .appFont(size: 13, weight: .semibold)
@@ -105,7 +103,6 @@ struct FoodListScreen: View {
                             HStack(alignment: .firstTextBaseline) {
                                 Text(food.name)
                                     .appFont(size: 16, weight: .heavy)
-                                    .tracking(-0.16)
                                     .foregroundStyle(Palette.ink)
                                 Spacer()
                                 Text("已观察 \(food.observationDays) 天")
@@ -148,7 +145,7 @@ struct FoodListScreen: View {
                 .appFont(size: 14, weight: .heavy)
                 .foregroundStyle(foreground)
                 .frame(maxWidth: .infinity, minHeight: 46)
-                .background(background, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+                .background(background, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
         }
         .buttonStyle(PressableStyle())
     }
@@ -157,7 +154,6 @@ struct FoodListScreen: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("排敏进度")
                 .appFont(size: 15, weight: .heavy)
-                .tracking(-0.15)
                 .foregroundStyle(Palette.ink)
 
             Card(padding: 0) {
@@ -199,7 +195,6 @@ struct FoodListScreen: View {
             HStack(alignment: .firstTextBaseline) {
                 Text("全部食材")
                     .appFont(size: 15, weight: .heavy)
-                    .tracking(-0.15)
                     .foregroundStyle(Palette.ink)
                 Spacer()
                 Text("共 \(store.foods.count) 种")
@@ -245,7 +240,7 @@ struct FoodListScreen: View {
                         .frame(maxWidth: .infinity, minHeight: 40)
                         .background {
                             if filter == option {
-                                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                                RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous)
                                     .fill(Palette.card)
                                     .shadowCard()
                             }
@@ -255,9 +250,9 @@ struct FoodListScreen: View {
             }
         }
         .padding(4)
-        .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 17, style: .continuous))
+        .background(Palette.bg2, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 17, style: .continuous)
+            RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous)
                 .stroke(Palette.line, lineWidth: 1)
         }
     }
@@ -308,7 +303,6 @@ private struct FoodListRow: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(food.name)
                             .appFont(size: 15, weight: .bold)
-                            .tracking(-0.15)
                             .foregroundStyle(Palette.ink)
                         Text(detailText)
                             .appFont(size: 12, weight: .semibold)
@@ -405,7 +399,7 @@ private struct FoodEditSheet: View {
                             .appFont(size: 14, weight: .heavy)
                             .foregroundStyle(Palette.pinkInk)
                             .frame(maxWidth: .infinity, minHeight: 48)
-                            .background(Palette.pink, in: RoundedRectangle(cornerRadius: 17, style: .continuous))
+                            .background(Palette.pink, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
                     }
                     .buttonStyle(PressableStyle())
                 }
@@ -450,7 +444,6 @@ private struct CustomConfirmDialog: View {
             VStack(spacing: 14) {
                 Text(title)
                     .appFont(size: 17, weight: .heavy)
-                    .tracking(-0.17)
                     .foregroundStyle(Palette.ink)
                     .multilineTextAlignment(.center)
                 Text(message)
@@ -464,7 +457,7 @@ private struct CustomConfirmDialog: View {
                             .appFont(size: 15, weight: .heavy)
                             .foregroundStyle(Palette.ink2)
                             .frame(maxWidth: .infinity, minHeight: 48)
-                            .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                            .background(Palette.bg2, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
                     }
                     .buttonStyle(PressableStyle())
 
@@ -473,14 +466,14 @@ private struct CustomConfirmDialog: View {
                             .appFont(size: 15, weight: .heavy)
                             .foregroundStyle(.white)
                             .frame(maxWidth: .infinity, minHeight: 48)
-                            .background(Palette.pinkInk, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                            .background(Palette.pinkInk, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
                     }
                     .buttonStyle(PressableStyle())
                 }
                 .padding(.top, 4)
             }
             .padding(20)
-            .background(Palette.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .background(Palette.card, in: RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous))
             .shadowCard()
             .padding(.horizontal, 40)
         }

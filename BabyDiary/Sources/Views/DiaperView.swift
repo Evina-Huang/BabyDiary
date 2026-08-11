@@ -61,7 +61,6 @@ struct DiaperScreen: View {
             HStack(alignment: .firstTextBaseline) {
                 Text("这次是什么情况？")
                     .appFont(size: 17, weight: .bold)
-                    .tracking(-0.2)
                     .foregroundStyle(Palette.ink)
                 Spacer(minLength: 8)
                 Text("选择一项")
@@ -89,7 +88,7 @@ struct DiaperScreen: View {
         } label: {
             VStack(spacing: 9) {
                 ZStack(alignment: .topTrailing) {
-                    RoundedRectangle(cornerRadius: 15, style: .continuous)
+                    RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous)
                         .fill(isSelected ? Palette.card.opacity(0.68) : option.tint.opacity(0.72))
                         .frame(width: 50, height: 50)
                         .overlay {
@@ -108,15 +107,14 @@ struct DiaperScreen: View {
                 VStack(spacing: 3) {
                     Text(option.label)
                         .appFont(size: 14, weight: .heavy)
-                        .tracking(-0.14)
                         .foregroundStyle(isSelected ? option.ink : Palette.ink)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.78)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.center)
                     Text(option.sub)
                         .appFont(size: 11, weight: .medium)
                         .foregroundStyle(isSelected ? option.ink.opacity(0.78) : Palette.ink3)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.78)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.center)
                 }
             }
             .padding(.horizontal, 8)
@@ -124,10 +122,10 @@ struct DiaperScreen: View {
             .frame(maxWidth: .infinity, minHeight: 126)
             .background(
                 isSelected ? option.tint : Palette.card,
-                in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+                in: RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous)
             )
             .overlay {
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous)
                     .stroke(isSelected ? option.ink.opacity(0.18) : Palette.line, lineWidth: 1)
             }
             .shadowCard()
@@ -180,10 +178,10 @@ struct DiaperScreen: View {
                             .padding(.horizontal, 10)
                             .background(
                                 isSelected ? Palette.yellow : Palette.bg2,
-                                in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous)
                             )
                             .overlay {
-                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous)
                                     .stroke(isSelected ? Palette.yellowInk.opacity(0.14) : .clear, lineWidth: 1)
                             }
                     }
@@ -197,13 +195,13 @@ struct DiaperScreen: View {
                 .foregroundStyle(Palette.ink)
                 .padding(.horizontal, 14)
                 .frame(minHeight: 48)
-                .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .background(Palette.bg2, in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
                 .accessibilityLabel("便便情况补充说明")
         }
         .padding(16)
-        .background(Palette.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(Palette.card, in: RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
+            RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous)
                 .stroke(Palette.line, lineWidth: 1)
         }
         .shadowCard()
@@ -224,11 +222,10 @@ struct DiaperScreen: View {
                 }
                 Text(enabled ? "保存换尿布记录" : "请先选择一种情况")
                     .appFont(size: 17, weight: .heavy)
-                    .tracking(-0.17)
                     .foregroundStyle(foreground)
             }
             .frame(maxWidth: .infinity, minHeight: 56)
-            .background(background, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .background(background, in: RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous))
             .shadowPill(tint: enabled ? background.opacity(0.9) : .clear)
         }
         .buttonStyle(PressableStyle())

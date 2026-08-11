@@ -94,6 +94,21 @@ enum Palette {
     static let dangerInk  = Color.adaptive(light: 0xB94032, dark: 0xFF9B88)
 }
 
+enum AppRadius {
+    /// Small controls, icon wells, and compact status surfaces.
+    static let compact: CGFloat = 12
+    /// Inputs, list controls, and grouped secondary surfaces.
+    static let control: CGFloat = 16
+    /// Primary sections, cards, and modal content surfaces.
+    static let surface: CGFloat = 20
+}
+
+enum SurfaceElevation {
+    case flat
+    case raised
+    case floating
+}
+
 extension Color {
     init(hex: UInt32, alpha: Double = 1.0) {
         let r = Double((hex >> 16) & 0xFF) / 255.0
@@ -126,7 +141,7 @@ private extension UIColor {
     }
 }
 
-// Shadow helpers — two-layer soft shadows matching the CSS tokens.
+// Two elevation levels. Flat content uses borders and spacing only.
 extension View {
     /// `--shadow-1` — subtle card shadow.
     func shadowCard() -> some View {
@@ -140,9 +155,21 @@ extension View {
             .shadow(color: Color.adaptive(light: 0x2B2520, dark: 0x000000, lightAlpha: 0.04, darkAlpha: 0.22), radius: 4, x: 0, y: 2)
             .shadow(color: Color.adaptive(light: 0x2B2520, dark: 0x000000, lightAlpha: 0.05, darkAlpha: 0.18), radius: 20, x: 0, y: 8)
     }
-    /// `--shadow-pill` — glowing shadow under coral CTA.
-    func shadowPill(tint: Color) -> some View {
-        self.shadow(color: tint.opacity(0.2), radius: 10, x: 0, y: 3)
+    /// Primary pills share the subtle elevation instead of introducing a third glow style.
+    func shadowPill(tint _: Color) -> some View {
+        shadowCard()
+    }
+
+    @ViewBuilder
+    func surfaceElevation(_ elevation: SurfaceElevation) -> some View {
+        switch elevation {
+        case .flat:
+            self
+        case .raised:
+            shadowCard()
+        case .floating:
+            shadowSurface()
+        }
     }
 
     func appFont(
@@ -159,8 +186,80 @@ extension View {
         ))
     }
 
+    func appText(_ role: AppTextRole) -> some View {
+        appFont(
+            size: role.size,
+            weight: role.weight,
+            relativeTo: role.relativeStyle
+        )
+    }
+
     func respectReduceMotion() -> some View {
         modifier(ReduceMotionModifier())
+    }
+}
+
+/// Semantic type roles keep hierarchy consistent while retaining Dynamic Type scaling.
+enum AppTextRole {
+    case pageTitle
+    case screenTitle
+    case heroTitle
+    case sectionTitle
+    case cardTitle
+    case body
+    case bodyEmphasis
+    case label
+    case caption
+    case captionEmphasis
+    case micro
+    case button
+    case statValue
+    case timer
+
+    var size: CGFloat {
+        switch self {
+        case .pageTitle: return 28
+        case .screenTitle: return 22
+        case .heroTitle: return 21
+        case .sectionTitle: return 18
+        case .cardTitle: return 16
+        case .body, .bodyEmphasis: return 15
+        case .label: return 14
+        case .caption, .captionEmphasis: return 12
+        case .micro: return 11
+        case .button: return 17
+        case .statValue: return 28
+        case .timer: return 44
+        }
+    }
+
+    var weight: Font.Weight {
+        switch self {
+        case .pageTitle, .screenTitle, .heroTitle:
+            return .bold
+        case .sectionTitle, .cardTitle, .button:
+            return .semibold
+        case .body, .caption:
+            return .regular
+        case .bodyEmphasis, .label, .captionEmphasis, .micro:
+            return .medium
+        case .statValue, .timer:
+            return .black
+        }
+    }
+
+    var relativeStyle: Font.TextStyle {
+        switch self {
+        case .pageTitle, .statValue, .timer: return .largeTitle
+        case .screenTitle: return .title2
+        case .heroTitle: return .title3
+        case .sectionTitle, .cardTitle: return .headline
+        case .body, .bodyEmphasis: return .body
+        case .label: return .subheadline
+        case .caption, .captionEmphasis: return .caption
+        case .micro: return .caption2
+        case .button: return .headline
+        }
     }
 }
 
@@ -180,9 +279,23 @@ private struct AppFontModifier: ViewModifier {
     func body(content: Content) -> some View {
         content.font(.system(
             size: min(scaledSize, baseSize * Self.maximumScale(for: baseSize)),
-            weight: weight,
+            weight: hierarchyWeight,
             design: design
         ))
+    }
+
+    /// Older screens used heavy weights for nearly every label. Normalize those
+    /// requests so only explicit key figures (`.black`) retain maximum emphasis.
+    private var hierarchyWeight: Font.Weight {
+        if weight == .heavy || weight == .bold {
+            if baseSize < 14 { return .medium }
+            if baseSize < 20 { return .semibold }
+            return .bold
+        }
+        if weight == .semibold, baseSize < 14 {
+            return .medium
+        }
+        return weight
     }
 
     static func relativeStyle(for size: CGFloat) -> Font.TextStyle {
@@ -218,12 +331,12 @@ private struct ReduceMotionModifier: ViewModifier {
     }
 }
 
-// Uppercase micro-label used all over the UI ("主题色", "跳到屏幕", etc.)
+// Quiet micro-label used for compact supporting information.
 struct MicroLabel: View {
     let text: String
     var body: some View {
         Text(text)
-            .appFont(size: 12, weight: .semibold, relativeTo: .caption)
+            .appText(.captionEmphasis)
             .foregroundStyle(Palette.ink3)
     }
 }

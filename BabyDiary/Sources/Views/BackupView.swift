@@ -66,7 +66,7 @@ struct BackupScreen: View {
         Card(padding: 18) {
             HStack(alignment: .top, spacing: 14) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous)
                         .fill(Palette.mintTint)
                     AppIcon.Shield(size: 27, color: Palette.mint600, fill: .white.opacity(0.4))
                 }
@@ -74,8 +74,7 @@ struct BackupScreen: View {
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text("自动保存已开启")
-                        .appFont(size: 17, weight: .black)
-                        .tracking(-0.18)
+                        .appText(.cardTitle)
                         .foregroundStyle(Palette.ink)
                     Text(lastSavedText)
                         .appFont(size: 12, weight: .bold)
@@ -179,7 +178,7 @@ struct BackupScreen: View {
                             .frame(maxWidth: .infinity, minHeight: 50)
                             .background(
                                 Palette.pink,
-                                in: RoundedRectangle(cornerRadius: 17, style: .continuous)
+                                in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous)
                             )
                     }
                     .buttonStyle(PressableStyle())
@@ -199,11 +198,10 @@ struct BackupScreen: View {
     ) -> some View {
         HStack(spacing: 12) {
             Text(format)
-                .appFont(size: 10, weight: .black)
-                .tracking(0.3)
+                .appText(.micro)
                 .foregroundStyle(ink)
                 .frame(width: 48, height: 42)
-                .background(tint, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+                .background(tint, in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
@@ -223,7 +221,7 @@ struct BackupScreen: View {
                         .appFont(size: 13, weight: .heavy)
                         .foregroundStyle(ink)
                         .frame(minWidth: 58, minHeight: 44)
-                        .background(tint, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .background(tint, in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
                 }
             } else {
                 Button(action: generate) {
@@ -231,7 +229,7 @@ struct BackupScreen: View {
                         .appFont(size: 13, weight: .heavy)
                         .foregroundStyle(ink)
                         .frame(minWidth: 58, minHeight: 44)
-                        .background(tint, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .background(tint, in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
                 }
                 .buttonStyle(PressableStyle())
             }
@@ -249,7 +247,7 @@ struct BackupScreen: View {
             .padding(.horizontal, 14)
             .background(
                 failed ? Palette.pink : Palette.mintTint,
-                in: RoundedRectangle(cornerRadius: 15, style: .continuous)
+                in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous)
             )
     }
 
@@ -275,7 +273,6 @@ struct BackupScreen: View {
     private func sectionTitle(_ title: String) -> some View {
         Text(title)
             .appFont(size: 15, weight: .heavy)
-            .tracking(-0.15)
             .foregroundStyle(Palette.ink)
     }
 

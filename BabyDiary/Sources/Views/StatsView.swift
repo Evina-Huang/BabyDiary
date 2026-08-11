@@ -1,14 +1,13 @@
 import SwiftUI
 
-struct StatsView: View {
+enum StatsRange: Int, Hashable, CaseIterable {
+    case d7 = 7, d14 = 14, d30 = 30
+    var label: String { "\(rawValue) 天" }
+}
+
+struct StatsDashboardView: View {
     @Environment(AppStore.self) private var store
-
-    enum Range: Int, Hashable, CaseIterable {
-        case d7 = 7, d14 = 14, d30 = 30
-        var label: String { "\(rawValue) 天" }
-    }
-
-    @State private var range: Range = .d7
+    @Binding var range: StatsRange
 
     private var periodStart: Date {
         let calendar = Calendar.current
@@ -37,81 +36,51 @@ struct StatsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            ScreenBody {
-                pageHeader
-                    .padding(.bottom, 18)
+            rangeSeg
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.bottom, 16)
 
-                rangeSeg
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.bottom, 16)
+            overviewCard
+                .padding(.bottom, 16)
 
-                overviewCard
-                    .padding(.bottom, 16)
-
-                PatternChart(events: store.events, range: range.rawValue, theme: store.theme)
-            }
+            PatternChart(events: store.events, range: range.rawValue, theme: store.theme)
         }
-        .background(Palette.bg)
-    }
-
-    private var pageHeader: some View {
-        HStack(alignment: .bottom, spacing: 12) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text("统计")
-                    .appFont(size: 28, weight: .bold)
-                    .tracking(-0.7)
-                    .foregroundStyle(Palette.ink)
-                Text("查看宝宝最近的照护节奏")
-                    .appFont(size: 13, weight: .medium)
-                    .foregroundStyle(Palette.ink3)
-            }
-            Spacer(minLength: 8)
-            Text("\(periodEvents.count) 条记录")
-                .appFont(size: 13, weight: .semibold)
-                .monospacedDigit()
-                .foregroundStyle(store.theme.primary600)
-                .padding(.horizontal, 12)
-                .frame(height: 32)
-                .background(store.theme.primaryTint, in: Capsule())
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var rangeSeg: some View {
         SegPill(selection: $range,
-                options: Range.allCases.map { ($0, $0.label) })
+                options: StatsRange.allCases.map { ($0, $0.label) })
+            .frame(minHeight: 44)
+            .accessibilityLabel("趋势时间范围")
     }
 
     private var overviewCard: some View {
-        Card(padding: 16) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text("周期概览")
-                        .appFont(size: 16, weight: .bold)
-                        .tracking(-0.2)
-                        .foregroundStyle(Palette.ink)
-                    Spacer(minLength: 8)
-                    Text(periodDateLabel)
-                        .appFont(size: 12, weight: .medium)
-                        .foregroundStyle(Palette.ink3)
-                }
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text("周期概览")
+                    .appFont(size: 16, weight: .bold)
+                    .foregroundStyle(Palette.ink)
+                Spacer(minLength: 8)
+                Text(periodDateLabel)
+                    .appFont(size: 12, weight: .medium)
+                    .foregroundStyle(Palette.ink3)
+            }
 
-                HStack(spacing: 10) {
-                    summaryCell(kind: .sleep,
-                                value: formatDurShort(averageSleep),
-                                subtitle: "日均时长")
-                    summaryCell(kind: .feed,
-                                value: averageCount(for: .feed),
-                                subtitle: "日均次数")
-                }
-                HStack(spacing: 10) {
-                    summaryCell(kind: .diaper,
-                                value: averageCount(for: .diaper),
-                                subtitle: "日均次数")
-                    summaryCell(kind: .solid,
-                                value: averageCount(for: .solid),
-                                subtitle: "日均次数")
-                }
+            HStack(spacing: 10) {
+                summaryCell(kind: .sleep,
+                            value: formatDurShort(averageSleep),
+                            subtitle: "日均时长")
+                summaryCell(kind: .feed,
+                            value: averageCount(for: .feed),
+                            subtitle: "日均次数")
+            }
+            HStack(spacing: 10) {
+                summaryCell(kind: .diaper,
+                            value: averageCount(for: .diaper),
+                            subtitle: "日均次数")
+                summaryCell(kind: .solid,
+                            value: averageCount(for: .solid),
+                            subtitle: "日均次数")
             }
         }
     }
@@ -120,7 +89,7 @@ struct StatsView: View {
         let style = CategoryStyle.forKind(kind, iconSize: 17)
         return HStack(spacing: 10) {
             ZStack {
-                RoundedRectangle(cornerRadius: 11, style: .continuous)
+                RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous)
                     .fill(Palette.card.opacity(0.7))
                 style.icon
             }
@@ -132,7 +101,6 @@ struct StatsView: View {
                     .foregroundStyle(style.ink)
                 Text(value)
                     .appFont(size: 17, weight: .bold)
-                    .tracking(-0.25)
                     .monospacedDigit()
                     .foregroundStyle(Palette.ink)
                     .lineLimit(1)
@@ -145,7 +113,7 @@ struct StatsView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity, minHeight: 78, alignment: .leading)
-        .background(style.tint, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+        .background(style.tint, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
     }
 
     private func averageCount(for kind: EventKind) -> String {
@@ -230,7 +198,6 @@ private struct PatternChart: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("24 小时时间分布")
                     .appFont(size: 16, weight: .bold)
-                    .tracking(-0.2)
                     .foregroundStyle(Palette.ink)
                 Text("纵向查看每天的记录发生时段")
                     .appFont(size: 12, weight: .medium)
@@ -452,7 +419,10 @@ private struct PatternChart: View {
     }
 }
 
-#Preview("统计") {
-    StatsView()
-        .environment(AppStore.preview)
+#Preview("记录趋势") {
+    ScreenBody {
+        StatsDashboardView(range: .constant(.d7))
+    }
+    .background(Palette.bg)
+    .environment(AppStore.preview)
 }

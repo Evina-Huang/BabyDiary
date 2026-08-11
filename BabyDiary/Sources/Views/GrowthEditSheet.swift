@@ -84,7 +84,7 @@ struct GrowthEditSheet: View {
 
     private var originalSummary: some View {
         HStack(spacing: 14) {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous)
                 .fill(Palette.blue)
                 .frame(width: 54, height: 54)
                 .overlay {
@@ -114,9 +114,9 @@ struct GrowthEditSheet: View {
         }
         .padding(16)
         .background(Palette.card,
-                    in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    in: RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
+            RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous)
                 .stroke(Palette.line, lineWidth: 1)
         }
         .shadowCard()
@@ -144,7 +144,7 @@ struct GrowthEditSheet: View {
                 .padding(.horizontal, 14)
                 .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
                 .background(Palette.bg2,
-                            in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+                            in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
             }
         }
     }
@@ -201,7 +201,7 @@ struct GrowthEditSheet: View {
                     TextField("0.0", text: value)
                         .keyboardType(.decimalPad)
                         .multilineTextAlignment(.trailing)
-                        .appFont(size: 28, weight: .bold)
+                        .appText(.statValue)
                         .monospacedDigit()
                         .foregroundStyle(Palette.ink)
                         .frame(width: 104)
@@ -216,7 +216,7 @@ struct GrowthEditSheet: View {
             .padding(.horizontal, 14)
             .frame(minHeight: 72)
             .background(tint.opacity(0.68),
-                        in: RoundedRectangle(cornerRadius: 17, style: .continuous))
+                        in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
 
             if invalid {
                 Text("请输入大于 0 的数值")
@@ -229,7 +229,6 @@ struct GrowthEditSheet: View {
     private func sectionLabel(_ text: String) -> some View {
         Text(text)
             .appFont(size: 16, weight: .bold)
-            .tracking(-0.16)
             .foregroundStyle(Palette.ink)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.bottom, 10)

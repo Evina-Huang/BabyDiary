@@ -116,8 +116,7 @@ struct MilestoneEditSheet: View {
         VStack(alignment: .leading, spacing: 6) {
             MicroLabel(text: original == nil ? "新里程碑" : "当前记录")
             Text(original?.title ?? "记录一个重要时刻")
-                .appFont(size: 20, weight: .bold)
-                .tracking(-0.3)
+                .appText(.heroTitle)
                 .foregroundStyle(Palette.ink)
                 .lineLimit(2)
             Text(original == nil
@@ -129,9 +128,9 @@ struct MilestoneEditSheet: View {
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Palette.yellow.opacity(0.62),
-                    in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    in: RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
+            RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous)
                 .stroke(Palette.yellowInk.opacity(0.08), lineWidth: 1)
         }
     }
@@ -147,7 +146,7 @@ struct MilestoneEditSheet: View {
                         .padding(.horizontal, 14)
                         .frame(minHeight: 50)
                         .background(Palette.bg2,
-                                    in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+                                    in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
                 }
 
                 VStack(alignment: .leading, spacing: 8) {
@@ -160,7 +159,7 @@ struct MilestoneEditSheet: View {
                         .padding(.vertical, 13)
                         .frame(maxWidth: .infinity, minHeight: 92, alignment: .topLeading)
                         .background(Palette.bg2,
-                                    in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+                                    in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
                 }
             }
         }
@@ -312,9 +311,9 @@ struct MilestoneEditSheet: View {
             }
             .frame(maxWidth: .infinity, minHeight: 48)
             .background(selected ? Palette.yellow : Palette.bg2,
-                        in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous)
                     .stroke(selected ? Palette.yellowInk.opacity(0.18) : Palette.line,
                             lineWidth: 1)
             }
@@ -332,7 +331,7 @@ struct MilestoneEditSheet: View {
                 .scaledToFill()
                 .frame(height: 170)
                 .frame(maxWidth: .infinity)
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
                 .accessibilityLabel("已选择的里程碑照片")
         } else {
             HStack(spacing: 12) {
@@ -355,7 +354,7 @@ struct MilestoneEditSheet: View {
             .padding(.horizontal, 16)
             .frame(maxWidth: .infinity, minHeight: 72)
             .background(Palette.bg2,
-                        in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
         }
     }
 
@@ -383,9 +382,9 @@ struct MilestoneEditSheet: View {
                 .padding(.horizontal, 16)
                 .frame(minHeight: 68)
                 .background(Palette.card,
-                            in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                            in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
                 .overlay {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous)
                         .stroke(Palette.pink.opacity(0.8), lineWidth: 1)
                 }
             }
@@ -396,7 +395,6 @@ struct MilestoneEditSheet: View {
     private func sectionLabel(_ text: String) -> some View {
         Text(text)
             .appFont(size: 16, weight: .bold)
-            .tracking(-0.16)
             .foregroundStyle(Palette.ink)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.bottom, 10)

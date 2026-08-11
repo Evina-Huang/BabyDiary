@@ -19,8 +19,7 @@ struct ScreenHeader<Right: View>: View {
                 .accessibilityLabel("返回")
             }
             Text(title)
-                .appFont(size: 22, weight: .bold)
-                .tracking(-0.3)
+                .appText(.screenTitle)
                 .frame(maxWidth: .infinity, alignment: .leading)
             right()
         }
@@ -60,7 +59,8 @@ struct ScreenBody<Content: View>: View {
 
 struct Card<Content: View>: View {
     var padding: CGFloat = 18
-    var cornerRadius: CGFloat = 20
+    var cornerRadius: CGFloat = AppRadius.surface
+    var elevation: SurfaceElevation = .flat
     var onTap: (() -> Void)? = nil
     @ViewBuilder var content: () -> Content
 
@@ -73,7 +73,7 @@ struct Card<Content: View>: View {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .stroke(Palette.line, lineWidth: 1)
             }
-            .shadowCard()
+            .surfaceElevation(elevation)
         if let onTap {
             Button(action: onTap) { surface }
                 .buttonStyle(PressableStyle())
@@ -125,19 +125,14 @@ struct EventRow: View {
             CategoryIcon(kind: event.kind, size: 44)
             VStack(alignment: .leading, spacing: 2) {
                 Text(display.title)
-                    .appFont(size: 15, weight: .bold)
-                    .tracking(-0.15)
+                    .appText(.bodyEmphasis)
                     .foregroundStyle(Palette.ink)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.78)
-                    .allowsTightening(true)
+                    .lineLimit(2)
                 if let s = display.subtitle, !s.isEmpty {
                     Text(s)
-                        .appFont(size: 13, weight: .medium)
+                        .appText(.caption)
                         .foregroundStyle(Palette.ink3)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.84)
-                        .allowsTightening(true)
+                        .lineLimit(2)
                 }
             }
             .layoutPriority(1)
@@ -307,27 +302,24 @@ struct SinceLastBanner: View {
             let m = max(0, (delta % 3600) / 60)
             HStack(spacing: 10) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous)
                         .fill(Palette.card.opacity(0.6))
                     style.icon
                 }
                 .frame(width: 32, height: 32)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("距上次\(label)")
-                        .appFont(size: 10, weight: .heavy)
-                        .tracking(0.6)
-                        .textCase(.uppercase)
+                        .appText(.micro)
                         .foregroundStyle(style.ink.opacity(0.75))
                     Text(h > 0 ? "\(h)时\(m)分" : "\(m)分")
                         .appFont(size: 16, weight: .black)
-                        .tracking(-0.32)
                         .monospacedDigit()
                         .foregroundStyle(style.ink)
                 }
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, 12).padding(.vertical, 10)
-            .background(style.tint, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .background(style.tint, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
         } else {
             EmptyView()
         }
@@ -344,11 +336,11 @@ struct EmptyStateView: View {
         VStack(spacing: 14) {
             FriendlyMoonBlob().frame(width: 96, height: 96)
             Text(title)
-                .appFont(size: 16, weight: .heavy)
+                .appText(.cardTitle)
                 .foregroundStyle(Palette.ink)
             if let subtitle {
                 Text(subtitle)
-                    .appFont(size: 14, weight: .medium)
+                    .appText(.label)
                     .foregroundStyle(Palette.ink3)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: 260)
@@ -398,11 +390,11 @@ struct CTAButton: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .appFont(size: 17, weight: .semibold)
+                .appText(.button)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
                 .foregroundStyle(foreground)
-                .background(background, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .background(background, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
                 .shadowPill(tint: shadowTint)
         }
         .buttonStyle(PressableStyle())
@@ -440,7 +432,7 @@ struct SegPill<Value: Hashable>: View {
                     withAnimation(.easeOut(duration: 0.16)) { selection = val }
                 } label: {
                     Text(label)
-                        .appFont(size: 14, weight: .semibold)
+                        .appText(.label)
                         .foregroundStyle(selection == val ? Palette.ink : Palette.ink2)
                         .padding(.horizontal, 18)
                         .padding(.vertical, 8)
@@ -448,8 +440,10 @@ struct SegPill<Value: Hashable>: View {
                             if selection == val {
                                 RoundedRectangle(cornerRadius: 999, style: .continuous)
                                     .fill(Palette.card)
-                                    .shadow(color: .black.opacity(0.06), radius: 2, x: 0, y: 1)
-                                    .shadow(color: .black.opacity(0.04), radius: 6, x: 0, y: 2)
+                                    .overlay {
+                                        RoundedRectangle(cornerRadius: 999, style: .continuous)
+                                            .stroke(Palette.line, lineWidth: 1)
+                                    }
                             }
                         }
                 }
@@ -470,7 +464,7 @@ struct FieldLabel: View {
     let text: String
     var body: some View {
         Text(text)
-            .appFont(size: 12, weight: .semibold)
+            .appText(.captionEmphasis)
             .foregroundStyle(Palette.ink3)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -485,8 +479,8 @@ struct FormField<Content: View>: View {
             content()
                 .padding(.horizontal, 16).padding(.vertical, 14)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .appFont(size: 16, weight: .semibold)
+                .background(Palette.bg2, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
+                .appText(.body)
                 .foregroundStyle(Palette.ink)
         }
     }
@@ -536,7 +530,7 @@ struct InlineWheelTimePicker: View {
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, 12).padding(.vertical, 10)
-            .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .background(Palette.bg2, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
         }
     }
 }
