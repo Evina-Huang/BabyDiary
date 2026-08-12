@@ -119,7 +119,6 @@ struct GrowthEditSheet: View {
             RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous)
                 .stroke(Palette.line, lineWidth: 1)
         }
-        .shadowCard()
     }
 
     private var dateCard: some View {

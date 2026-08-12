@@ -2,37 +2,19 @@ import SwiftUI
 
 struct HealthView: View {
     let onOpen: (SubScreen) -> Void
+    let onOpenGrowth: () -> Void
     @Environment(AppStore.self) private var store
 
-    private var latestGrowth: GrowthPoint? {
-        store.growth.sorted { $0.ageMonths < $1.ageMonths }.last
+    init(
+        onOpen: @escaping (SubScreen) -> Void,
+        onOpenGrowth: @escaping () -> Void = {}
+    ) {
+        self.onOpen = onOpen
+        self.onOpenGrowth = onOpenGrowth
     }
 
-    private var pendingVaccines: [Vaccine] {
-        store.vaccines
-            .filter { !$0.done }
-            .sorted {
-                ($0.scheduledDate ?? .distantFuture) < ($1.scheduledDate ?? .distantFuture)
-            }
-    }
-
-    private var focusVaccine: Vaccine? { pendingVaccines.first }
-
-    private var overdueVaccineCount: Int {
-        pendingVaccines.filter { $0.status() == .overdue }.count
-    }
-
-    private var dueVaccineCount: Int {
-        pendingVaccines.filter { $0.status() == .due }.count
-    }
-
-    private var allergyAlertCount: Int {
-        store.foods.filter { $0.status == .allergic }.count +
-            store.medications.filter { $0.reaction == .allergic }.count
-    }
-
-    private var attentionCount: Int {
-        overdueVaccineCount + dueVaccineCount + allergyAlertCount
+    private var tasks: [HealthTask] {
+        store.healthTasks()
     }
 
     var body: some View {
@@ -41,16 +23,23 @@ struct HealthView: View {
                 pageHeader
                     .padding(.bottom, 18)
 
-                vaccineFocusCard
+                if let highestPriorityTask = tasks.first {
+                    taskHero(highestPriorityTask)
 
-                latestMeasureCard
-                    .padding(.top, 12)
+                    let remainingTasks = Array(tasks.dropFirst().prefix(3))
+                    if !remainingTasks.isEmpty {
+                        taskList(remainingTasks)
+                            .padding(.top, 20)
+                    }
+                } else {
+                    calmState
+                }
 
-                recordsHeader
-                    .padding(.top, 24)
+                toolsHeader
+                    .padding(.top, 28)
                     .padding(.bottom, 10)
 
-                recordDirectory
+                healthDirectory
             }
         }
         .background(Palette.bg)
@@ -58,201 +47,187 @@ struct HealthView: View {
 
     private var pageHeader: some View {
         HStack(alignment: .bottom, spacing: 12) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text("健康")
-                    .appText(.pageTitle)
-                    .foregroundStyle(Palette.ink)
-                Text("集中查看需要留意的健康事项")
-                    .appFont(size: 13, weight: .medium)
-                    .foregroundStyle(Palette.ink3)
-            }
+            Text("健康")
+                .appText(.pageTitle)
+                .foregroundStyle(Palette.ink)
             Spacer(minLength: 8)
-            Text(attentionCount > 0 ? "\(attentionCount) 项需留意" : "暂无待办")
-                .appFont(size: 13, weight: .semibold)
-                .monospacedDigit()
-                .foregroundStyle(attentionCount > 0 ? Palette.pinkInk : Palette.mint600)
-                .padding(.horizontal, 12)
-                .frame(height: 32)
-                .background(attentionCount > 0 ? Palette.pink : Palette.mintTint, in: Capsule())
+            if !tasks.isEmpty {
+                Text("\(tasks.count) 项待办")
+                    .appText(.captionEmphasis)
+                    .monospacedDigit()
+                    .foregroundStyle(highestPriorityStyle.ink)
+                    .padding(.horizontal, 12)
+                    .frame(minHeight: 32)
+                    .background(highestPriorityStyle.tint, in: Capsule())
+                    .accessibilityLabel("共有\(tasks.count)项健康待办")
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var vaccineFocusCard: some View {
-        let style = vaccineAttentionStyle
-        return Button { onOpen(.vaccine) } label: {
-            VStack(spacing: 0) {
-                HStack(spacing: 12) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous)
-                            .fill(Palette.card.opacity(0.68))
-                        AppIcon.Shield(size: 24, color: style.ink)
-                    }
-                    .frame(width: 44, height: 44)
+    private var highestPriorityStyle: HealthTaskVisualStyle {
+        tasks.first.map(taskStyle) ?? .calm
+    }
 
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("接种提醒")
-                            .appFont(size: 12, weight: .medium)
-                            .foregroundStyle(Palette.ink3)
-                        Text(vaccineFocusTitle)
-                            .appFont(size: 16, weight: .bold)
+    private func taskHero(_ task: HealthTask) -> some View {
+        let style = taskStyle(task)
+        return Button { open(task.destination) } label: {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(alignment: .top, spacing: 12) {
+                    taskIcon(task, size: 24, color: style.ink)
+                        .frame(width: 48, height: 48)
+                        .background(Palette.card.opacity(0.72), in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
+
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(style.label)
+                            .appText(.captionEmphasis)
+                            .foregroundStyle(style.ink)
+                        Text(task.title)
+                            .appText(.cardTitle)
                             .foregroundStyle(Palette.ink)
-                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
-                    Spacer(minLength: 6)
-                    Text(style.label)
-                        .appFont(size: 12, weight: .semibold)
-                        .foregroundStyle(style.ink)
-                        .padding(.horizontal, 10)
-                        .frame(height: 28)
-                        .background(Palette.card.opacity(0.68), in: Capsule())
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 16)
-                .padding(.bottom, 14)
 
-                Rectangle()
-                    .fill(style.ink.opacity(0.12))
-                    .frame(height: 1)
-
-                HStack(spacing: 8) {
-                    Text(vaccineFocusDetail)
-                        .appFont(size: 13, weight: .medium)
-                        .foregroundStyle(Palette.ink2)
-                    Spacer(minLength: 8)
-                    Text("查看计划")
-                        .appFont(size: 13, weight: .semibold)
-                        .foregroundStyle(store.theme.primary600)
-                    AppIcon.Chevron(size: 12, color: store.theme.primary600)
+                    Spacer(minLength: 0)
                 }
-                .padding(.horizontal, 16)
-                .frame(minHeight: 48)
+
+                Text(task.detail)
+                    .appText(.body)
+                    .foregroundStyle(Palette.ink2)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack(spacing: 6) {
+                    Text(task.actionTitle)
+                        .appText(.button)
+                    Spacer(minLength: 0)
+                }
+                .foregroundStyle(style.ink)
+                .frame(minHeight: 44)
+                .overlay(alignment: .top) {
+                    Rectangle()
+                        .fill(style.ink.opacity(0.14))
+                        .frame(height: 1)
+                }
             }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .background(style.tint, in: RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous)
-                    .stroke(style.ink.opacity(0.12), lineWidth: 1)
+                    .stroke(style.ink.opacity(0.16), lineWidth: 1)
             }
+            .appSurface(.elevated)
             .contentShape(RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous))
         }
         .buttonStyle(PressableStyle())
-        .accessibilityHint("查看接种计划")
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(style.label)，\(task.title)，\(task.detail)")
+        .accessibilityHint(task.actionTitle)
     }
 
-    private var vaccineAttentionStyle: (label: String, tint: Color, ink: Color) {
-        if store.vaccines.isEmpty {
-            return ("未建立", Palette.mintTint, Palette.mint600)
-        }
-        if overdueVaccineCount > 0 {
-            return ("\(overdueVaccineCount) 项逾期", Palette.pink, Palette.pinkInk)
-        }
-        if dueVaccineCount > 0 {
-            return ("近期 \(dueVaccineCount)", Palette.yellow, Palette.yellowInk)
-        }
-        if pendingVaccines.isEmpty {
-            return ("已完成", Palette.mintTint, Palette.mint600)
-        }
-        return ("已安排", Palette.blue, Palette.blueInk)
-    }
-
-    private var vaccineFocusTitle: String {
-        if store.vaccines.isEmpty { return "建立宝宝的接种计划" }
-        if pendingVaccines.isEmpty { return "当前计划已全部完成" }
-        return focusVaccine?.name ?? "查看接种计划"
-    }
-
-    private var vaccineFocusDetail: String {
-        guard let vaccine = focusVaccine else {
-            return store.vaccines.isEmpty ? "添加疫苗和计划接种日期" : vaccineSubtitle
-        }
-        guard let date = vaccine.scheduledDate else { return vaccine.ageLabel }
-        let dateText = shortDate(date)
-        switch vaccine.status() {
-        case .overdue: return "计划 \(dateText) · 已超过计划日期"
-        case .due: return "计划 \(dateText) · 近期接种"
-        case .upcoming: return "计划 \(dateText) · \(vaccine.ageLabel)"
-        case .done: return "已完成"
-        }
-    }
-
-    private var latestMeasureCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text("最近测量")
-                    .appFont(size: 15, weight: .bold)
-                    .foregroundStyle(Palette.ink)
-                Spacer(minLength: 8)
-                Text(latestMeasureDateLabel)
-                    .appFont(size: 12, weight: .medium)
-                    .foregroundStyle(Palette.ink3)
-            }
-
-            HStack(spacing: 10) {
-                measureCell(
-                    label: "体重",
-                    value: latestGrowth.map { String(format: "%.1f", $0.weightKg) } ?? "—",
-                    unit: "kg",
-                    tint: Palette.pink,
-                    ink: Palette.pinkInk
-                )
-                measureCell(
-                    label: "身高",
-                    value: latestGrowth.map { String(format: "%.1f", $0.heightCm) } ?? "—",
-                    unit: "cm",
-                    tint: Palette.blue,
-                    ink: Palette.blueInk
-                )
-            }
-        }
-    }
-
-    private func measureCell(
-        label: String,
-        value: String,
-        unit: String,
-        tint: Color,
-        ink: Color
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(label)
-                .appFont(size: 11, weight: .medium)
-                .foregroundStyle(ink)
-            HStack(alignment: .firstTextBaseline, spacing: 4) {
-                Text(value)
-                    .appFont(size: 22, weight: .black)
-                    .monospacedDigit()
-                    .foregroundStyle(Palette.ink)
-                Text(unit)
-                    .appFont(size: 11, weight: .semibold)
-                    .foregroundStyle(Palette.ink3)
-            }
-        }
-        .padding(.horizontal, 13)
-        .padding(.vertical, 11)
-        .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
-        .background(tint, in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
-    }
-
-    private var latestMeasureDateLabel: String {
-        guard let latestGrowth else { return "还没有记录" }
-        return "\(formatDateLabel(latestGrowth.date)) · \(Int(latestGrowth.ageMonths)) 月龄"
-    }
-
-    private var recordsHeader: some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text("健康记录")
-                .appFont(size: 16, weight: .bold)
+    private func taskList(_ items: [HealthTask]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("接下来")
+                .appText(.sectionTitle)
                 .foregroundStyle(Palette.ink)
-            Spacer()
-            Text("3 个入口")
-                .appFont(size: 12, weight: .medium)
-                .foregroundStyle(Palette.ink3)
+
+            VStack(spacing: 0) {
+                ForEach(Array(items.enumerated()), id: \.element.id) { index, task in
+                    if index > 0 {
+                        Rectangle()
+                            .fill(Palette.line)
+                            .frame(height: 1)
+                            .padding(.leading, 60)
+                    }
+                    taskRow(task)
+                }
+            }
+            .background(Palette.card, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous)
+                    .stroke(Palette.line, lineWidth: 1)
+            }
         }
     }
 
-    private var recordDirectory: some View {
+    private func taskRow(_ task: HealthTask) -> some View {
+        let style = taskStyle(task)
+        return Button { open(task.destination) } label: {
+            HStack(alignment: .top, spacing: 12) {
+                taskIcon(task, size: 20, color: style.ink)
+                    .frame(width: 40, height: 40)
+                    .background(style.tint, in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(style.label)
+                        .appText(.captionEmphasis)
+                        .foregroundStyle(style.ink)
+                    Text(task.title)
+                        .appText(.bodyEmphasis)
+                        .foregroundStyle(Palette.ink)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(task.detail)
+                        .appText(.caption)
+                        .foregroundStyle(Palette.ink3)
+                        .lineLimit(2)
+                }
+
+                Spacer(minLength: 4)
+
+                Text(task.actionTitle)
+                    .appText(.captionEmphasis)
+                    .foregroundStyle(style.ink)
+                    .multilineTextAlignment(.trailing)
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, minHeight: 88, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PressableStyle())
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(style.label)，\(task.title)，\(task.detail)")
+        .accessibilityHint(task.actionTitle)
+    }
+
+    private var calmState: some View {
+        HStack(alignment: .top, spacing: 14) {
+            AppIcon.Check(size: 23, color: Palette.mint600)
+                .frame(width: 44, height: 44)
+                .background(Palette.mintTint, in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
+
+            Text("当前没有需要处理的健康事项")
+                .appText(.cardTitle)
+                .foregroundStyle(Palette.ink)
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Palette.card, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous)
+                .stroke(Palette.line, lineWidth: 1)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var toolsHeader: some View {
+        Text("健康工具")
+            .appText(.sectionTitle)
+            .foregroundStyle(Palette.ink)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var healthDirectory: some View {
         VStack(spacing: 0) {
             Rectangle().fill(Palette.line).frame(height: 1)
+            healthRecordRow(
+                title: "疫苗接种",
+                subtitle: vaccineSubtitle,
+                tint: Palette.mintTint,
+                icon: { AppIcon.Shield(size: 21, color: Palette.mint600) },
+                onTap: { onOpen(.vaccine) }
+            )
+            directoryDivider
             healthRecordRow(
                 title: "用药记录",
                 subtitle: medicationSubtitle,
@@ -282,37 +257,37 @@ struct HealthView: View {
 
     private func healthRecordRow<Icon: View>(
         title: String,
-        subtitle: String,
+        subtitle: String?,
         tint: Color,
         @ViewBuilder icon: () -> Icon,
         onTap: @escaping () -> Void
     ) -> some View {
         Button(action: onTap) {
             HStack(spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous)
-                        .fill(tint)
-                    icon()
-                }
-                .frame(width: 40, height: 40)
+                icon()
+                    .frame(width: 40, height: 40)
+                    .background(tint, in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)
-                        .appFont(size: 15, weight: .semibold)
+                        .appText(.bodyEmphasis)
                         .foregroundStyle(Palette.ink)
-                    Text(subtitle)
-                        .appFont(size: 12, weight: .medium)
-                        .foregroundStyle(Palette.ink3)
-                        .lineLimit(1)
+                    if let subtitle, !subtitle.isEmpty {
+                        Text(subtitle)
+                            .appText(.caption)
+                            .foregroundStyle(Palette.ink3)
+                            .lineLimit(2)
+                    }
                 }
                 Spacer(minLength: 6)
                 AppIcon.Chevron(size: 14, color: Palette.ink3)
             }
             .padding(.horizontal, 16)
-            .frame(minHeight: 72)
+            .frame(maxWidth: .infinity, minHeight: 72)
             .contentShape(Rectangle())
         }
         .buttonStyle(PressableStyle())
+        .accessibilityHint("打开\(title)")
     }
 
     private var directoryDivider: some View {
@@ -322,7 +297,44 @@ struct HealthView: View {
             .padding(.leading, 68)
     }
 
-    // MARK: — Subtitles
+    @ViewBuilder
+    private func taskIcon(_ task: HealthTask, size: CGFloat, color: Color) -> some View {
+        switch task.kind {
+        case .foodAllergy, .foodObservationDue:
+            AppIcon.Bowl(size: size, color: color)
+        case .medicationAllergy, .medicationReview:
+            AppIcon.Pill(size: size, color: color)
+        case .overdueVaccine, .upcomingVaccine:
+            AppIcon.Shield(size: size, color: color)
+        case .growthCheck:
+            AppIcon.Chart(size: size, color: color)
+        }
+    }
+
+    private func taskStyle(_ task: HealthTask) -> HealthTaskVisualStyle {
+        switch task.priority {
+        case .critical:
+            return .init(label: "重要提醒", tint: Palette.dangerTint, ink: Palette.dangerInk)
+        case .overdue:
+            return .init(label: "已逾期", tint: Palette.pink, ink: Palette.pinkInk)
+        case .today:
+            return .init(label: "今日确认", tint: Palette.yellow, ink: Palette.yellowInk)
+        case .upcoming:
+            return .init(label: "即将到期", tint: Palette.blue, ink: Palette.blueInk)
+        case .recommendation:
+            let label = task.kind == .medicationReview ? "建议复查" : "建议记录"
+            return .init(label: label, tint: Palette.mintTint, ink: Palette.mint600)
+        }
+    }
+
+    private func open(_ destination: HealthTaskDestination) {
+        switch destination {
+        case .vaccine: onOpen(.vaccine)
+        case .foodList: onOpen(.foodList)
+        case .medication: onOpen(.medication)
+        case .growth: onOpenGrowth()
+        }
+    }
 
     private var vaccineSubtitle: String {
         let done = store.vaccines.filter(\.done).count
@@ -332,35 +344,36 @@ struct HealthView: View {
     }
 
     private var foodSubtitle: String {
-        let safe = store.foods.filter { $0.status == .safe }.count
-        let allergic = store.foods.filter { $0.status == .allergic }.count
+        let total = store.foods.count
         let observing = store.foods.filter { $0.status == .observing }.count
-        var parts: [String] = []
-        if safe > 0 { parts.append("已排敏 \(safe)") }
-        if allergic > 0 { parts.append("过敏 \(allergic)") }
+        guard total > 0 else { return "暂无记录" }
+        var parts = ["\(total) 种食材"]
         if observing > 0 { parts.append("观察中 \(observing)") }
-        return parts.isEmpty ? "暂无记录" : parts.joined(separator: " · ")
+        return parts.joined(separator: " · ")
     }
 
-    private var recipeSubtitle: String {
+    private var recipeSubtitle: String? {
         let count = store.recipes.count
-        return count == 0 ? "组合常用食材，快速记录辅食" : "\(count) 个食谱"
+        return count == 0 ? nil : "\(count) 个食谱"
     }
 
     private var medicationSubtitle: String {
         let total = store.medications.count
-        let allergic = store.medications.filter { $0.reaction == .allergic }.count
         guard total > 0 else { return "记录药名、剂量与用药反应" }
-        if allergic > 0 { return "\(total) 条记录 · 疑似过敏 \(allergic)" }
-        return "\(total) 条记录 · 暂无药物过敏"
+        return "\(total) 条记录"
     }
+}
 
-    private func shortDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "zh_CN")
-        formatter.dateFormat = "M月d日"
-        return formatter.string(from: date)
-    }
+private struct HealthTaskVisualStyle {
+    let label: String
+    let tint: Color
+    let ink: Color
+
+    static let calm = HealthTaskVisualStyle(
+        label: "状态安心",
+        tint: Palette.mintTint,
+        ink: Palette.mint600
+    )
 }
 
 #Preview("健康") {

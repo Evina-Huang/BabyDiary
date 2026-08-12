@@ -173,15 +173,9 @@ private struct RecipeCard: View {
                     .lineSpacing(4)
                     .fixedSize(horizontal: false, vertical: true)
 
-                HStack(alignment: .firstTextBaseline) {
-                    Text(createdLabel)
-                        .appFont(size: 11, weight: .semibold)
-                        .foregroundStyle(Palette.ink3)
-                    Spacer()
-                    Text("轻触编辑")
-                        .appFont(size: 11, weight: .bold)
-                        .foregroundStyle(Palette.ink3)
-                }
+                Text(createdLabel)
+                    .appFont(size: 11, weight: .semibold)
+                    .foregroundStyle(Palette.ink3)
             }
         }
     }

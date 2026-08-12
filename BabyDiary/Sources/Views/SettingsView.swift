@@ -97,9 +97,29 @@ private struct AppearanceSettingsCard: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
-                HStack(spacing: 8) {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 92), spacing: 8)], spacing: 8) {
                     ForEach(AppAppearance.allCases) { option in
                         appearanceButton(option)
+                    }
+                }
+
+                Rectangle()
+                    .fill(Palette.line)
+                    .frame(height: 1)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("主题色")
+                        .appText(.bodyEmphasis)
+                        .foregroundStyle(Palette.ink)
+                    Text("四套主题共用同一组浅色与深色语义 Token。")
+                        .appText(.caption)
+                        .foregroundStyle(Palette.ink3)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), spacing: 8)], spacing: 8) {
+                    ForEach(AppTheme.allCases) { theme in
+                        themeButton(theme)
                     }
                 }
             }
@@ -137,6 +157,44 @@ private struct AppearanceSettingsCard: View {
         }
         .buttonStyle(PressableStyle())
         .accessibilityLabel("外观，\(option.label)")
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    private func themeButton(_ option: AppTheme) -> some View {
+        let selected = store.theme == option
+
+        return Button {
+            store.updateTheme(option)
+        } label: {
+            HStack(spacing: 9) {
+                Circle()
+                    .fill(option.primary)
+                    .frame(width: 24, height: 24)
+                    .overlay {
+                        Circle().stroke(option.primary600.opacity(0.45), lineWidth: 1)
+                    }
+                Text(option.label)
+                    .appText(.captionEmphasis)
+                    .foregroundStyle(selected ? option.primary600 : Palette.ink2)
+                Spacer(minLength: 0)
+                if selected {
+                    AppIcon.Check(size: 13, color: option.primary600)
+                        .accessibilityHidden(true)
+                }
+            }
+            .padding(.horizontal, 12)
+            .frame(maxWidth: .infinity, minHeight: 48)
+            .background(selected ? option.primaryTint : Palette.bg2,
+                        in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous)
+                    .stroke(selected ? option.primary600.opacity(0.42) : Palette.line,
+                            lineWidth: selected ? 2 : 1)
+            }
+        }
+        .buttonStyle(PressableStyle())
+        .accessibilityLabel("主题，\(option.label)")
+        .accessibilityValue(selected ? "已选中" : "未选中")
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }

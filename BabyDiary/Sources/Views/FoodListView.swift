@@ -81,15 +81,9 @@ struct FoodListScreen: View {
                         }
                         .frame(width: 50, height: 50)
 
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text("观察期已经结束")
-                                .appText(.cardTitle)
-                                .foregroundStyle(Palette.ink)
-                            Text("根据这几天的情况，为食材标记最终结果。")
-                                .appFont(size: 13, weight: .semibold)
-                                .foregroundStyle(Palette.ink3)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
+                        Text("观察期已经结束")
+                            .appText(.cardTitle)
+                            .foregroundStyle(Palette.ink)
                     }
 
                     ForEach(Array(dueFoods.enumerated()), id: \.element.id) { index, food in
@@ -242,7 +236,6 @@ struct FoodListScreen: View {
                             if filter == option {
                                 RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous)
                                     .fill(Palette.card)
-                                    .shadowCard()
                             }
                         }
                 }
@@ -474,7 +467,7 @@ private struct CustomConfirmDialog: View {
             }
             .padding(20)
             .background(Palette.card, in: RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous))
-            .shadowCard()
+            .appSurface(.elevated)
             .padding(.horizontal, 40)
         }
         .transition(.opacity)

@@ -16,29 +16,51 @@ struct SolidScreen: View {
     @State private var time: Date = .now
     @State private var notes: String = ""
     @State private var showObservationDetails = false
-    @State private var showNotes = false
+    @State private var showDetails = false
+    @State private var showExitConfirmation = false
+    @State private var showSaved = false
+    @State private var saveCompleted = false
+    @State private var initialDraft: SolidDraft?
 
     var body: some View {
         VStack(spacing: 0) {
-            ScreenHeader(title: "辅食记录", onBack: onBack)
+            ScreenHeader(title: "辅食记录", onBack: requestClose)
             ScreenBody {
                 lastSolidContext.padding(.top, 8)
 
+                foodSelectionCard.padding(.top, 16)
                 observationOverview.padding(.top, 14)
-                foodSelectionCard.padding(.top, 18)
 
                 if !selectedNames.isEmpty {
-                    recordDetailsCard
-                        .padding(.top, 18)
-                        .transition(.opacity.combined(with: .move(edge: .top)))
                     selectionNotice.padding(.top, 12)
-                    notesCard.padding(.top, 12)
+                    AdjustmentDetails(
+                        isExpanded: $showDetails,
+                        summary: "份量、记录时间与备注"
+                    ) {
+                        solidDetails
+                    }
+                    .padding(.top, 12)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
                 }
-
-                saveButton.padding(.top, 20)
             }
         }
         .background(Palette.bg)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            RecordSaveBar(status: saveStatus, theme: store.theme, action: submit)
+        }
+        .overlay(alignment: .top) {
+            RecordSuccessToast(isPresented: showSaved, title: "辅食记录已保存")
+                .padding(.top, 12)
+        }
+        .recordExitProtection(
+            exitProtection,
+            isPresented: $showExitConfirmation,
+            onDiscard: resetDraft,
+            onDismiss: onBack
+        )
+        .onAppear {
+            if initialDraft == nil { initialDraft = currentDraft }
+        }
     }
 
     private var observingFoods: [FoodItem] {
@@ -379,46 +401,50 @@ struct SolidScreen: View {
         }
     }
 
-    private var recordDetailsCard: some View {
-        Card(padding: 16) {
-            VStack(alignment: .leading, spacing: 18) {
-                Text("记录详情")
-                    .appFont(size: 16, weight: .bold)
-                    .foregroundStyle(Palette.ink)
-
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 10) {
-                        FieldLabel(text: "份量")
-                        Spacer(minLength: 0)
-                        SegPill<Unit>(
-                            selection: $unit,
-                            options: [(.g, "克 g"), (.ml, "毫升 ml")]
-                        )
-                        .frame(minHeight: 44)
-                    }
-
-                    HStack(spacing: 8) {
-                        TextField("少量", text: $amount)
-                            .appFont(size: 17, weight: .semibold)
-                            .foregroundStyle(Palette.ink)
-                            .keyboardType(.numberPad)
-                        Text(unit.rawValue)
-                            .appFont(size: 14, weight: .bold)
-                            .foregroundStyle(Palette.ink3)
-                    }
-                    .padding(.horizontal, 14)
-                    .frame(minHeight: 50)
-                    .background(Palette.bg2, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
-
-                    HStack(spacing: 8) {
-                        amountPresetButton(nil)
-                        ForEach(amountPresets, id: \.self) { value in
-                            amountPresetButton(value)
-                        }
-                    }
+    private var solidDetails: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 10) {
+                    FieldLabel(text: "份量")
+                    Spacer(minLength: 0)
+                    SegPill<Unit>(
+                        selection: $unit,
+                        options: [(.g, "克 g"), (.ml, "毫升 ml")]
+                    )
+                    .frame(minHeight: 44)
                 }
 
-                InlineWheelTimePicker(time: $time, theme: store.theme)
+                HStack(spacing: 8) {
+                    TextField("少量", text: $amount)
+                        .appFont(size: 17, weight: .medium)
+                        .foregroundStyle(Palette.ink)
+                        .keyboardType(.numberPad)
+                    Text(unit.rawValue)
+                        .appText(.label)
+                        .foregroundStyle(Palette.ink3)
+                }
+                .padding(.horizontal, 14)
+                .frame(minHeight: 50)
+                .background(Palette.bg2, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
+
+                HStack(spacing: 8) {
+                    amountPresetButton(nil)
+                    ForEach(amountPresets, id: \.self) { value in
+                        amountPresetButton(value)
+                    }
+                }
+            }
+
+            InlineWheelTimePicker(time: $time, theme: store.theme)
+
+            VStack(alignment: .leading, spacing: 8) {
+                FieldLabel(text: "备注")
+                TextField("例如：第一次吃南瓜，很喜欢", text: $notes, axis: .vertical)
+                    .lineLimit(2...4)
+                    .appFont(size: 16, weight: .medium)
+                    .foregroundStyle(Palette.ink)
+                    .padding(14)
+                    .background(Palette.bg2, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
             }
         }
     }
@@ -493,71 +519,10 @@ struct SolidScreen: View {
         .background(tint.opacity(0.58), in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
     }
 
-    private var notesCard: some View {
-        Card(padding: 0) {
-            VStack(spacing: 0) {
-                Button {
-                    withAnimation(.easeOut(duration: 0.2)) {
-                        showNotes.toggle()
-                    }
-                } label: {
-                    HStack(spacing: 10) {
-                        AppIcon.Plus(size: 18, color: store.theme.primary600)
-                            .rotationEffect(.degrees(showNotes ? 45 : 0))
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("添加备注")
-                                .appFont(size: 14, weight: .bold)
-                                .foregroundStyle(Palette.ink)
-                            Text("口味偏好、反应等，可选")
-                                .appFont(size: 11, weight: .medium)
-                                .foregroundStyle(Palette.ink3)
-                        }
-                        Spacer(minLength: 0)
-                        Text(showNotes ? "收起" : "填写")
-                            .appFont(size: 12, weight: .bold)
-                            .foregroundStyle(store.theme.primary600)
-                    }
-                    .padding(.horizontal, 16)
-                    .frame(maxWidth: .infinity, minHeight: 64)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(PressableStyle())
-                .accessibilityValue(showNotes ? "已展开" : "已收起")
-
-                if showNotes {
-                    TextField("例如：第一次吃南瓜，很喜欢", text: $notes, axis: .vertical)
-                        .lineLimit(2...4)
-                        .appFont(size: 16, weight: .semibold)
-                        .foregroundStyle(Palette.ink)
-                        .padding(14)
-                        .background(Palette.bg2, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 16)
-                        .transition(.opacity)
-                }
-            }
-        }
-    }
-
-    private var saveButton: some View {
-        let enabled = !selectedNames.isEmpty
-        let background: Color = enabled ? store.theme.primary : Palette.bg2
-        let foreground: Color = enabled ? .white : Palette.ink3
-        return Button(action: submit) {
-            HStack(spacing: 8) {
-                if enabled {
-                    AppIcon.Check(size: 18, color: foreground)
-                }
-                Text(enabled ? "保存辅食记录" : "请先选择食物")
-                    .appFont(size: 17, weight: .heavy)
-                    .foregroundStyle(foreground)
-            }
-            .frame(maxWidth: .infinity, minHeight: 56)
-            .background(background, in: RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous))
-            .shadowPill(tint: enabled ? background.opacity(0.9) : .clear)
-        }
-        .buttonStyle(PressableStyle())
-        .disabled(!enabled)
+    private var saveStatus: RecordSaveStatus {
+        if saveCompleted { return .success }
+        guard !selectedNames.isEmpty else { return .disabledQuietly }
+        return .ready("保存")
     }
 
     private func toggleFood(_ name: String) {
@@ -612,7 +577,7 @@ struct SolidScreen: View {
     }
 
     private func submit() {
-        guard !selectedNames.isEmpty else { return }
+        guard !selectedNames.isEmpty, !saveCompleted else { return }
         let trimmedAmount = amount.trimmingCharacters(in: .whitespaces)
         let amountText = trimmedAmount.isEmpty ? "少量" : "\(trimmedAmount)\(unit.rawValue)"
         let trimmedNotes = notes.trimmingCharacters(in: .whitespaces)
@@ -627,8 +592,56 @@ struct SolidScreen: View {
                 observationDays: observationDaysMap[foodName] ?? 3
             )
         }
-        onBack()
+        saveCompleted = true
+        RecordSaveFeedback.complete(isPresented: $showSaved, then: onBack)
     }
+
+    private var currentDraft: SolidDraft {
+        SolidDraft(
+            selectedNames: selectedNames,
+            observationDaysMap: observationDaysMap,
+            customInput: customInput,
+            amount: amount,
+            unit: unit,
+            time: time,
+            notes: notes
+        )
+    }
+
+    private var exitProtection: RecordExitProtection {
+        guard !saveCompleted, let initialDraft, currentDraft != initialDraft else { return .none }
+        return .unsaved
+    }
+
+    private func requestClose() {
+        if exitProtection.requiresConfirmation {
+            showExitConfirmation = true
+        } else {
+            onBack()
+        }
+    }
+
+    private func resetDraft() {
+        guard let initialDraft else { return }
+        selectedNames = initialDraft.selectedNames
+        observationDaysMap = initialDraft.observationDaysMap
+        customInput = initialDraft.customInput
+        amount = initialDraft.amount
+        unit = initialDraft.unit
+        time = initialDraft.time
+        notes = initialDraft.notes
+        showDetails = false
+    }
+}
+
+private struct SolidDraft: Equatable {
+    let selectedNames: [String]
+    let observationDaysMap: [String: Int]
+    let customInput: String
+    let amount: String
+    let unit: SolidScreen.Unit
+    let time: Date
+    let notes: String
 }
 
 private struct FoodStatusBadgeStyle: ViewModifier {

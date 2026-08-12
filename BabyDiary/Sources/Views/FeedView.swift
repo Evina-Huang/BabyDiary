@@ -6,6 +6,7 @@ import SwiftUI
 struct FeedScreen: View {
     let onBack: () -> Void
     @Environment(AppStore.self) private var store
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     enum Mode: String, Hashable { case breast, formula }
     enum FormulaSub: String, Hashable { case timer, manual }
@@ -21,6 +22,7 @@ struct FeedScreen: View {
     @State private var bManualTime: Date = .now
     @State private var bManualFirstSide: Side = .L
     @State private var showBreastManualDetails = false
+    @State private var showBreastTimerDetails = false
 
     // Breast timer state
     @State private var bPhase: Phase = .idle
@@ -42,6 +44,13 @@ struct FeedScreen: View {
     @State private var ml: Int = 210
     @State private var time: Date = .now
     @State private var showFormulaManualDetails = false
+    @State private var showFormulaTimerDetails = false
+    @State private var notes: String = ""
+    @State private var showExitConfirmation = false
+    @State private var showDiscardConfirmation = false
+    @State private var showSaved = false
+    @State private var saveCompleted = false
+    @State private var initialDraft: FeedDraft?
 
     private var formulaPresetValues: [Int] {
         let recentCustomValues = store.formulaMlHistory.filter {
@@ -52,7 +61,7 @@ struct FeedScreen: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            ScreenHeader(title: "喂奶记录", onBack: onBack)
+            ScreenHeader(title: "喂奶记录", onBack: requestClose)
             ScreenBody {
                 TimelineView(.periodic(from: .now, by: 0.5)) { ctx in
                     content(now: ctx.date)
@@ -60,8 +69,34 @@ struct FeedScreen: View {
             }
         }
         .background(Palette.bg)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            RecordSaveBar(
+                status: saveStatus,
+                theme: store.theme,
+                disabledButtonTitle: "保存",
+                action: saveCurrentEntry
+            )
+        }
+        .overlay(alignment: .top) {
+            RecordSuccessToast(isPresented: showSaved, title: "喂奶记录已保存")
+                .padding(.top, 12)
+        }
+        .recordExitProtection(
+            exitProtection,
+            isPresented: $showExitConfirmation,
+            onPreserve: syncDraftToStore,
+            onDiscard: discardActiveDraft,
+            onDismiss: onBack
+        )
+        .confirmationDialog("放弃本次喂奶计时？", isPresented: $showDiscardConfirmation, titleVisibility: .visible) {
+            Button("放弃并清空", role: .destructive, action: discardActiveDraft)
+            Button("继续记录", role: .cancel) {}
+        } message: {
+            Text("当前计时、剂量和备注都会被清空。")
+        }
         .onAppear {
             restoreDraft()
+            if initialDraft == nil { initialDraft = currentDraft }
         }
         .onChange(of: currentDraft) { _, _ in
             syncDraftToStore()
@@ -152,23 +187,19 @@ struct FeedScreen: View {
                 FieldLabel(text: "右侧(分钟)")
                 StepperInput(value: $bManualMinR, step: 1, min: 0, max: 120, suffix: "分")
             }
-            if bManualMinL > 0 && bManualMinR > 0 {
-                breastManualOrderPicker
+            AdjustmentDetails(
+                isExpanded: $showBreastManualDetails,
+                summary: "双侧顺序、记录时间与备注",
+                tint: Palette.pinkInk
+            ) {
+                VStack(spacing: 18) {
+                    if bManualMinL > 0 && bManualMinR > 0 {
+                        breastManualOrderPicker
+                    }
+                    InlineWheelTimePicker(time: $bManualTime, theme: store.theme)
+                    notesField
+                }
             }
-            optionalSettingsToggle(
-                title: "调整记录时间",
-                subtitle: "默认保存为现在",
-                expanded: $showBreastManualDetails
-            )
-            if showBreastManualDetails {
-                InlineWheelTimePicker(time: $bManualTime, theme: store.theme)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-            }
-            CTAButton(title: "保存记录",
-                      variant: .primary,
-                      theme: store.theme,
-                      action: saveBreastManual)
-                .padding(.top, 4)
         }
     }
 
@@ -205,15 +236,12 @@ struct FeedScreen: View {
     private func breastTimerBlock(liveL: TimeInterval, liveR: TimeInterval, total: TimeInterval) -> some View {
         let lastEndedSide = lastBreastFeed?.breastEndingSide
         VStack(spacing: 14) {
-            HStack(spacing: 10) {
-                SideButton(side: .L, label: "左边", ms: liveL,
-                           active: bActive == .L && bPhase != .idle,
-                           phase: bPhase,
-                           showsLastEndedHint: bPhase == .idle && lastEndedSide == .left) { startOn(.L) }
-                SideButton(side: .R, label: "右边", ms: liveR,
-                           active: bActive == .R && bPhase != .idle,
-                           phase: bPhase,
-                           showsLastEndedHint: bPhase == .idle && lastEndedSide == .right) { startOn(.R) }
+            Group {
+                if dynamicTypeSize.isAccessibilitySize {
+                    VStack(spacing: 10) { sideButtons(lastEndedSide: lastEndedSide, liveL: liveL, liveR: liveR) }
+                } else {
+                    HStack(spacing: 10) { sideButtons(lastEndedSide: lastEndedSide, liveL: liveL, liveR: liveR) }
+                }
             }
 
             if bPhase == .idle {
@@ -227,16 +255,38 @@ struct FeedScreen: View {
             }
 
             if bPhase != .idle {
-                CTAButton(title: "完成,保存",
-                          variant: .primary, theme: store.theme,
-                          action: saveBreast)
-                Button("清空重来") { resetBreast() }
-                    .appFont(size: 13, weight: .bold)
-                    .foregroundStyle(Palette.ink3)
-                    .padding(.vertical, 8)
-                    .frame(maxWidth: .infinity)
+                AdjustmentDetails(
+                    isExpanded: $showBreastTimerDetails,
+                    summary: "开始时间与备注",
+                    tint: Palette.pinkInk
+                ) {
+                    VStack(spacing: 18) {
+                        InlineWheelTimePicker(time: breastTimerStartBinding, theme: store.theme, label: "开始时间")
+                        notesField
+                    }
+                }
+
+                Button { showDiscardConfirmation = true } label: {
+                    Text("放弃本次计时")
+                        .appText(.label)
+                        .foregroundStyle(Palette.dangerInk)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(PressableStyle())
             }
         }
+    }
+
+    @ViewBuilder
+    private func sideButtons(lastEndedSide: BreastFeedSide?, liveL: TimeInterval, liveR: TimeInterval) -> some View {
+        SideButton(side: .L, label: "左边", ms: liveL,
+                   active: bActive == .L && bPhase != .idle,
+                   phase: bPhase,
+                   showsLastEndedHint: bPhase == .idle && lastEndedSide == .left) { startOn(.L) }
+        SideButton(side: .R, label: "右边", ms: liveR,
+                   active: bActive == .R && bPhase != .idle,
+                   phase: bPhase,
+                   showsLastEndedHint: bPhase == .idle && lastEndedSide == .right) { startOn(.R) }
     }
 
     private struct SideButton: View {
@@ -264,6 +314,8 @@ struct FeedScreen: View {
                         .appFont(size: 32, weight: .black)
                         .monospacedDigit()
                         .foregroundStyle(active ? accent : Palette.ink)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.78)
                     statusLabel(accent: accent)
                         .frame(height: 18)
                 }
@@ -277,6 +329,17 @@ struct FeedScreen: View {
                 )
             }
             .buttonStyle(PressableStyle())
+            .accessibilityLabel("\(label)，\(phaseAccessibilityLabel)，\(formatMMSS(ms))")
+            .accessibilityHint(active ? "轻触切换到这一侧继续记录" : "轻触从这一侧开始记录")
+        }
+
+        private var phaseAccessibilityLabel: String {
+            guard active else { return "未选择" }
+            switch phase {
+            case .running: return "计时中"
+            case .paused: return "已暂停"
+            case .idle, .stopped: return "已选择"
+            }
         }
 
         @ViewBuilder
@@ -318,11 +381,15 @@ struct FeedScreen: View {
 
             if fSub == .timer {
                 VStack(spacing: 14) {
+                    mlInput
+
                     VStack(spacing: 4) {
                         Text(formatMMSS(live))
                             .appText(.timer)
                             .monospacedDigit()
                             .foregroundStyle(timerInk(for: fPhase))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.78)
                         if fPhase == .running {
                             HStack(spacing: 6) {
                                 Circle().fill(Palette.pinkInk).frame(width: 6, height: 6)
@@ -345,25 +412,36 @@ struct FeedScreen: View {
                     .padding(.horizontal, 16).padding(.vertical, 22)
                     .background(timerTint(for: fPhase),
                                 in: RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous))
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("奶粉计时，\(formulaPhaseAccessibilityLabel)，\(formatMMSS(live))")
 
                     formulaActionRow
+
+                    if fPhase != .idle {
+                        AdjustmentDetails(
+                            isExpanded: $showFormulaTimerDetails,
+                            summary: "开始时间与备注",
+                            tint: Palette.pinkInk
+                        ) {
+                            VStack(spacing: 18) {
+                                InlineWheelTimePicker(time: formulaTimerStartBinding, theme: store.theme, label: "开始时间")
+                                notesField
+                            }
+                        }
+                    }
                 }
             } else {
                 mlInput
-                optionalSettingsToggle(
-                    title: "调整记录时间",
-                    subtitle: "默认保存为现在",
-                    expanded: $showFormulaManualDetails
-                )
-                if showFormulaManualDetails {
-                    manualTimePicker
-                        .transition(.opacity.combined(with: .move(edge: .top)))
+                AdjustmentDetails(
+                    isExpanded: $showFormulaManualDetails,
+                    summary: "记录时间与备注",
+                    tint: Palette.pinkInk
+                ) {
+                    VStack(spacing: 18) {
+                        manualTimePicker
+                        notesField
+                    }
                 }
-                CTAButton(title: "保存记录",
-                          variant: .primary,
-                          theme: store.theme,
-                          action: saveFormulaManual)
-                    .padding(.top, 4)
             }
         }
         .padding(.top, 22)
@@ -375,31 +453,42 @@ struct FeedScreen: View {
         case .idle:
             CTAButton(title: "开始计时", theme: store.theme, action: startFormula)
         case .running:
-            HStack(spacing: 10) {
+            Group {
+                if dynamicTypeSize.isAccessibilitySize {
+                    VStack(spacing: 10) { runningFormulaButtons }
+                } else {
+                    HStack(spacing: 10) { runningFormulaButtons }
+                }
+            }
+        case .paused:
+            Group {
+                if dynamicTypeSize.isAccessibilitySize {
+                    VStack(spacing: 10) { pausedFormulaButtons }
+                } else {
+                    HStack(spacing: 10) { pausedFormulaButtons }
+                }
+            }
+        case .stopped:
+            CTAButton(title: "重新计时", variant: .ghost, theme: store.theme) {
+                showDiscardConfirmation = true
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var runningFormulaButtons: some View {
                 CTAButton(title: "暂停", variant: .ghost, theme: store.theme, action: pauseFormula)
                     .frame(maxWidth: .infinity)
                 CTAButton(title: "停止", theme: store.theme, action: stopFormula)
                     .frame(maxWidth: .infinity)
-            }
-        case .paused:
-            HStack(spacing: 10) {
+    }
+
+    @ViewBuilder
+    private var pausedFormulaButtons: some View {
                 CTAButton(title: "继续", variant: .ghost, theme: store.theme, action: resumeFormula)
                     .frame(maxWidth: .infinity)
                 CTAButton(title: "停止", theme: store.theme, action: stopFormula)
                     .frame(maxWidth: .infinity)
-            }
-        case .stopped:
-            mlInput
-            HStack(spacing: 10) {
-                CTAButton(title: "重来", variant: .ghost, theme: store.theme, action: resetFormula)
-                    .frame(maxWidth: .infinity)
-                CTAButton(title: "保存记录",
-                          variant: .primary,
-                          theme: store.theme,
-                          action: saveFormulaTimer)
-                    .frame(maxWidth: .infinity)
-            }
-        }
     }
 
     private func lastFeedContext(_ event: Event) -> some View {
@@ -430,44 +519,30 @@ struct FeedScreen: View {
         .accessibilityElement(children: .combine)
     }
 
-    private func optionalSettingsToggle(
-        title: String,
-        subtitle: String,
-        expanded: Binding<Bool>
-    ) -> some View {
-        Button {
-            withAnimation(.easeOut(duration: 0.2)) {
-                expanded.wrappedValue.toggle()
-            }
-        } label: {
-            HStack(spacing: 10) {
-                Image(systemName: "clock.arrow.circlepath")
-                    .appFont(size: 16, weight: .semibold)
-                    .foregroundStyle(Palette.pinkInk)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .appFont(size: 14, weight: .semibold)
-                        .foregroundStyle(Palette.ink)
-                    Text(subtitle)
-                        .appFont(size: 12, weight: .medium)
-                        .foregroundStyle(Palette.ink3)
-                }
-                Spacer(minLength: 0)
-                Image(systemName: "chevron.down")
-                    .appFont(size: 12, weight: .bold)
-                    .foregroundStyle(Palette.ink3)
-                    .rotationEffect(.degrees(expanded.wrappedValue ? 180 : 0))
-            }
-            .padding(.horizontal, 14)
-            .frame(minHeight: 56)
-            .background(Palette.card, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous)
-                    .stroke(Palette.line, lineWidth: 1)
-            }
+    private var notesField: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            FieldLabel(text: "备注")
+            TextField("例如：吐奶、拍嗝情况", text: $notes, axis: .vertical)
+                .lineLimit(2...4)
+                .appText(.body)
+                .foregroundStyle(Palette.ink)
+                .padding(14)
+                .background(Palette.bg2, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
         }
-        .buttonStyle(PressableStyle())
-        .accessibilityValue(expanded.wrappedValue ? "已展开" : "已收起")
+    }
+
+    private var breastTimerStartBinding: Binding<Date> {
+        Binding(
+            get: { bSessionStart ?? .now },
+            set: { bSessionStart = $0 }
+        )
+    }
+
+    private var formulaTimerStartBinding: Binding<Date> {
+        Binding(
+            get: { fSessionStart ?? .now },
+            set: { fSessionStart = $0 }
+        )
     }
 
     private var mlInput: some View {
@@ -531,6 +606,15 @@ struct FeedScreen: View {
         }
     }
 
+    private var formulaPhaseAccessibilityLabel: String {
+        switch fPhase {
+        case .idle: return "尚未开始"
+        case .running: return "计时中"
+        case .paused: return "已暂停"
+        case .stopped: return "已停止"
+        }
+    }
+
     private func timerTint(for phase: Phase) -> Color {
         switch phase {
         case .idle:
@@ -543,6 +627,36 @@ struct FeedScreen: View {
     }
 
     // MARK: — Actions
+
+    private var saveStatus: RecordSaveStatus {
+        if saveCompleted { return .success }
+        switch mode {
+        case .breast:
+            if bSub == .manual {
+                return bManualMinL + bManualMinR > 0
+                    ? .ready("保存喂奶记录")
+                    : .disabled(message: "请填写至少一侧的喂养时长")
+            }
+            return bPhase == .idle
+                ? .disabled(message: "轻触左侧或右侧开始计时")
+                : .ready("保存喂奶记录")
+        case .formula:
+            if fSub == .manual { return .ready("保存喂奶记录") }
+            return fPhase == .idle
+                ? .disabled(message: "开始计时后即可保存")
+                : .ready("保存喂奶记录")
+        }
+    }
+
+    private func saveCurrentEntry() {
+        guard !saveCompleted else { return }
+        switch (mode, mode == .breast ? bSub : fSub) {
+        case (.breast, .manual): saveBreastManual()
+        case (.breast, .timer): saveBreast()
+        case (.formula, .manual): saveFormulaManual()
+        case (.formula, .timer): saveFormulaTimer()
+        }
+    }
 
     private func startOn(_ side: Side) {
         let now = Date()
@@ -616,9 +730,10 @@ struct FeedScreen: View {
             title = "母乳 · 右侧"; sub = "\(tot)分"
         }
         let correctedEnd = correctedBreastTimerEnd(start: start, end: end, activeDuration: l + r)
-        store.addEvent(.init(kind: .feed, at: start, endAt: correctedEnd, title: title, sub: sub))
+        store.addEvent(.init(kind: .feed, at: start, endAt: correctedEnd, title: title, sub: appendingNotes(to: sub)))
         resetBreast()
-        onBack()
+        store.syncFeedDraft(nil)
+        completeSave()
     }
 
     private func saveBreastManual() {
@@ -635,8 +750,8 @@ struct FeedScreen: View {
         } else {
             title = "母乳 · 右侧"; sub = "\(tot)分"
         }
-        store.addEvent(.init(kind: .feed, at: bManualTime, endAt: bManualTime, title: title, sub: sub))
-        onBack()
+        store.addEvent(.init(kind: .feed, at: bManualTime, endAt: bManualTime, title: title, sub: appendingNotes(to: sub)))
+        completeSave()
     }
 
     private func startFormula() {
@@ -650,26 +765,30 @@ struct FeedScreen: View {
         fDurMs += now.timeIntervalSince(start)
         return fDurMs
     }
-    private func pauseFormula() { _ = bankFormula(); fSegStart = nil; fPhase = .paused }
-    private func resumeFormula() { fSegStart = Date(); fPhase = .running }
+    private func pauseFormula() { _ = bankFormula(); fSessionEnd = Date(); fSegStart = nil; fPhase = .paused }
+    private func resumeFormula() { fSegStart = Date(); fSessionEnd = nil; fPhase = .running }
     private func stopFormula() { _ = bankFormula(); fSessionEnd = Date(); fSegStart = nil; fPhase = .stopped }
     private func resetFormula() {
         fPhase = .idle; fDurMs = 0; fSegStart = nil; fSessionStart = nil; fSessionEnd = nil
     }
     private func saveFormulaTimer() {
-        guard fPhase == .stopped, let s = fSessionStart, let e = fSessionEnd else { return }
+        let now = Date()
+        if fPhase == .running { _ = bankFormula(at: now) }
+        guard fPhase != .idle, let s = fSessionStart else { return }
+        let e = fPhase == .running ? now : (fSessionEnd ?? now)
         store.addEvent(.init(kind: .feed, at: s,
                              endAt: e,
                              title: "奶粉",
-                             sub: "\(ml) ml · \(hhmm(s)) - \(hhmm(e))"))
+                             sub: appendingNotes(to: "\(ml) ml · \(hhmm(s)) - \(hhmm(e))")))
         store.recordFormulaMilliliters(ml)
         resetFormula()
-        onBack()
+        store.syncFeedDraft(nil)
+        completeSave()
     }
     private func saveFormulaManual() {
-        store.addEvent(.init(kind: .feed, at: time, title: "奶粉", sub: "\(ml) ml"))
+        store.addEvent(.init(kind: .feed, at: time, title: "奶粉", sub: appendingNotes(to: "\(ml) ml")))
         store.recordFormulaMilliliters(ml)
-        onBack()
+        completeSave()
     }
 
     private var currentDraft: FeedDraft {
@@ -694,7 +813,8 @@ struct FeedScreen: View {
             formulaSessionStart: fSessionStart,
             formulaSessionEnd: fSessionEnd,
             formulaMilliliters: ml,
-            formulaTime: time
+            formulaTime: time,
+            notes: trimmedNotes
         )
     }
 
@@ -724,6 +844,7 @@ struct FeedScreen: View {
             fSessionEnd = draft.formulaSessionEnd
             ml = draft.formulaMilliliters
             time = draft.formulaTime
+            notes = draft.notes ?? ""
             return
         }
 
@@ -737,6 +858,47 @@ struct FeedScreen: View {
 
     private func syncDraftToStore() {
         store.syncFeedDraft(currentDraft.hasActiveState ? currentDraft : nil)
+    }
+
+    private var trimmedNotes: String? {
+        let value = notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        return value.isEmpty ? nil : value
+    }
+
+    private var exitProtection: RecordExitProtection {
+        guard !saveCompleted else { return .none }
+        if currentDraft.hasActiveState {
+            return .timerDraft(isRunning: bPhase == .running || fPhase == .running)
+        }
+        return currentDraft == initialDraft ? .none : .unsaved
+    }
+
+    private func requestClose() {
+        if exitProtection.requiresConfirmation {
+            showExitConfirmation = true
+        } else {
+            onBack()
+        }
+    }
+
+    private func discardActiveDraft() {
+        resetBreast()
+        resetFormula()
+        notes = ""
+        showBreastTimerDetails = false
+        showFormulaTimerDetails = false
+        store.syncFeedDraft(nil)
+        initialDraft = currentDraft
+    }
+
+    private func appendingNotes(to summary: String) -> String {
+        guard let trimmedNotes else { return summary }
+        return "\(summary) · \(trimmedNotes)"
+    }
+
+    private func completeSave() {
+        saveCompleted = true
+        RecordSaveFeedback.complete(isPresented: $showSaved, then: onBack)
     }
 
     private func draftPhase(from phase: Phase) -> FeedDraftPhase {

@@ -24,6 +24,7 @@ struct DataSnapshot: Codable {
     var sleepReminder: SleepReminderSettings? = nil
     var formulaMlHistory: [Int]? = nil
     var appearance: AppAppearance? = nil
+    var theme: AppTheme? = nil
 
     init(
         version: Int = 6,
@@ -42,7 +43,8 @@ struct DataSnapshot: Codable {
         feedReminder: FeedReminderSettings? = nil,
         sleepReminder: SleepReminderSettings? = nil,
         formulaMlHistory: [Int]? = nil,
-        appearance: AppAppearance? = nil
+        appearance: AppAppearance? = nil,
+        theme: AppTheme? = nil
     ) {
         self.version = version
         self.exportedAt = exportedAt
@@ -61,6 +63,7 @@ struct DataSnapshot: Codable {
         self.sleepReminder = sleepReminder
         self.formulaMlHistory = formulaMlHistory
         self.appearance = appearance
+        self.theme = theme
     }
 
     init(
@@ -91,7 +94,8 @@ struct DataSnapshot: Codable {
             feedReminder: nil,
             sleepReminder: nil,
             formulaMlHistory: nil,
-            appearance: nil
+            appearance: nil,
+            theme: nil
         )
     }
 }
@@ -143,7 +147,8 @@ extension AppStore {
                      feedDraft: feedDraft, feedReminder: feedReminder,
                      sleepReminder: sleepReminder,
                      formulaMlHistory: formulaMlHistory,
-                     appearance: appearance)
+                     appearance: appearance,
+                     theme: theme)
     }
 
     func apply(_ snap: DataSnapshot) {
@@ -177,6 +182,9 @@ extension AppStore {
         formulaMlHistory = snap.formulaMlHistory ?? formulaMlHistory
         if let savedAppearance = snap.appearance {
             appearance = savedAppearance
+        }
+        if let savedTheme = snap.theme {
+            theme = savedTheme
         }
     }
 

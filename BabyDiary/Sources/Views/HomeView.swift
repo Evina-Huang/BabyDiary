@@ -2,6 +2,8 @@ import SwiftUI
 import PhotosUI
 
 struct HomeView: View {
+    @Environment(AppStore.self) private var store
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     var onOpen: (SubScreen) -> Void
 
     var body: some View {
@@ -9,14 +11,25 @@ struct HomeView: View {
             HomeHeader(onOpen: onOpen)
 
             ScreenBody {
-                BabyBadge()
+                if let activeState = store.activeCareState {
+                    ActiveCareCard(state: activeState) {
+                        onOpen(activeState.destination)
+                    }
                     .padding(.top, 8)
+                }
 
-                HomeSectionHeader(title: "快速记录", detail: "轻触即可开始")
+                BabyBadge()
+                    .padding(.top, store.activeCareState == nil ? 8 : 12)
+
+                NightQuickEntry {
+                    onOpen(.nightQuick)
+                }
+                .padding(.top, 14)
+
+                HomeSectionHeader(title: "快速记录")
                     .padding(.top, 20)
 
-                // 2×2 quick-add grid
-                let cols = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
+                let cols = quickActionColumns
                 LazyVGrid(columns: cols, spacing: 12) {
                     QuickTile(kind: .sleep,  onTap: { onOpen(.sleep) })
                     QuickTile(kind: .feed,   onTap: { onOpen(.feed) })
@@ -35,24 +48,97 @@ struct HomeView: View {
         }
         .background(Palette.bg)
     }
+
+    private var quickActionColumns: [GridItem] {
+        let count = dynamicTypeSize.isAccessibilitySize ? 1 : 2
+        return Array(repeating: GridItem(.flexible(), spacing: 12), count: count)
+    }
 }
 
 private struct HomeSectionHeader: View {
     let title: String
-    let detail: String
 
     var body: some View {
-        HStack(alignment: .top) {
-            Text(title)
-                .appText(.sectionTitle)
-                .foregroundStyle(Palette.ink)
-            Spacer(minLength: 8)
-            Text(detail)
-                .appText(.caption)
-                .foregroundStyle(Palette.ink3)
-                .lineLimit(2)
-                .multilineTextAlignment(.trailing)
+        Text(title)
+            .appText(.sectionTitle)
+            .foregroundStyle(Palette.ink)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct NightQuickEntry: View {
+    @Environment(AppStore.self) private var store
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Group {
+                if dynamicTypeSize.isAccessibilitySize {
+                    VStack(alignment: .leading, spacing: 12) {
+                        leadingContent
+                        callToAction
+                    }
+                } else {
+                    HStack(spacing: 12) {
+                        leadingContent
+                        Spacer(minLength: 8)
+                        callToAction
+                    }
+                }
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
+            .background(
+                LinearGradient(
+                    colors: [Palette.lavender, store.theme.primaryTint],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                in: RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous)
+                    .stroke(Palette.lavenderInk.opacity(0.2), lineWidth: 1)
+            }
         }
+        .buttonStyle(PressableStyle())
+        .accessibilityLabel("夜间快速记录")
+        .accessibilityHint("打开只包含睡眠、喂奶、尿布和辅食的快速记录")
+    }
+
+    private var leadingContent: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous)
+                    .fill(Palette.card.opacity(0.72))
+                AppIcon.Moon(size: 26, color: Palette.lavenderInk)
+            }
+            .frame(width: 46, height: 46)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("夜间快速记录")
+                    .appText(.cardTitle)
+                    .foregroundStyle(Palette.ink)
+                Text("低注意力 · 两步左右完成")
+                    .appText(.caption)
+                    .foregroundStyle(Palette.ink2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private var callToAction: some View {
+        HStack(spacing: 5) {
+            Text("打开")
+                .appText(.label)
+            AppIcon.Chevron(size: 14, color: Palette.lavenderInk)
+        }
+        .foregroundStyle(Palette.lavenderInk)
+        .padding(.horizontal, 12)
+        .frame(minHeight: 44)
+        .background(Palette.card.opacity(0.72), in: Capsule())
+        .frame(maxWidth: dynamicTypeSize.isAccessibilitySize ? .infinity : nil)
     }
 }
 
@@ -82,9 +168,9 @@ private struct HomeHeader: View {
             HStack(spacing: 10) {
                 Button { onOpen(.settings) } label: {
                     Image(systemName: "gearshape")
-                        .appFont(size: 18, weight: .semibold)
+                        .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(store.theme.primary600)
-                        .frame(width: 40, height: 40)
+                        .frame(width: 44, height: 44)
                         .background(store.theme.primaryTint, in: Circle())
                 }
                 .buttonStyle(.plain)
@@ -92,9 +178,9 @@ private struct HomeHeader: View {
 
                 Button { onOpen(.backup) } label: {
                     Image(systemName: "square.and.arrow.up.on.square")
-                        .appFont(size: 18, weight: .semibold)
+                        .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(store.theme.primary600)
-                        .frame(width: 40, height: 40)
+                        .frame(width: 44, height: 44)
                         .background(store.theme.primaryTint, in: Circle())
                 }
                 .buttonStyle(.plain)
@@ -202,17 +288,16 @@ private struct BabyBadge: View {
             .clipShape(Circle())
 
             VStack(alignment: .leading, spacing: 3) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(store.baby.name)
-                        .appFont(size: 19, weight: .bold)
-                        .foregroundStyle(Palette.ink)
-                    Text(store.baby.ageLabel)
-                        .appFont(size: 12, weight: .semibold)
-                        .foregroundStyle(store.theme.primary600)
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        babyName
+                        babyAge
+                    }
+                    VStack(alignment: .leading, spacing: 2) {
+                        babyName
+                        babyAge
+                    }
                 }
-                Text("出生 \(store.baby.birthLabel)")
-                    .appFont(size: 12, weight: .medium)
-                    .foregroundStyle(Palette.ink3)
             }
             .layoutPriority(1)
 
@@ -220,7 +305,7 @@ private struct BabyBadge: View {
 
             Button { editing = true } label: {
                 Image(systemName: "pencil")
-                    .appFont(size: 14, weight: .semibold)
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Palette.ink2)
                     .frame(width: 44, height: 44)
                     .background(Palette.bg2, in: Circle())
@@ -239,6 +324,20 @@ private struct BabyBadge: View {
             EditBabyScreen(onClose: { editing = false })
                 .environment(store)
         }
+    }
+
+    private var babyName: some View {
+        Text(store.baby.name)
+            .appText(.heroTitle)
+            .foregroundStyle(Palette.ink)
+            .lineLimit(2)
+    }
+
+    private var babyAge: some View {
+        Text(store.baby.ageLabel)
+            .appText(.captionEmphasis)
+            .foregroundStyle(store.theme.primary600)
+            .lineLimit(2)
     }
 }
 
@@ -334,44 +433,96 @@ private struct QuickTile: View {
     }
 }
 
-// MARK: — Live sleep timer banner
+// MARK: — Priority live status
 
-private struct TimerBanner: View {
-    let timer: RunningTimer
+private struct ActiveCareCard: View {
+    let state: ActiveCareState
+    let onContinue: () -> Void
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { ctx in
-            let running = timer.isRunning
-            let dur = running ? timer.elapsed(at: ctx.date) : timer.accumulated
-            let tint = running ? Palette.lavender : Palette.bg2
-            let ink = running ? Palette.lavenderInk : Palette.ink2
-
-            HStack(spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous)
-                        .fill(Palette.card.opacity(0.6))
-                    AppIcon.Moon(size: 26, color: ink)
-                }
-                .frame(width: 42, height: 42)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 8) {
-                        if running {
-                            PulseDot(color: ink)
+            let style = CategoryStyle.forKind(state.kind, iconSize: 26)
+            Card(
+                padding: 18,
+                surfaceStyle: .elevated,
+                backgroundColor: style.tint
+            ) {
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack(alignment: .top, spacing: 12) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous)
+                                .fill(Palette.card.opacity(0.72))
+                            style.icon
                         }
-                        Text(running ? "正在睡觉" : "已暂停")
-                            .appText(.captionEmphasis)
-                            .foregroundStyle(ink)
+                        .frame(width: 48, height: 48)
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(spacing: 8) {
+                                if state.isRunning {
+                                    PulseDot(color: style.ink)
+                                }
+                                Text(state.isRunning ? "进行中" : "已暂停")
+                                    .appText(.captionEmphasis)
+                                    .foregroundStyle(style.ink)
+                            }
+                            Text(state.activityLabel)
+                                .appText(.heroTitle)
+                                .foregroundStyle(Palette.ink)
+                                .lineLimit(2)
+                            Text("开始于 \(formatTime(state.startedAt))")
+                                .appText(.body)
+                                .foregroundStyle(Palette.ink2)
+                                .monospacedDigit()
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    Text(formatDur(dur))
-                        .appFont(size: 22, weight: .black)
-                        .monospacedDigit()
-                        .foregroundStyle(ink)
+
+                    if dynamicTypeSize.isAccessibilitySize {
+                        VStack(alignment: .leading, spacing: 14) {
+                            duration(at: ctx.date, ink: style.ink)
+                            continueButton(ink: style.ink)
+                        }
+                    } else {
+                        HStack(alignment: .bottom, spacing: 16) {
+                            duration(at: ctx.date, ink: style.ink)
+                            Spacer(minLength: 0)
+                            continueButton(ink: style.ink)
+                        }
+                    }
                 }
-                Spacer(minLength: 0)
             }
-            .padding(.horizontal, 16).padding(.vertical, 14)
-            .background(tint, in: RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous))
         }
+    }
+
+    private func duration(at date: Date, ink: Color) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text("已持续")
+                .appText(.caption)
+                .foregroundStyle(Palette.ink2)
+            Text(formatDur(state.elapsed(at: date)))
+                .appText(.statValue)
+                .monospacedDigit()
+                .foregroundStyle(ink)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private func continueButton(ink: Color) -> some View {
+        Button(action: onContinue) {
+            HStack(spacing: 8) {
+                Text("继续记录")
+                    .appText(.button)
+                AppIcon.Chevron(size: 16, color: ink)
+            }
+            .foregroundStyle(ink)
+            .padding(.horizontal, 16)
+            .frame(maxWidth: dynamicTypeSize.isAccessibilitySize ? .infinity : nil, minHeight: 44)
+            .background(Palette.card.opacity(0.78), in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
+        }
+        .buttonStyle(PressableStyle())
+        .accessibilityHint("打开\(state.activityLabel)记录")
     }
 }
 
@@ -394,58 +545,76 @@ private struct PulseDot: View {
 
 private struct DailySummaryStrip: View {
     @Environment(AppStore.self) private var store
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     var body: some View {
         TimelineView(.periodic(from: .now, by: 30)) { ctx in
             let summary = store.dailySummary(on: ctx.date, now: ctx.date)
 
-            Card(padding: 16, cornerRadius: AppRadius.surface) {
+            Card(padding: 16, cornerRadius: AppRadius.surface, surfaceStyle: .card) {
                 VStack(alignment: .leading, spacing: 14) {
-                    HStack(alignment: .firstTextBaseline) {
-                        Text("今天")
-                            .appFont(size: 17, weight: .bold)
-                            .foregroundStyle(Palette.ink)
-                        Spacer()
-                        Text("实时汇总")
-                            .appFont(size: 12, weight: .medium)
-                            .foregroundStyle(Palette.ink3)
-                    }
-                    HStack(spacing: 0) {
-                        SummaryCell(ink: Palette.lavenderInk,
-                                    value: formatDurShort(summary.sleepDuration).replacingOccurrences(of: " ", with: ""),
-                                    label: "睡眠")
-                        SummaryCell(ink: Palette.pinkInk,
-                                    value: "\(summary.feedCount)次",
-                                    label: "喂奶")
-                        SummaryCell(ink: Palette.blueInk,
-                                    value: "\(summary.diaperCount)次", label: "尿布")
-                        SummaryCell(ink: Palette.yellowInk,
-                                    value: "\(summary.solidCount)次", label: "辅食")
+                    Text("今天")
+                        .appFont(size: 17, weight: .bold)
+                        .foregroundStyle(Palette.ink)
+                    if dynamicTypeSize.isAccessibilitySize {
+                        LazyVGrid(
+                            columns: [
+                                GridItem(.flexible(), spacing: 12),
+                                GridItem(.flexible(), spacing: 12),
+                            ],
+                            spacing: 12
+                        ) {
+                            ForEach(summaryItems(summary)) { item in
+                                SummaryCell(item: item, grouped: true)
+                            }
+                        }
+                    } else {
+                        HStack(spacing: 0) {
+                            ForEach(summaryItems(summary)) { item in
+                                SummaryCell(item: item, grouped: false)
+                            }
+                        }
                     }
                 }
             }
         }
     }
 
-    private struct SummaryCell: View {
-        let ink: Color
-        let value: String
+    private func summaryItems(_ summary: DailyEventSummary) -> [SummaryItem] {
+        [
+            SummaryItem(label: "睡眠", value: formatDurShort(summary.sleepDuration).replacingOccurrences(of: " ", with: ""), ink: Palette.lavenderInk),
+            SummaryItem(label: "喂奶", value: "\(summary.feedCount)次", ink: Palette.pinkInk),
+            SummaryItem(label: "尿布", value: "\(summary.diaperCount)次", ink: Palette.blueInk),
+            SummaryItem(label: "辅食", value: "\(summary.solidCount)次", ink: Palette.yellowInk),
+        ]
+    }
+
+    private struct SummaryItem: Identifiable {
         let label: String
+        let value: String
+        let ink: Color
+        var id: String { label }
+    }
+
+    private struct SummaryCell: View {
+        let item: SummaryItem
+        let grouped: Bool
 
         var body: some View {
             VStack(alignment: .leading, spacing: 4) {
-                Text(value)
+                Text(item.value)
                     .appFont(size: 16, weight: .bold)
                     .monospacedDigit()
-                    .foregroundStyle(ink)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
-                    .allowsTightening(true)
-                Text(label)
+                    .foregroundStyle(item.ink)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(item.label)
                     .appFont(size: 11, weight: .medium)
                     .foregroundStyle(Palette.ink3)
             }
-            .frame(maxWidth: .infinity)
-            .padding(.horizontal, 4)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, grouped ? 10 : 4)
+            .padding(.vertical, grouped ? 10 : 0)
+            .background(grouped ? Palette.bg2 : .clear, in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
         }
     }
 }
@@ -685,7 +854,7 @@ private struct EditBabyScreen: View {
                     ZStack {
                         Circle().fill(store.theme.primary)
                         Image(systemName: "camera.fill")
-                            .appFont(size: 13, weight: .bold)
+                            .font(.system(size: 13, weight: .bold))
                             .foregroundStyle(.white)
                     }
                     .frame(width: 30, height: 30)
