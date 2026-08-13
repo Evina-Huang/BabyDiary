@@ -135,6 +135,23 @@ struct BabyDiaryTests {
         #expect(!store.events.contains(first))
     }
 
+    @Test func deletedEventCanBeRestoredThroughStore() throws {
+        let store = AppStore()
+        let event = Event(id: "undo-feed", kind: .feed, at: Date(), title: "奶粉", sub: "120 ml")
+        store.events = [event]
+
+        let snapshot = try #require(store.deleteEventForUndo(event))
+        #expect(store.events.isEmpty)
+
+        store.restoreDeletedEvent(snapshot)
+
+        #expect(store.events == [event])
+    }
+
+    @Test func primaryNavigationHasExactlyFourTabs() {
+        #expect(MainTab.allCases == [.home, .records, .growth, .health])
+    }
+
     @Test func recentEventsSortsByEventTime() {
         let store = AppStore()
         let cal = Calendar.current
@@ -148,6 +165,53 @@ struct BabyDiaryTests {
         ]
 
         #expect(store.recentEvents(kind: .feed).map(\.id) == ["latest", "old"])
+    }
+
+    @Test func activeCareStateUsesMostRecentlyStartedSession() throws {
+        let store = AppStore()
+        let cal = Calendar(identifier: .gregorian)
+        let sleepStart = cal.date(from: DateComponents(year: 2026, month: 8, day: 12, hour: 9))!
+        let feedStart = cal.date(from: DateComponents(year: 2026, month: 8, day: 12, hour: 10))!
+        store.activeTimer = RunningTimer(
+            kind: .sleep,
+            startedAt: sleepStart,
+            accumulated: 0,
+            resumedAt: sleepStart
+        )
+        var draft = FeedDraft()
+        draft.mode = .breast
+        draft.breastPhase = .running
+        draft.breastSessionStart = feedStart
+        draft.breastSegmentStart = feedStart
+        store.feedDraft = draft
+
+        let state = try #require(store.activeCareState)
+
+        #expect(state.kind == .feed)
+        #expect(state.startedAt == feedStart)
+        #expect(state.destination == .feed)
+    }
+
+    @Test func activeCareStateFeedElapsedIncludesSavedAndLiveSegments() throws {
+        let store = AppStore()
+        let cal = Calendar(identifier: .gregorian)
+        let sessionStart = cal.date(from: DateComponents(year: 2026, month: 8, day: 12, hour: 10))!
+        let segmentStart = cal.date(from: DateComponents(year: 2026, month: 8, day: 12, hour: 10, minute: 5))!
+        let now = cal.date(from: DateComponents(year: 2026, month: 8, day: 12, hour: 10, minute: 9))!
+        var draft = FeedDraft()
+        draft.mode = .breast
+        draft.breastPhase = .running
+        draft.breastSessionStart = sessionStart
+        draft.breastSegmentStart = segmentStart
+        draft.breastLeftDuration = 3 * 60
+        draft.breastRightDuration = 2 * 60
+        store.feedDraft = draft
+
+        let state = try #require(store.activeCareState)
+
+        #expect(state.activityLabel == "母乳喂养")
+        #expect(state.elapsed(at: now) == 9 * 60)
+        #expect(state.isRunning)
     }
 
     @Test func mostRecentEventUsesFeedEndTime() throws {
@@ -749,6 +813,36 @@ struct BabyDiaryTests {
         #expect(!store.foods.contains { $0.name == "南瓜泥" })
     }
 
+    @Test func undoSolidDeletionRestoresFoodStatisticsAndStatus() throws {
+        let store = AppStore()
+        let triedAt = Date()
+        let solid = Event(id: "solid-undo", kind: .solid, at: triedAt, title: "南瓜泥", sub: "30g")
+        let food = FoodItem(
+            id: "fd-safe",
+            name: "南瓜泥",
+            firstUsedAt: triedAt,
+            status: .safe,
+            timesEaten: 1,
+            observationDays: 5,
+            notes: "无过敏反应"
+        )
+        store.events = [solid]
+        store.foods = [food]
+
+        let snapshot = try #require(store.deleteEventForUndo(solid))
+        #expect(store.foods.isEmpty)
+
+        store.restoreDeletedEvent(snapshot)
+
+        let restoredFood = try #require(store.foods.first)
+        #expect(store.events == [solid])
+        #expect(restoredFood.id == food.id)
+        #expect(restoredFood.status == .safe)
+        #expect(restoredFood.timesEaten == 1)
+        #expect(restoredFood.observationDays == 5)
+        #expect(restoredFood.notes == "无过敏反应")
+    }
+
     @Test func updateSolidEventRetargetsFoodList() {
         let store = AppStore()
         let originalAt = Date()
@@ -1081,6 +1175,17 @@ struct BabyDiaryTests {
         #expect(draft.formulaMilliliters == 210)
     }
 
+    @Test func feedDraftPersistsOptionalNotes() throws {
+        var draft = FeedDraft()
+        draft.notes = "已拍嗝"
+
+        let data = try JSONEncoder().encode(draft)
+        let restored = try JSONDecoder().decode(FeedDraft.self, from: data)
+
+        #expect(restored == draft)
+        #expect(restored.notes == "已拍嗝")
+    }
+
     @Test func shortcutStartsBreastFeedDraftWithoutDuplicating() throws {
         let store = AppStore()
         let cal = Calendar.current
@@ -1203,6 +1308,48 @@ struct BabyDiaryTests {
         #expect(store.events.map(\.title) == ["嘘嘘+臭臭", "臭臭"])
     }
 
+    @Test func nightRecorderUsesWetAsNewStoreDiaperDefault() {
+        let store = AppStore()
+
+        #expect(store.preferredNightDiaperType == .wet)
+    }
+
+    @Test func nightRecorderPrefersMostRecentDiaperType() {
+        let store = AppStore()
+        let cal = Calendar(identifier: .gregorian)
+        let older = cal.date(from: DateComponents(year: 2026, month: 8, day: 12, hour: 21))!
+        let newer = cal.date(from: DateComponents(year: 2026, month: 8, day: 12, hour: 23))!
+        store.events = [
+            Event(id: "wet", kind: .diaper, at: older, title: "嘘嘘"),
+            Event(id: "both", kind: .diaper, at: newer, title: "嘘嘘+臭臭"),
+        ]
+
+        #expect(store.preferredNightDiaperType == .both)
+    }
+
+    @Test func nightRecorderPrefersLatestSolidFoodAndRecordsIt() throws {
+        let store = AppStore()
+        let cal = Calendar(identifier: .gregorian)
+        let older = cal.date(from: DateComponents(year: 2026, month: 8, day: 12, hour: 12))!
+        let newer = cal.date(from: DateComponents(year: 2026, month: 8, day: 12, hour: 18))!
+        let recordedAt = cal.date(from: DateComponents(year: 2026, month: 8, day: 12, hour: 23))!
+        store.events = [
+            Event(id: "pumpkin", kind: .solid, at: older, title: "南瓜泥", sub: "20g"),
+            Event(id: "banana", kind: .solid, at: newer, title: "香蕉泥 · 米糊", sub: "少量"),
+        ]
+
+        #expect(store.preferredNightSolidName == "香蕉泥")
+
+        let event = store.recordSolidFromShortcut(at: recordedAt)
+        let food = try #require(store.foods.first { $0.name == "香蕉泥" })
+
+        #expect(event.kind == .solid)
+        #expect(event.title == "香蕉泥")
+        #expect(event.sub == "少量")
+        #expect(event.at == recordedAt)
+        #expect(food.timesEaten == 1)
+    }
+
     @Test func sleepEventTitleUsesDurationFromManualTimes() {
         let cal = Calendar.current
         let start = cal.date(from: DateComponents(year: 2026, month: 4, day: 22, hour: 10, minute: 5))!
@@ -1256,6 +1403,34 @@ struct BabyDiaryTests {
         #expect(restored.appearance == .dark)
     }
 
+    @Test func themeIsIncludedInSnapshot() {
+        let store = AppStore()
+        store.theme = .sky
+
+        let snapshot = store.snapshot()
+        let restored = AppStore()
+        restored.apply(snapshot)
+
+        #expect(snapshot.theme == .sky)
+        #expect(restored.theme == .sky)
+    }
+
+    @Test func legacySnapshotKeepsCurrentTheme() {
+        let store = AppStore()
+        store.theme = .lavender
+        let legacy = DataSnapshot(
+            baby: store.baby,
+            events: [],
+            vaccines: [],
+            growth: [],
+            foods: []
+        )
+
+        store.apply(legacy)
+
+        #expect(store.theme == .lavender)
+    }
+
     @Test func legacySnapshotKeepsCurrentAppearancePreference() {
         let store = AppStore()
         store.appearance = .light
@@ -1275,5 +1450,124 @@ struct BabyDiaryTests {
         #expect(store.appearance == .light)
         #expect(AppAppearance.system.colorScheme == nil)
         #expect(AppAppearance.dark.colorScheme == .dark)
+    }
+
+    @Test func healthTasksFollowSafetyPriorityOrder() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let now = calendar.date(from: DateComponents(
+            year: 2026, month: 8, day: 12, hour: 12
+        ))!
+        let store = AppStore()
+        store.growth = [
+            .init(id: "recent-growth", date: now, ageMonths: 8, weightKg: 8.2, heightCm: 70, headCm: nil)
+        ]
+        store.foods = [
+            .init(
+                id: "food-allergy",
+                name: "鸡蛋黄",
+                firstUsedAt: calendar.date(byAdding: .day, value: -2, to: now)!,
+                status: .allergic,
+                timesEaten: 1,
+                observationDays: 3
+            ),
+            .init(
+                id: "food-due",
+                name: "南瓜泥",
+                firstUsedAt: calendar.date(byAdding: .day, value: -3, to: now)!,
+                status: .observing,
+                timesEaten: 2,
+                observationDays: 3
+            ),
+        ]
+        store.medications = [
+            .init(
+                id: "med-allergy",
+                name: "头孢克洛",
+                takenAt: calendar.date(byAdding: .day, value: -1, to: now)!,
+                reaction: .allergic,
+                reactionNote: "出现皮疹"
+            )
+        ]
+        store.vaccines = [
+            .init(
+                id: "overdue",
+                name: "百白破疫苗",
+                ageLabel: "5 月龄",
+                ageMonths: 5,
+                scheduledDate: calendar.date(byAdding: .day, value: -10, to: now),
+                doneDate: nil
+            ),
+            .init(
+                id: "upcoming",
+                name: "麻腮风疫苗",
+                ageLabel: "8 月龄",
+                ageMonths: 8,
+                scheduledDate: calendar.date(byAdding: .day, value: 10, to: now),
+                doneDate: nil
+            ),
+        ]
+
+        let tasks = store.healthTasks(referenceDate: now, calendar: calendar)
+
+        #expect(tasks.map(\.kind) == [
+            .medicationAllergy,
+            .foodAllergy,
+            .overdueVaccine,
+            .foodObservationDue,
+            .upcomingVaccine,
+        ])
+        #expect(tasks.map(\.priority) == [
+            .critical,
+            .critical,
+            .overdue,
+            .today,
+            .upcoming,
+        ])
+    }
+
+    @Test func dueFoodObservationOpensDirectlyIntoFoodProcessing() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let now = calendar.date(from: DateComponents(
+            year: 2026, month: 8, day: 12, hour: 12
+        ))!
+        let store = AppStore()
+        store.growth = [
+            .init(id: "recent-growth", date: now, ageMonths: 8, weightKg: 8.2, heightCm: 70, headCm: nil)
+        ]
+        store.foods = [
+            .init(
+                id: "food-due",
+                name: "南瓜泥",
+                firstUsedAt: calendar.date(byAdding: .day, value: -3, to: now)!,
+                status: .observing,
+                timesEaten: 2,
+                observationDays: 3
+            )
+        ]
+
+        let task = try #require(store.healthTasks(
+            referenceDate: now,
+            calendar: calendar
+        ).first)
+
+        #expect(task.kind == .foodObservationDue)
+        #expect(task.destination == .foodList)
+        #expect(task.actionTitle == "立即确认")
+    }
+
+    @Test func healthTasksCanBeEmptyAfterRecentChecks() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let now = calendar.date(from: DateComponents(
+            year: 2026, month: 8, day: 12, hour: 12
+        ))!
+        let store = AppStore()
+        store.growth = [
+            .init(id: "recent-growth", date: now, ageMonths: 8, weightKg: 8.2, heightCm: 70, headCm: nil)
+        ]
+
+        #expect(store.healthTasks(referenceDate: now, calendar: calendar).isEmpty)
     }
 }

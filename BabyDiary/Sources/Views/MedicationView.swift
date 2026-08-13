@@ -226,14 +226,9 @@ private struct MedicationEditSheet: View {
                 VStack(spacing: 18) {
                     Card(padding: 16) {
                         VStack(alignment: .leading, spacing: 16) {
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text("用药信息")
-                                    .appFont(size: 17, weight: .bold)
-                                    .foregroundStyle(Palette.ink)
-                                Text("填写药名、剂量和服用时间")
-                                    .appFont(size: 12, weight: .medium)
-                                    .foregroundStyle(Palette.ink3)
-                            }
+                            Text("用药信息")
+                                .appFont(size: 17, weight: .bold)
+                                .foregroundStyle(Palette.ink)
 
                             FormField(label: "药名") {
                                 TextField("例如：对乙酰氨基酚", text: $name)

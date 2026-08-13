@@ -3,12 +3,18 @@ import SwiftUI
 struct SleepScreen: View {
     let onBack: () -> Void
     @Environment(AppStore.self) private var store
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     @State private var draftStart: Date = .now
     @State private var draftEnd: Date = .now
     @State private var entryMode: SleepEntryMode = .timer
     @State private var activePicker: SleepPicker?
     @State private var showTimerDetails = false
+    @State private var showExitConfirmation = false
+    @State private var showDiscardConfirmation = false
+    @State private var showSaved = false
+    @State private var saveCompleted = false
+    @State private var initialDraft: SleepDraft?
 
     private var timer: RunningTimer? {
         guard let timer = store.activeTimer, timer.kind == .sleep else { return nil }
@@ -30,7 +36,7 @@ struct SleepScreen: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            ScreenHeader(title: "睡眠记录", onBack: handleBack)
+            ScreenHeader(title: "睡眠记录", onBack: requestClose)
             ScreenBody {
                 TimelineView(.periodic(from: .now, by: 1)) { ctx in
                     content(now: ctx.date)
@@ -38,7 +44,35 @@ struct SleepScreen: View {
             }
         }
         .background(Palette.bg)
-        .onAppear(perform: syncDraftFromTimer)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            RecordSaveBar(
+                status: saveStatus,
+                theme: store.theme,
+                disabledButtonTitle: "保存",
+                action: saveCurrentEntry
+            )
+        }
+        .overlay(alignment: .top) {
+            RecordSuccessToast(isPresented: showSaved, title: "睡眠记录已保存")
+                .padding(.top, 12)
+        }
+        .recordExitProtection(
+            exitProtection,
+            isPresented: $showExitConfirmation,
+            onPreserve: preserveTimerDraft,
+            onDiscard: discardForExit,
+            onDismiss: onBack
+        )
+        .confirmationDialog("放弃本次睡眠计时？", isPresented: $showDiscardConfirmation, titleVisibility: .visible) {
+            Button("放弃并清空", role: .destructive, action: discardDraftSleep)
+            Button("继续记录", role: .cancel) {}
+        } message: {
+            Text("当前计时和已经调整的时间都会被清空。")
+        }
+        .onAppear {
+            syncDraftFromTimer()
+            if initialDraft == nil { initialDraft = currentDraft }
+        }
         .onChange(of: entryMode) { _, newValue in
             if newValue == .manual {
                 prepareManualDraftIfNeeded()
@@ -62,17 +96,26 @@ struct SleepScreen: View {
         }
 
         if entryMode == .manual && timer == nil {
-            manualSleepCard()
+            manualSleepOverview()
+            AdjustmentDetails(
+                isExpanded: $showTimerDetails,
+                summary: "开始时间与结束时间",
+                tint: Palette.lavenderInk
+            ) {
+                manualSleepFields()
+            }
+            .padding(.top, 14)
         } else {
             heroCard(now: now)
             if timer != nil {
-                detailToggle
-                    .padding(.top, 14)
-                if showTimerDetails {
-                    editorCard()
-                        .padding(.top, 10)
-                        .transition(.opacity.combined(with: .move(edge: .top)))
+                AdjustmentDetails(
+                    isExpanded: $showTimerDetails,
+                    summary: "仅在时间不准确时调整",
+                    tint: Palette.lavenderInk
+                ) {
+                    editorFields()
                 }
+                .padding(.top, 14)
             }
         }
         lastNightCard
@@ -120,11 +163,12 @@ struct SleepScreen: View {
                     Text(compactTimerDurationText(at: now))
                         .appText(.timer)
                         .monospacedDigit()
-                        .fixedSize(horizontal: true, vertical: false)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.78)
                 }
                 .foregroundStyle(isRunning ? Palette.lavenderInk : Palette.ink)
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel(timerDurationText(at: now))
+                .accessibilityLabel("\(isRunning ? "正在睡觉" : paused ? "睡眠计时已暂停" : "睡眠计时尚未开始")，持续时间\(timerDurationText(at: now))")
                 .padding(.top, 16)
 
                 Text(statusText())
@@ -133,31 +177,21 @@ struct SleepScreen: View {
                     .padding(.top, 10)
 
                 if timer != nil {
-                    HStack(spacing: 10) {
-                        CTAButton(title: isRunning ? "暂停" : "继续",
-                                  variant: .ghost,
-                                  theme: store.theme) {
-                            isRunning ? pauseSleep() : resumeSleep()
-                        }
-                        CTAButton(title: "保存记录",
-                                  variant: .primary,
-                                  theme: store.theme) {
-                            saveSleep()
-                        }
+                    CTAButton(title: isRunning ? "暂停计时" : "继续计时",
+                              variant: .ghost,
+                              theme: store.theme) {
+                        isRunning ? pauseSleep() : resumeSleep()
                     }
                     .padding(.top, 22)
 
-                    Button(action: discardDraftSleep) {
-                        Text("清空本次")
-                            .appFont(size: 14, weight: .heavy)
-                            .foregroundStyle(Palette.ink2)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 11)
-                            .background(Palette.card.opacity(0.55),
-                                        in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
+                    Button { showDiscardConfirmation = true } label: {
+                        Text("放弃本次计时")
+                            .appText(.label)
+                            .foregroundStyle(Palette.dangerInk)
+                            .frame(maxWidth: .infinity, minHeight: 44)
                     }
                     .buttonStyle(PressableStyle())
-                    .padding(.top, 10)
+                    .padding(.top, 6)
                 } else {
                     CTAButton(title: "开始睡眠", theme: store.theme) {
                         startSleep()
@@ -176,70 +210,16 @@ struct SleepScreen: View {
         .shadowCard()
     }
 
-    private var detailToggle: some View {
-        Button {
-            withAnimation(.easeOut(duration: 0.2)) {
-                showTimerDetails.toggle()
-            }
-        } label: {
-            HStack(spacing: 10) {
-                Image(systemName: "clock.arrow.circlepath")
-                    .appFont(size: 16, weight: .semibold)
-                    .foregroundStyle(Palette.lavenderInk)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("调整记录时间")
-                        .appFont(size: 14, weight: .semibold)
-                        .foregroundStyle(Palette.ink)
-                    Text("仅在开始或结束时间不准确时使用")
-                        .appFont(size: 12, weight: .medium)
-                        .foregroundStyle(Palette.ink3)
-                }
-                Spacer(minLength: 0)
-                Image(systemName: "chevron.down")
-                    .appFont(size: 12, weight: .bold)
-                    .foregroundStyle(Palette.ink3)
-                    .rotationEffect(.degrees(showTimerDetails ? 180 : 0))
-            }
-            .padding(.horizontal, 16)
-            .frame(minHeight: 56)
-            .background(Palette.card, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous)
-                    .stroke(Palette.line, lineWidth: 1)
-            }
-        }
-        .buttonStyle(PressableStyle())
-        .accessibilityValue(showTimerDetails ? "已展开" : "已收起")
-    }
-
-    private func manualSleepCard() -> some View {
+    private func manualSleepOverview() -> some View {
         let duration = max(0, draftEnd.timeIntervalSince(draftStart))
         return Card {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 10) {
                 Text("手动输入睡眠")
-                    .appFont(size: 15, weight: .heavy)
-
-                CompactDateTimeField(time: $draftStart,
-                                     theme: store.theme,
-                                     label: "开始时间",
-                                     onPickDate: { activePicker = .startDate },
-                                     onPickTime: { activePicker = .startTime })
-                    .onChange(of: draftStart) { _, newValue in
-                        if draftEnd < newValue {
-                            draftEnd = newValue
-                        }
-                    }
-
-                CompactDateTimeField(time: $draftEnd,
-                                     theme: store.theme,
-                                     label: "结束时间",
-                                     onPickDate: { activePicker = .endDate },
-                                     onPickTime: { activePicker = .endTime })
-                    .onChange(of: draftEnd) { _, newValue in
-                        if newValue < draftStart {
-                            draftEnd = draftStart
-                        }
-                    }
+                    .appText(.cardTitle)
+                    .foregroundStyle(Palette.ink)
+                Text("默认记录最近一小时，结束于现在")
+                    .appText(.body)
+                    .foregroundStyle(Palette.ink2)
 
                 HStack {
                     FieldLabel(text: "合计")
@@ -252,23 +232,34 @@ struct SleepScreen: View {
                 .padding(.vertical, 12)
                 .background(Palette.lavender.opacity(0.7),
                             in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
-
-                CTAButton(title: "保存记录",
-                          variant: .primary,
-                          theme: store.theme,
-                          action: saveManualSleep)
-                    .disabled(duration <= 0)
-                    .opacity(duration > 0 ? 1 : 0.55)
-                    .padding(.top, 4)
             }
         }
     }
 
-    private func editorCard() -> some View {
-        return Card {
-            VStack(alignment: .leading, spacing: 14) {
-                Text("手动调整时间")
-                    .appFont(size: 15, weight: .heavy)
+    private func manualSleepFields() -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            CompactDateTimeField(time: $draftStart,
+                                 theme: store.theme,
+                                 label: "开始时间",
+                                 onPickDate: { activePicker = .startDate },
+                                 onPickTime: { activePicker = .startTime })
+                .onChange(of: draftStart) { _, newValue in
+                    if draftEnd < newValue { draftEnd = newValue }
+                }
+
+            CompactDateTimeField(time: $draftEnd,
+                                 theme: store.theme,
+                                 label: "结束时间",
+                                 onPickDate: { activePicker = .endDate },
+                                 onPickTime: { activePicker = .endTime })
+                .onChange(of: draftEnd) { _, newValue in
+                    if newValue < draftStart { draftEnd = draftStart }
+                }
+        }
+    }
+
+    private func editorFields() -> some View {
+        VStack(alignment: .leading, spacing: 14) {
 
                 CompactDateTimeField(time: $draftStart,
                                      theme: store.theme,
@@ -297,7 +288,6 @@ struct SleepScreen: View {
                         }
                         syncActiveTimerFromDraft()
                     }
-            }
         }
     }
 
@@ -306,12 +296,22 @@ struct SleepScreen: View {
         return Group {
             if wakings > 0 || longest > 0 {
                 Card(padding: 16, cornerRadius: AppRadius.surface) {
-                    HStack(spacing: 0) {
-                        nightStat(label: "昨夜夜醒", value: "\(wakings) 次")
-                        Rectangle()
-                            .fill(Palette.line)
-                            .frame(width: 1, height: 38)
-                        nightStat(label: "连续最长", value: formatDurShort(longest))
+                    Group {
+                        if dynamicTypeSize.isAccessibilitySize {
+                            VStack(alignment: .leading, spacing: 16) {
+                                nightStat(label: "昨夜夜醒", value: "\(wakings) 次")
+                                Rectangle().fill(Palette.line).frame(height: 1)
+                                nightStat(label: "连续最长", value: formatDurShort(longest))
+                            }
+                        } else {
+                            HStack(spacing: 0) {
+                                nightStat(label: "昨夜夜醒", value: "\(wakings) 次")
+                                Rectangle()
+                                    .fill(Palette.line)
+                                    .frame(width: 1, height: 38)
+                                nightStat(label: "连续最长", value: formatDurShort(longest))
+                            }
+                        }
                     }
                 }
                 .padding(.top, 14)
@@ -378,6 +378,26 @@ struct SleepScreen: View {
             ?? now.addingTimeInterval(-3600)
     }
 
+    private var saveStatus: RecordSaveStatus {
+        if saveCompleted { return .success }
+        if entryMode == .manual, timer == nil {
+            return draftEnd > draftStart
+                ? .ready("保存睡眠记录")
+                : .disabled(message: "结束时间需要晚于开始时间")
+        }
+        return timer == nil
+            ? .disabled(message: "开始计时后即可保存")
+            : .ready("保存睡眠记录")
+    }
+
+    private func saveCurrentEntry() {
+        if entryMode == .manual, timer == nil {
+            saveManualSleep()
+        } else {
+            saveSleep()
+        }
+    }
+
     private func saveSleep(now: Date = Date()) {
         guard let timer = store.activeTimer else { return }
         if timer.isRunning {
@@ -395,7 +415,7 @@ struct SleepScreen: View {
             sub: "\(formatTime(draftStart)) - \(formatTime(draftEnd))"
         ))
         store.stopTimer()
-        onBack()
+        completeSave()
     }
 
     private func saveManualSleep() {
@@ -410,12 +430,16 @@ struct SleepScreen: View {
             title: "睡眠 \(formatDurShort(dur))",
             sub: "\(formatTime(draftStart)) - \(formatTime(end))"
         ))
-        onBack()
+        completeSave()
     }
 
-    private func handleBack() {
+    private func requestClose() {
         activePicker = nil
-        onBack()
+        if exitProtection.requiresConfirmation {
+            showExitConfirmation = true
+        } else {
+            onBack()
+        }
     }
 
     private func handleScreenDisappear() {
@@ -434,6 +458,41 @@ struct SleepScreen: View {
         draftStart = .now
         draftEnd = .now
         activePicker = nil
+        initialDraft = currentDraft
+    }
+
+    private var currentDraft: SleepDraft {
+        SleepDraft(start: draftStart, end: draftEnd, mode: entryMode)
+    }
+
+    private var exitProtection: RecordExitProtection {
+        guard !saveCompleted else { return .none }
+        if timer != nil {
+            return .timerDraft(isRunning: isRunning)
+        }
+        guard let initialDraft, currentDraft != initialDraft else { return .none }
+        return .unsaved
+    }
+
+    private func preserveTimerDraft() {
+        activePicker = nil
+        syncActiveTimerFromDraft()
+    }
+
+    private func discardForExit() {
+        if timer != nil {
+            discardDraftSleep()
+        } else if let initialDraft {
+            draftStart = initialDraft.start
+            draftEnd = initialDraft.end
+            entryMode = initialDraft.mode
+        }
+    }
+
+    private func completeSave() {
+        guard !saveCompleted else { return }
+        saveCompleted = true
+        RecordSaveFeedback.complete(isPresented: $showSaved, then: onBack)
     }
 
     private func statusText() -> String {
@@ -482,6 +541,12 @@ struct SleepScreen: View {
         let longest = night.compactMap(\.duration).max() ?? 0
         return (max(0, night.count - 1), longest)
     }
+}
+
+private struct SleepDraft: Equatable {
+    let start: Date
+    let end: Date
+    let mode: SleepEntryMode
 }
 
 private struct CompactDateTimeField: View {

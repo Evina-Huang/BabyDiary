@@ -23,6 +23,7 @@ struct VaccineScreen: View {
                     .background(store.theme.primaryTint, in: Capsule())
                 }
                 .buttonStyle(PressableStyle())
+                .accessibilityLabel("关闭添加疫苗")
             }
             ScreenBody {
                 let plan = store.vaccines
@@ -293,6 +294,7 @@ private struct VaccineCard: View {
                     .background(Palette.mint, in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
                 }
                 .buttonStyle(PressableStyle())
+                .accessibilityLabel("清空搜索")
 
                 Button(action: onEdit) {
                     Text("编辑")
@@ -306,7 +308,6 @@ private struct VaccineCard: View {
         }
         .padding(16)
         .background(bg, in: RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous))
-        .shadowCard()
         .contentShape(Rectangle())
     }
 
@@ -378,7 +379,7 @@ private struct VaccineAddPlanSheet: View {
                          onBack: selectedGroup == nil ? onClose : { selectedGroup = nil }) {
                 Button(action: onClose) {
                     AppIcon.Close(size: 14, color: Palette.ink2)
-                        .frame(width: 38, height: 38)
+                        .frame(width: 44, height: 44)
                         .background(Palette.bg2, in: Circle())
                 }
                 .buttonStyle(PressableStyle())
@@ -465,7 +466,6 @@ private struct VaccineAddPlanSheet: View {
                 }
                 .padding(16)
                 .background(Palette.card, in: RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous))
-                .shadowCard()
             }
             .buttonStyle(PressableStyle())
             .padding(.top, 12)
@@ -482,7 +482,7 @@ private struct VaccineAddPlanSheet: View {
             if !query.isEmpty {
                 Button { query = "" } label: {
                     AppIcon.Close(size: 12, color: Palette.ink3)
-                        .frame(width: 28, height: 28)
+                        .frame(width: 44, height: 44)
                         .background(Palette.bg2, in: Circle())
                 }
                 .buttonStyle(PressableStyle())
@@ -495,7 +495,6 @@ private struct VaccineAddPlanSheet: View {
             RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous)
                 .stroke(Palette.line, lineWidth: 1)
         )
-        .shadowCard()
     }
 
     private func detail(_ group: VaccineTemplateGroup) -> some View {
@@ -622,7 +621,6 @@ private struct VaccineTemplateGroupRow: View {
             }
             .padding(16)
             .background(Palette.card, in: RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous))
-            .shadowCard()
         }
         .buttonStyle(PressableStyle())
     }
@@ -689,7 +687,7 @@ private struct VaccineDoseTemplateRow: View {
                     .appFont(size: 13, weight: .heavy)
                     .foregroundStyle(joined ? Palette.ink3 : store.theme.primary600)
                     .padding(.horizontal, 13)
-                    .frame(height: 38)
+                    .frame(minHeight: 44)
                     .background(joined ? Palette.bg2 : store.theme.primaryTint, in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
             }
             .buttonStyle(PressableStyle())
@@ -701,7 +699,6 @@ private struct VaccineDoseTemplateRow: View {
             RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous)
                 .strokeBorder(joined ? Palette.line : Color.clear, lineWidth: 1)
         )
-        .shadowCard()
     }
 
     private func chip(_ text: String, ink: Color, bg: Color) -> some View {
@@ -885,7 +882,7 @@ private struct CompletedVaccineEditor: View {
                         Button { showDeleteConfirm = true } label: {
                             HStack(spacing: 6) {
                                 Image(systemName: "trash")
-                                    .appFont(size: 13, weight: .bold)
+                                    .font(.system(size: 13, weight: .bold))
                                 Text(vaccine.isCustom ? "删除此疫苗" : "从我的计划中移除")
                                     .appFont(size: 14, weight: .heavy)
                             }
@@ -971,7 +968,7 @@ private struct VaccineConfirmDialog: View {
             }
             .padding(20)
             .background(Palette.card, in: RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous))
-            .shadowCard()
+            .appSurface(.elevated)
             .padding(.horizontal, 40)
         }
         .transition(.opacity)

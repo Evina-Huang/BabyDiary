@@ -189,14 +189,9 @@ struct GrowthView: View {
 
     private var pageHeader: some View {
         HStack(alignment: .bottom, spacing: 12) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text("成长")
-                    .appText(.pageTitle)
-                    .foregroundStyle(Palette.ink)
-                Text(sectionSubtitle)
-                    .appFont(size: 13, weight: .medium)
-                    .foregroundStyle(Palette.ink3)
-            }
+            Text("成长")
+                .appText(.pageTitle)
+                .foregroundStyle(Palette.ink)
             Spacer(minLength: 8)
             Text(sectionCountLabel)
                 .appFont(size: 13, weight: .semibold)
@@ -207,14 +202,6 @@ struct GrowthView: View {
                 .background(store.theme.primaryTint, in: Capsule())
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private var sectionSubtitle: String {
-        switch section {
-        case .measure: return "查看最新测量与生长趋势"
-        case .teeth: return "记录每一颗乳牙"
-        case .milestones: return "收藏重要成长时刻"
-        }
     }
 
     private var sectionCountLabel: String {
@@ -489,7 +476,7 @@ struct GrowthView: View {
                                 .padding(.vertical, 14)
                                 .background(canSubmitMeasurement ? store.theme.primary : Palette.bg2,
                                             in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
-                                .shadowPill(tint: canSubmitMeasurement ? store.theme.primary600 : .clear)
+                                .shadowPill(tint: store.theme.primary600, isEnabled: canSubmitMeasurement)
                         }
                         .buttonStyle(PressableStyle())
                         .frame(maxWidth: .infinity)
@@ -874,7 +861,6 @@ struct EntryCard<Icon: View>: View {
             .padding(.horizontal, 18).padding(.vertical, 14)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Palette.card, in: RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous))
-            .shadowCard()
         }
         .buttonStyle(PressableStyle())
     }
@@ -1121,7 +1107,6 @@ private struct MilestoneTimelineRow: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(Palette.card,
                                 in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
-                    .shadowCard()
                 }
                 .contentShape(Rectangle())
             }

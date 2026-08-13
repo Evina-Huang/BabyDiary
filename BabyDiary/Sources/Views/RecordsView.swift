@@ -3,6 +3,11 @@ import SwiftUI
 struct RecordsView: View {
     @Environment(AppStore.self) private var store
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    let onOpen: (SubScreen) -> Void
+
+    init(onOpen: @escaping (SubScreen) -> Void = { _ in }) {
+        self.onOpen = onOpen
+    }
 
     private enum RecordFilter: String, CaseIterable, Hashable {
         case all, feed, sleep, diaper, solid
@@ -38,6 +43,8 @@ struct RecordsView: View {
     @State private var filter: RecordFilter = .all
     @State private var showingTrends = false
     @State private var statsRange: StatsRange = .d7
+    @State private var pendingDeletion: DeletedEventSnapshot?
+    @State private var undoDismissTask: Task<Void, Never>?
 
     private var filteredSorted: [Event] {
         let dateFiltered: [Event] = {
@@ -83,37 +90,26 @@ struct RecordsView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            ScreenBody {
-                if showingTrends {
-                    trendsHeader
-                        .padding(.bottom, 18)
+        ZStack {
+            timelineList
+                .opacity(showingTrends ? 0 : 1)
+                .allowsHitTesting(!showingTrends)
+                .accessibilityHidden(showingTrends)
 
-                    StatsDashboardView(range: $statsRange)
-                        .transition(.opacity)
-                } else {
-                    recordsHeader
-                        .padding(.bottom, 18)
-
-                    filterControls
-
-                    if groups.isEmpty {
-                        let emptyTitle = selectedDate == nil ? "还没有记录" : "这天还没有记录"
-                        let emptySub = selectedDate == nil ? "快回到首页添加第一条小记录吧" : "换一天看看吧"
-                        EmptyStateView(title: emptyTitle, subtitle: emptySub)
-                            .padding(.vertical, 28)
-                            .overlay(alignment: .top) {
-                                Rectangle().fill(Palette.line).frame(height: 1)
-                            }
-                    } else {
-                        ForEach(groups) { group in
-                            groupBlock(group).padding(.bottom, 24)
-                        }
-                    }
-                }
-            }
+            trendsScroll
+                .opacity(showingTrends ? 1 : 0)
+                .allowsHitTesting(showingTrends)
+                .accessibilityHidden(!showingTrends)
         }
         .background(Palette.bg)
+        .overlay(alignment: .bottom) {
+            if let pendingDeletion {
+                UndoToast(message: "已删除“\(pendingDeletion.event.title)”", action: undoDeletion)
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 12)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
         .sheet(item: $editing) { ev in
             EventEditSheet(
                 event: ev,
@@ -123,24 +119,22 @@ struct RecordsView: View {
                     editing = nil
                 },
                 onDelete: { removed in
-                    store.deleteEvent(removed)
+                    deleteWithUndo(removed)
                     editing = nil
                 }
             )
             .environment(store)
         }
+        .onDisappear {
+            undoDismissTask?.cancel()
+        }
     }
 
     private var recordsHeader: some View {
         HStack(alignment: .bottom, spacing: 12) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text("记录")
-                    .appText(.pageTitle)
-                    .foregroundStyle(Palette.ink)
-                Text(selectedDate == nil ? "按时间查看宝宝的日常" : collapsedLabel)
-                    .appFont(size: 13, weight: .medium)
-                    .foregroundStyle(Palette.ink3)
-            }
+            Text("记录")
+                .appText(.pageTitle)
+                .foregroundStyle(Palette.ink)
             Spacer(minLength: 8)
             Button { setShowingTrends(true) } label: {
                 HStack(spacing: 6) {
@@ -196,6 +190,92 @@ struct RecordsView: View {
                 showingTrends = isShowing
             }
         }
+    }
+
+    private var timelineList: some View {
+        List {
+            recordsHeader
+                .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 18, trailing: 20))
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+
+            filterControls
+                .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 0, trailing: 20))
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+
+            if let activeState = visibleActiveState {
+                ActiveRecordBanner(state: activeState) {
+                    onOpen(activeState.destination)
+                }
+                .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 18, trailing: 20))
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+            }
+
+            if groups.isEmpty {
+                let emptyTitle = selectedDate == nil ? "还没有记录" : "这天还没有记录"
+                let emptySub = selectedDate == nil ? "快回到首页添加第一条小记录吧" : "换一天看看吧"
+                EmptyStateView(title: emptyTitle, subtitle: emptySub)
+                    .padding(.vertical, 28)
+                    .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 24, trailing: 20))
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+            }
+
+            ForEach(groups) { group in
+                Section {
+                    let summary = store.dailySummary(on: group.day)
+                    if filter == .all, !summary.isEmpty {
+                        DailySummaryText(summary: summary)
+                            .padding(.vertical, 10)
+                            .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 0, trailing: 20))
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color.clear)
+                    }
+
+                    ForEach(Array(group.items.enumerated()), id: \.element.id) { index, event in
+                        RecordsTimelineRow(
+                            event: event,
+                            isLast: index == group.items.count - 1,
+                            onDelete: deleteWithUndo,
+                            onEdit: { editing = $0 }
+                        )
+                        .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 0, trailing: 20))
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+                    }
+                } header: {
+                    daySectionHeader(group)
+                }
+            }
+        }
+        .listStyle(.plain)
+        .listSectionSpacing(0)
+        .scrollContentBackground(.hidden)
+        .contentMargins(.top, 0, for: .scrollContent)
+        .background(Palette.bg)
+    }
+
+    private var trendsScroll: some View {
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 0) {
+                trendsHeader
+                    .padding(.bottom, 18)
+
+                StatsDashboardView(range: $statsRange)
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 8)
+            .padding(.bottom, 120)
+        }
+        .background(Palette.bg)
+    }
+
+    private var visibleActiveState: ActiveCareState? {
+        guard let state = store.activeCareState else { return nil }
+        guard filter.kind == nil || filter.kind == state.kind else { return nil }
+        return state
     }
 
     private var filterControls: some View {
@@ -340,50 +420,28 @@ struct RecordsView: View {
         return f.string(from: date)
     }
 
-    private func groupBlock(_ g: DayGroup) -> some View {
-        let summary = store.dailySummary(on: g.day)
-        return VStack(alignment: .leading, spacing: 0) {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(g.label)
-                        .appText(.sectionTitle)
-                        .foregroundStyle(Palette.ink)
-                    Text(groupDateDetail(g.day))
-                        .appFont(size: 12, weight: .medium)
-                        .foregroundStyle(Palette.ink3)
-                    Spacer(minLength: 8)
-                    Text("\(g.items.count) 条")
-                        .appFont(size: 12, weight: .semibold)
-                        .monospacedDigit()
-                        .foregroundStyle(Palette.ink3)
-                }
-
-                if filter == .all, !summary.isEmpty {
-                    DailySummaryText(summary: summary)
-                }
-            }
-            .padding(.horizontal, 2)
-            .padding(.top, 4)
-            .padding(.bottom, 14)
-
-            Rectangle()
-                .fill(Palette.line)
-                .frame(height: 1)
-
-            VStack(spacing: 0) {
-                ForEach(Array(g.items.enumerated()), id: \.element.id) { index, event in
-                    RecordsTimelineRow(
-                        event: event,
-                        isLast: index == g.items.count - 1,
-                        onDelete: { store.deleteEvent($0) },
-                        onEdit: { editing = $0 }
-                    )
-                }
-            }
+    private func daySectionHeader(_ group: DayGroup) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(group.label)
+                .appText(.sectionTitle)
+                .foregroundStyle(Palette.ink)
+            Text(groupDateDetail(group.day))
+                .appText(.caption)
+                .foregroundStyle(Palette.ink3)
+            Spacer(minLength: 8)
+            Text("\(group.items.count) 条")
+                .appText(.captionEmphasis)
+                .monospacedDigit()
+                .foregroundStyle(Palette.ink3)
         }
+        .textCase(nil)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 10)
+        .background(Palette.bg)
         .overlay(alignment: .bottom) {
             Rectangle().fill(Palette.line).frame(height: 1)
         }
+        .accessibilityElement(children: .combine)
     }
 
     private func groupDateDetail(_ date: Date) -> String {
@@ -391,6 +449,93 @@ struct RecordsView: View {
         formatter.locale = Locale(identifier: "zh_CN")
         formatter.dateFormat = "M月d日 EEEE"
         return formatter.string(from: date)
+    }
+
+    private func deleteWithUndo(_ event: Event) {
+        guard let snapshot = store.deleteEventForUndo(event) else { return }
+        undoDismissTask?.cancel()
+        UINotificationFeedbackGenerator().notificationOccurred(.warning)
+        withAnimation(.easeOut(duration: 0.2)) {
+            pendingDeletion = snapshot
+        }
+        undoDismissTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(4))
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeIn(duration: 0.16)) {
+                pendingDeletion = nil
+            }
+        }
+    }
+
+    private func undoDeletion() {
+        guard let snapshot = pendingDeletion else { return }
+        undoDismissTask?.cancel()
+        store.restoreDeletedEvent(snapshot)
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        AppAccessibility.announce("已撤销删除，记录已恢复")
+        withAnimation(.easeIn(duration: 0.16)) {
+            pendingDeletion = nil
+        }
+    }
+}
+
+private struct ActiveRecordBanner: View {
+    let state: ActiveCareState
+    let onContinue: () -> Void
+
+    var body: some View {
+        let style = CategoryStyle.forKind(state.kind, iconSize: 22)
+        Button(action: onContinue) {
+            TimelineView(.periodic(from: .now, by: 1)) { context in
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack(alignment: .top, spacing: 12) {
+                        CategoryIcon(kind: state.kind, size: 44)
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(spacing: 6) {
+                                Circle()
+                                    .fill(state.isRunning ? style.ink : Palette.yellowInk)
+                                    .frame(width: 7, height: 7)
+                                Text(state.isRunning ? "进行中" : "已暂停")
+                                    .appText(.captionEmphasis)
+                                    .foregroundStyle(state.isRunning ? style.ink : Palette.yellowInk)
+                            }
+                            Text(state.activityLabel)
+                                .appText(.cardTitle)
+                                .foregroundStyle(Palette.ink)
+                            Text("开始于 \(formatTime(state.startedAt))")
+                                .appText(.caption)
+                                .foregroundStyle(Palette.ink3)
+                        }
+                        Spacer(minLength: 8)
+                    }
+
+                    HStack(alignment: .firstTextBaseline, spacing: 12) {
+                        Text(formatDur(state.elapsed(at: context.date)))
+                            .appFont(size: 24, weight: .black, relativeTo: .title2)
+                            .monospacedDigit()
+                            .foregroundStyle(Palette.ink)
+                        Spacer(minLength: 8)
+                        HStack(spacing: 5) {
+                            Text("继续记录")
+                                .appText(.label)
+                            AppIcon.Chevron(size: 13, color: style.ink)
+                        }
+                        .foregroundStyle(style.ink)
+                    }
+                }
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(style.tint, in: RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous)
+                        .stroke(style.ink.opacity(0.18), lineWidth: 1)
+                }
+                .appSurface(.elevated)
+            }
+        }
+        .buttonStyle(PressableStyle())
+        .accessibilityLabel("\(state.activityLabel)，\(state.isRunning ? "进行中" : "已暂停")，继续记录")
     }
 }
 
@@ -454,6 +599,20 @@ private struct RecordsTimelineRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(PressableStyle())
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            Button(role: .destructive) {
+                onDelete(event)
+            } label: {
+                Label("删除", systemImage: "trash")
+            }
+
+            Button {
+                onEdit(event)
+            } label: {
+                Label("编辑", systemImage: "pencil")
+            }
+            .tint(Palette.blueInk)
+        }
         .contextMenu {
             Button {
                 onEdit(event)
@@ -461,14 +620,12 @@ private struct RecordsTimelineRow: View {
                 Label("编辑", systemImage: "pencil")
             }
             Button(role: .destructive) {
-                let feedback = UINotificationFeedbackGenerator()
-                feedback.notificationOccurred(.success)
                 onDelete(event)
             } label: {
                 Label("删除", systemImage: "trash")
             }
         }
-        .accessibilityHint("轻触编辑，长按可删除")
+        .accessibilityHint("轻触编辑，也可向左侧滑编辑或删除")
     }
 }
 

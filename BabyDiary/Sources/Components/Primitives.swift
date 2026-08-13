@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // MARK: — Screen chrome
 
@@ -60,7 +61,8 @@ struct ScreenBody<Content: View>: View {
 struct Card<Content: View>: View {
     var padding: CGFloat = 18
     var cornerRadius: CGFloat = AppRadius.surface
-    var elevation: SurfaceElevation = .flat
+    var surfaceStyle: SurfaceStyle = .plain
+    var backgroundColor: Color = Palette.card
     var onTap: (() -> Void)? = nil
     @ViewBuilder var content: () -> Content
 
@@ -68,12 +70,12 @@ struct Card<Content: View>: View {
         let surface = content()
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(padding)
-            .background(Palette.card, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .background(backgroundColor, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .stroke(Palette.line, lineWidth: 1)
             }
-            .surfaceElevation(elevation)
+            .appSurface(surfaceStyle)
         if let onTap {
             Button(action: onTap) { surface }
                 .buttonStyle(PressableStyle())
@@ -395,7 +397,7 @@ struct CTAButton: View {
                 .padding(.vertical, 16)
                 .foregroundStyle(foreground)
                 .background(background, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
-                .shadowPill(tint: shadowTint)
+                .shadowPill(tint: shadowTint, isEnabled: variant == .primary)
         }
         .buttonStyle(PressableStyle())
     }
@@ -419,41 +421,465 @@ struct CTAButton: View {
     }
 }
 
+// MARK: — Quick-record flow primitives
+
+/// Shared progressive-disclosure panel used by the four high-frequency forms.
+struct AdjustmentDetails<Content: View>: View {
+    @Binding var isExpanded: Bool
+    var summary: String = "时间、备注等可选设置"
+    var tint: Color = Palette.ink3
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Button {
+                withAnimation(.easeOut(duration: 0.2)) {
+                    isExpanded.toggle()
+                }
+            } label: {
+                HStack(spacing: 12) {
+                    AppIcon.Plus(size: 17, color: tint)
+                        .rotationEffect(.degrees(isExpanded ? 45 : 0))
+                        .frame(width: 32, height: 32)
+                        .background(Palette.bg2, in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("调整详情")
+                            .appText(.cardTitle)
+                            .foregroundStyle(Palette.ink)
+                        Text(summary)
+                            .appText(.caption)
+                            .foregroundStyle(Palette.ink3)
+                            .lineLimit(2)
+                    }
+
+                    Spacer(minLength: 8)
+
+                    AppIcon.Chevron(size: 15, color: Palette.ink3)
+                        .rotationEffect(.degrees(isExpanded ? 270 : 90))
+                        .frame(width: 44, height: 44)
+                }
+                .padding(.leading, 14)
+                .padding(.trailing, 6)
+                .frame(maxWidth: .infinity, minHeight: 64)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(PressableStyle())
+            .accessibilityValue(isExpanded ? "已展开" : "已收起")
+
+            if isExpanded {
+                Rectangle()
+                    .fill(Palette.line)
+                    .frame(height: 1)
+                    .padding(.horizontal, 14)
+
+                content()
+                    .padding(16)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .background(Palette.card, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous)
+                .stroke(Palette.line, lineWidth: 1)
+        }
+        .clipped()
+    }
+}
+
+enum RecordSaveStatus: Equatable {
+    case ready(String)
+    case disabled(message: String)
+    case disabledQuietly
+    case error(message: String)
+    case saving
+    case success
+
+    var isEnabled: Bool {
+        if case .ready = self { return true }
+        return false
+    }
+}
+
+/// A consistent action bar anchored immediately above the bottom safe area.
+struct RecordSaveBar: View {
+    let status: RecordSaveStatus
+    let theme: AppTheme
+    var disabledButtonTitle: String = "暂时无法保存"
+    let action: () -> Void
+
+    var body: some View {
+        VStack(spacing: 8) {
+            if let message = statusMessage {
+                Text(message)
+                    .appText(.captionEmphasis)
+                    .foregroundStyle(statusMessageColor)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityLabel(statusAccessibilityLabel(message))
+            }
+
+            Button(action: action) {
+                HStack(spacing: 8) {
+                    buttonIcon
+                    Text(buttonTitle)
+                        .appText(.button)
+                }
+                .foregroundStyle(buttonForeground)
+                .frame(maxWidth: .infinity, minHeight: 56)
+                .background(buttonBackground, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
+                .shadowPill(tint: theme.primary600, isEnabled: status.isEnabled)
+            }
+            .buttonStyle(PressableStyle())
+            .disabled(!status.isEnabled)
+            .accessibilityHint(status.isEnabled ? "保存当前记录" : "")
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 10)
+        .padding(.bottom, 8)
+        .background(.ultraThinMaterial)
+        .overlay(alignment: .top) {
+            Rectangle().fill(Palette.line).frame(height: 1)
+        }
+    }
+
+    @ViewBuilder
+    private var buttonIcon: some View {
+        switch status {
+        case .saving:
+            ProgressView().tint(buttonForeground)
+        case .success:
+            AppIcon.Check(size: 18, color: buttonForeground)
+        case .ready, .disabled, .disabledQuietly, .error:
+            EmptyView()
+        }
+    }
+
+    private var buttonTitle: String {
+        switch status {
+        case .ready(let title): return title
+        case .disabled: return disabledButtonTitle
+        case .disabledQuietly: return "保存"
+        case .error: return "请检查填写内容"
+        case .saving: return "正在保存"
+        case .success: return "已保存"
+        }
+    }
+
+    private var buttonBackground: Color {
+        switch status {
+        case .ready: return theme.primary
+        case .success: return Palette.mint
+        case .error: return Palette.dangerTint
+        case .disabled, .disabledQuietly, .saving: return Palette.bg2
+        }
+    }
+
+    private var buttonForeground: Color {
+        switch status {
+        case .ready: return theme.onPrimary
+        case .success: return Palette.mint600
+        case .error: return Palette.dangerInk
+        case .disabled, .disabledQuietly, .saving: return Palette.ink3
+        }
+    }
+
+    private var statusMessage: String? {
+        switch status {
+        case .disabled(let message), .error(let message): return message
+        case .ready, .disabledQuietly, .saving, .success: return nil
+        }
+    }
+
+    private var statusMessageColor: Color {
+        if case .error = status { return Palette.dangerInk }
+        return Palette.ink3
+    }
+
+    private func statusAccessibilityLabel(_ message: String) -> String {
+        if case .error = status { return "保存错误，\(message)" }
+        return "无法保存，\(message)"
+    }
+}
+
+struct RecordSuccessToast: View {
+    let isPresented: Bool
+    var title: String = "记录已保存"
+
+    var body: some View {
+        if isPresented {
+            HStack(spacing: 9) {
+                AppIcon.Check(size: 16, color: Palette.mint600)
+                Text(title)
+                    .appText(.bodyEmphasis)
+                    .foregroundStyle(Palette.ink)
+            }
+            .padding(.horizontal, 16)
+            .frame(minHeight: 48)
+            .background(Palette.card, in: Capsule())
+            .overlay { Capsule().stroke(Palette.line, lineWidth: 1) }
+            .appSurface(.elevated)
+            .accessibilityAddTraits(.isStaticText)
+            .onAppear {
+                AppAccessibility.announce(title)
+            }
+            .transition(.move(edge: .top).combined(with: .opacity))
+        }
+    }
+}
+
+struct UndoToast: View {
+    let message: String
+    let action: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Text(message)
+                .appText(.bodyEmphasis)
+                .foregroundStyle(Palette.ink)
+                .lineLimit(2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            Button("撤销", action: action)
+                .appText(.button)
+                .foregroundStyle(Palette.blueInk)
+                .frame(minWidth: 56, minHeight: 44)
+                .buttonStyle(PressableStyle())
+                .accessibilityHint("恢复刚刚删除的记录")
+        }
+        .padding(.leading, 16)
+        .padding(.trailing, 8)
+        .padding(.vertical, 8)
+        .background(Palette.card, in: RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous)
+                .stroke(Palette.line, lineWidth: 1)
+        }
+        .appSurface(.elevated)
+        .accessibilityElement(children: .contain)
+        .onAppear {
+            AppAccessibility.announce("\(message)，可以撤销")
+        }
+    }
+}
+
+enum AppAccessibility {
+    static func announce(_ message: String) {
+        guard UIAccessibility.isVoiceOverRunning else { return }
+        UIAccessibility.post(notification: .announcement, argument: message)
+    }
+}
+
+enum RecordSaveFeedback {
+    @MainActor
+    static func complete(
+        isPresented: Binding<Bool>,
+        delay: TimeInterval = 0.65,
+        then completion: @escaping () -> Void
+    ) {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        withAnimation(.easeOut(duration: 0.2)) {
+            isPresented.wrappedValue = true
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+            completion()
+        }
+    }
+}
+
+enum RecordExitProtection: Equatable {
+    case none
+    case unsaved
+    case timerDraft(isRunning: Bool)
+
+    var requiresConfirmation: Bool { self != .none }
+}
+
+extension View {
+    func recordExitProtection(
+        _ protection: RecordExitProtection,
+        isPresented: Binding<Bool>,
+        onPreserve: @escaping () -> Void = {},
+        onDiscard: @escaping () -> Void,
+        onDismiss: @escaping () -> Void
+    ) -> some View {
+        modifier(RecordExitProtectionModifier(
+            protection: protection,
+            isPresented: isPresented,
+            onPreserve: onPreserve,
+            onDiscard: onDiscard,
+            onDismiss: onDismiss
+        ))
+    }
+}
+
+private struct RecordExitProtectionModifier: ViewModifier {
+    let protection: RecordExitProtection
+    @Binding var isPresented: Bool
+    let onPreserve: () -> Void
+    let onDiscard: () -> Void
+    let onDismiss: () -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .background {
+                SheetDismissAttemptMonitor(
+                    isDisabled: protection.requiresConfirmation,
+                    onAttempt: { isPresented = true }
+                )
+                .frame(width: 0, height: 0)
+            }
+            .confirmationDialog(
+                dialogTitle,
+                isPresented: $isPresented,
+                titleVisibility: .visible
+            ) {
+                dialogActions
+            } message: {
+                Text(dialogMessage)
+            }
+    }
+
+    @ViewBuilder
+    private var dialogActions: some View {
+        switch protection {
+        case .none:
+            EmptyView()
+        case .unsaved:
+            Button("放弃更改", role: .destructive) {
+                onDiscard()
+                onDismiss()
+            }
+            Button("继续编辑", role: .cancel) {}
+        case .timerDraft:
+            Button("保留计时并退出") {
+                onPreserve()
+                onDismiss()
+            }
+            Button("放弃本次计时", role: .destructive) {
+                onDiscard()
+                onDismiss()
+            }
+            Button("继续记录", role: .cancel) {}
+        }
+    }
+
+    private var dialogTitle: String {
+        switch protection {
+        case .none: return ""
+        case .unsaved: return "放弃未保存的记录？"
+        case .timerDraft(let isRunning): return isRunning ? "计时仍在进行" : "计时记录尚未保存"
+        }
+    }
+
+    private var dialogMessage: String {
+        switch protection {
+        case .none: return ""
+        case .unsaved: return "退出后，本页填写的内容将不会保留。"
+        case .timerDraft(let isRunning):
+            return isRunning
+                ? "保留后计时会继续，可从首页的进行中状态继续记录。"
+                : "可以保留当前草稿，稍后从首页继续完成记录。"
+        }
+    }
+}
+
+private struct SheetDismissAttemptMonitor: UIViewControllerRepresentable {
+    let isDisabled: Bool
+    let onAttempt: () -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(isDisabled: isDisabled, onAttempt: onAttempt)
+    }
+
+    func makeUIViewController(context: Context) -> UIViewController {
+        UIViewController()
+    }
+
+    func updateUIViewController(_ controller: UIViewController, context: Context) {
+        context.coordinator.isDisabled = isDisabled
+        context.coordinator.onAttempt = onAttempt
+        DispatchQueue.main.async {
+            controller.parent?.presentationController?.delegate = context.coordinator
+        }
+    }
+
+    final class Coordinator: NSObject, UIAdaptivePresentationControllerDelegate {
+        var isDisabled: Bool
+        var onAttempt: () -> Void
+
+        init(isDisabled: Bool, onAttempt: @escaping () -> Void) {
+            self.isDisabled = isDisabled
+            self.onAttempt = onAttempt
+        }
+
+        func presentationControllerShouldDismiss(_ presentationController: UIPresentationController) -> Bool {
+            !isDisabled
+        }
+
+        func presentationControllerDidAttemptToDismiss(_ presentationController: UIPresentationController) {
+            guard isDisabled else { return }
+            onAttempt()
+        }
+    }
+}
+
 // MARK: — Segmented pill toggle
 
 struct SegPill<Value: Hashable>: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Binding var selection: Value
     let options: [(Value, String)]
 
     var body: some View {
-        HStack(spacing: 0) {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(spacing: 4))
+            : AnyLayout(HStackLayout(spacing: 0))
+
+        layout {
             ForEach(options, id: \.0) { (val, label) in
+                let selected = selection == val
                 Button {
-                    withAnimation(.easeOut(duration: 0.16)) { selection = val }
+                    if reduceMotion {
+                        selection = val
+                    } else {
+                        withAnimation(.easeOut(duration: 0.16)) { selection = val }
+                    }
                 } label: {
-                    Text(label)
-                        .appText(.label)
-                        .foregroundStyle(selection == val ? Palette.ink : Palette.ink2)
-                        .padding(.horizontal, 18)
-                        .padding(.vertical, 8)
-                        .background {
-                            if selection == val {
-                                RoundedRectangle(cornerRadius: 999, style: .continuous)
-                                    .fill(Palette.card)
-                                    .overlay {
-                                        RoundedRectangle(cornerRadius: 999, style: .continuous)
-                                            .stroke(Palette.line, lineWidth: 1)
-                                    }
-                            }
+                    HStack(spacing: 6) {
+                        if selected {
+                            AppIcon.Check(size: 13, color: Palette.ink)
+                                .accessibilityHidden(true)
                         }
+                        Text(label)
+                            .appText(.label)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .foregroundStyle(selected ? Palette.ink : Palette.ink2)
+                    .frame(maxWidth: dynamicTypeSize.isAccessibilitySize ? .infinity : nil, minHeight: 44)
+                    .padding(.horizontal, 18)
+                    .background {
+                        if selected {
+                            RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous)
+                                .fill(Palette.card)
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous)
+                                        .stroke(Palette.line, lineWidth: 1)
+                                }
+                        }
+                    }
                 }
                 .buttonStyle(PressableStyle())
+                .accessibilityLabel(label)
+                .accessibilityValue(selected ? "已选中" : "未选中")
+                .accessibilityAddTraits(selected ? .isSelected : [])
             }
         }
         .padding(4)
-        .background(Palette.bg2, in: RoundedRectangle(cornerRadius: 999, style: .continuous))
+        .background(Palette.bg2, in: RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 999, style: .continuous).stroke(Palette.line, lineWidth: 1)
+            RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous)
+                .stroke(Palette.line, lineWidth: 1)
         )
     }
 }

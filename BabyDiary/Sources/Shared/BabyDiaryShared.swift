@@ -8,6 +8,7 @@ enum BabyDiaryDestination: String {
     case solid
     case diaper
     case records
+    case health
 }
 
 enum BabyDiaryShared {

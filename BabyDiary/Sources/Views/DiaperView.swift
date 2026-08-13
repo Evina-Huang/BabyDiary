@@ -29,10 +29,15 @@ struct DiaperScreen: View {
     @State private var type: DiaperEventType? = nil
     @State private var diaperNote: String = ""
     @State private var time: Date = .now
+    @State private var showDetails = false
+    @State private var showExitConfirmation = false
+    @State private var showSaved = false
+    @State private var saveCompleted = false
+    @State private var initialDraft: DiaperDraft?
 
     var body: some View {
         VStack(spacing: 0) {
-            ScreenHeader(title: "换尿布记录", onBack: onBack)
+            ScreenHeader(title: "换尿布记录", onBack: requestClose)
             ScreenBody {
                 SinceLastBanner(
                     kind: .diaper,
@@ -43,30 +48,44 @@ struct DiaperScreen: View {
 
                 typePicker.padding(.top, 24)
 
-                if selectedTypeAllowsNote {
-                    notePicker
-                        .padding(.top, 20)
+                if type != nil {
+                    AdjustmentDetails(
+                        isExpanded: $showDetails,
+                        summary: selectedTypeAllowsNote
+                            ? "便便情况、补充说明与记录时间"
+                            : "记录时间"
+                    ) {
+                        diaperDetails
+                    }
+                        .padding(.top, 16)
                         .transition(.opacity.combined(with: .move(edge: .top)))
                 }
-
-                timePicker.padding(.top, 22)
-                saveButton.padding(.top, 22)
             }
         }
         .background(Palette.bg)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            RecordSaveBar(status: saveStatus, theme: store.theme, action: submit)
+        }
+        .overlay(alignment: .top) {
+            RecordSuccessToast(isPresented: showSaved, title: "换尿布记录已保存")
+                .padding(.top, 12)
+        }
+        .recordExitProtection(
+            exitProtection,
+            isPresented: $showExitConfirmation,
+            onDiscard: resetDraft,
+            onDismiss: onBack
+        )
+        .onAppear {
+            if initialDraft == nil { initialDraft = currentDraft }
+        }
     }
 
     private var typePicker: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("这次是什么情况？")
-                    .appFont(size: 17, weight: .bold)
-                    .foregroundStyle(Palette.ink)
-                Spacer(minLength: 8)
-                Text("选择一项")
-                    .appFont(size: 12, weight: .semibold)
-                    .foregroundStyle(Palette.ink3)
-            }
+            Text("这次是什么情况？")
+                .appFont(size: 17, weight: .bold)
+                .foregroundStyle(Palette.ink)
 
             HStack(alignment: .top, spacing: 10) {
                 ForEach(options) { option in
@@ -128,14 +147,22 @@ struct DiaperScreen: View {
                 RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous)
                     .stroke(isSelected ? option.ink.opacity(0.18) : Palette.line, lineWidth: 1)
             }
-            .shadowCard()
         }
         .buttonStyle(PressableStyle())
         .accessibilityLabel("\(option.label)，\(option.sub)")
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
-    private var notePicker: some View {
+    private var diaperDetails: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            if selectedTypeAllowsNote {
+                noteDetails
+            }
+            timePicker
+        }
+    }
+
+    private var noteDetails: some View {
         let columns = [GridItem(.adaptive(minimum: 84), spacing: 8)]
         let noteOptions = DiaperNotePreset.options(including: diaperNote)
 
@@ -190,46 +217,27 @@ struct DiaperScreen: View {
                 }
             }
 
-            TextField("补充其他情况", text: $diaperNote)
-                .appFont(size: 16, weight: .semibold)
-                .foregroundStyle(Palette.ink)
-                .padding(.horizontal, 14)
-                .frame(minHeight: 48)
-                .background(Palette.bg2, in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
-                .accessibilityLabel("便便情况补充说明")
+            VStack(alignment: .leading, spacing: 8) {
+                FieldLabel(text: "补充说明")
+                TextField("补充其他情况", text: $diaperNote)
+                    .appFont(size: 16, weight: .medium)
+                    .foregroundStyle(Palette.ink)
+                    .padding(.horizontal, 14)
+                    .frame(minHeight: 48)
+                    .background(Palette.bg2, in: RoundedRectangle(cornerRadius: AppRadius.compact, style: .continuous))
+                    .accessibilityLabel("便便情况补充说明")
+            }
         }
-        .padding(16)
-        .background(Palette.card, in: RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous)
-                .stroke(Palette.line, lineWidth: 1)
-        }
-        .shadowCard()
     }
 
     private var timePicker: some View {
         InlineWheelTimePicker(time: $time, theme: store.theme)
     }
 
-    private var saveButton: some View {
-        let enabled = type != nil
-        let background: Color = enabled ? store.theme.primary : Palette.bg2
-        let foreground: Color = enabled ? .white : Palette.ink3
-        return Button(action: submit) {
-            HStack(spacing: 8) {
-                if enabled {
-                    AppIcon.Check(size: 18, color: foreground)
-                }
-                Text(enabled ? "保存换尿布记录" : "请先选择一种情况")
-                    .appFont(size: 17, weight: .heavy)
-                    .foregroundStyle(foreground)
-            }
-            .frame(maxWidth: .infinity, minHeight: 56)
-            .background(background, in: RoundedRectangle(cornerRadius: AppRadius.surface, style: .continuous))
-            .shadowPill(tint: enabled ? background.opacity(0.9) : .clear)
-        }
-        .buttonStyle(PressableStyle())
-        .disabled(!enabled)
+    private var saveStatus: RecordSaveStatus {
+        if saveCompleted { return .success }
+        guard type != nil else { return .disabledQuietly }
+        return .ready("保存")
     }
 
     private var selectedTypeAllowsNote: Bool {
@@ -237,14 +245,44 @@ struct DiaperScreen: View {
     }
 
     private func submit() {
-        guard let selectedType = type else { return }
+        guard let selectedType = type, !saveCompleted else { return }
 
         let trimmedNote = diaperNote.trimmingCharacters(in: .whitespacesAndNewlines)
         let note = selectedType.allowsNote && !trimmedNote.isEmpty ? trimmedNote : nil
         store.addEvent(.init(kind: .diaper, at: time, title: selectedType.label, sub: note))
-        diaperNote = ""
-        onBack()
+        saveCompleted = true
+        RecordSaveFeedback.complete(isPresented: $showSaved, then: onBack)
     }
+
+    private var currentDraft: DiaperDraft {
+        DiaperDraft(type: type, note: diaperNote, time: time)
+    }
+
+    private var exitProtection: RecordExitProtection {
+        guard !saveCompleted, let initialDraft, currentDraft != initialDraft else { return .none }
+        return .unsaved
+    }
+
+    private func requestClose() {
+        if exitProtection.requiresConfirmation {
+            showExitConfirmation = true
+        } else {
+            onBack()
+        }
+    }
+
+    private func resetDraft() {
+        type = nil
+        diaperNote = ""
+        time = initialDraft?.time ?? .now
+        showDetails = false
+    }
+}
+
+private struct DiaperDraft: Equatable {
+    let type: DiaperEventType?
+    let note: String
+    let time: Date
 }
 
 private struct DiaperTypeGlyph: View {

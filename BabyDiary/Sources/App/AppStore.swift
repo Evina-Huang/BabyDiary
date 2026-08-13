@@ -26,6 +26,19 @@ final class AppStore {
     static let defaultFormulaMilliliters = 270
     static let formulaMilliliterPresets = [120, 150, 180, 210, 240, 270]
 
+    /// The single care session that should lead status-first surfaces.
+    /// If sleep and feeding overlap, the most recently started session wins.
+    var activeCareState: ActiveCareState? {
+        var candidates: [ActiveCareState] = []
+        if let activeTimer, activeTimer.kind == .sleep {
+            candidates.append(.sleep(activeTimer))
+        }
+        if let feedDraft, feedDraft.hasActiveState {
+            candidates.append(.feed(feedDraft))
+        }
+        return candidates.max { $0.startedAt < $1.startedAt }
+    }
+
     init(seedDemoData: Bool = false) {
         baby = seedDemoData ? Self.demoBaby() : Self.defaultBaby()
         if seedDemoData {
@@ -62,6 +75,12 @@ final class AppStore {
     func updateAppearance(_ appearance: AppAppearance) {
         guard self.appearance != appearance else { return }
         self.appearance = appearance
+        persist()
+    }
+
+    func updateTheme(_ theme: AppTheme) {
+        guard self.theme != theme else { return }
+        self.theme = theme
         persist()
     }
 
@@ -275,15 +294,46 @@ final class AppStore {
     }
 
     func deleteEvent(_ e: Event) {
-        events.removeAll { $0.id == e.id }
-        if e.kind == .solid {
-            syncSolidFoods(named: Set(solidFoodNames(in: e)))
+        _ = deleteEventForUndo(e)
+    }
+
+    /// Removes an event and captures the related data needed for a lossless undo.
+    @discardableResult
+    func deleteEventForUndo(_ e: Event) -> DeletedEventSnapshot? {
+        guard let storedEvent = events.first(where: { $0.id == e.id }) else { return nil }
+        let foodNames = Set(solidFoodNames(in: storedEvent))
+        let relatedFoods = foods.filter { foodNames.contains($0.name) }
+
+        events.removeAll { $0.id == storedEvent.id }
+        if storedEvent.kind == .solid {
+            syncSolidFoods(named: foodNames)
         }
         persist()
-        if e.kind == .feed || e.kind == .solid {
+        refreshSchedules(afterChanging: storedEvent)
+        return DeletedEventSnapshot(event: storedEvent, relatedFoods: relatedFoods)
+    }
+
+    /// Restores a previously deleted event through the same consistency path as deletion.
+    func restoreDeletedEvent(_ snapshot: DeletedEventSnapshot) {
+        guard !events.contains(where: { $0.id == snapshot.event.id }) else { return }
+        events.append(snapshot.event)
+
+        if snapshot.event.kind == .solid {
+            for food in snapshot.relatedFoods where !foods.contains(where: { $0.name == food.name }) {
+                foods.append(food)
+            }
+            syncSolidFoods(named: Set(solidFoodNames(in: snapshot.event)))
+        }
+
+        persist()
+        refreshSchedules(afterChanging: snapshot.event)
+    }
+
+    private func refreshSchedules(afterChanging event: Event) {
+        if event.kind == .feed || event.kind == .solid {
             refreshFeedReminderSchedule()
         }
-        if e.kind == .sleep {
+        if event.kind == .sleep {
             refreshSleepReminderSchedule()
         }
     }
@@ -510,6 +560,35 @@ final class AppStore {
     func recordDiaperFromShortcut(type: DiaperEventType = .wet, at date: Date = Date()) -> Event {
         let event = Event(kind: .diaper, at: date, title: type.label)
         addEvent(event)
+        return event
+    }
+
+    /// The night recorder preselects the most recently used diaper type so a
+    /// sleepy caregiver only needs to verify it. The UI still requires an
+    /// explicit confirmation before calling `recordDiaperFromShortcut`.
+    var preferredNightDiaperType: DiaperEventType {
+        guard let latest = mostRecentEvent(kind: .diaper) else { return .wet }
+        return DiaperEventType.from(title: latest.title)
+    }
+
+    /// A low-attention solid-food default based on the latest logged food.
+    /// "米糊" keeps the confirmation useful for a brand-new store without
+    /// introducing a separate night-only preference.
+    var preferredNightSolidName: String {
+        guard let latest = mostRecentEvent(kind: .solid),
+              let firstName = solidFoodNames(in: latest).first else {
+            return "米糊"
+        }
+        return firstName
+    }
+
+    @discardableResult
+    func recordSolidFromShortcut(foodName: String? = nil, at date: Date = Date()) -> Event {
+        let trimmed = foodName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let name = trimmed.isEmpty ? preferredNightSolidName : trimmed
+        let event = Event(kind: .solid, at: date, title: name, sub: "少量")
+        addEvent(event)
+        recordSolidFood(name, at: date, observationDays: 3)
         return event
     }
 
@@ -1194,6 +1273,11 @@ final class AppStore {
     }
 }
 
+struct DeletedEventSnapshot: Equatable {
+    let event: Event
+    let relatedFoods: [FoodItem]
+}
+
 struct DailyEventSummary: Equatable {
     var feedCount: Int = 0
     var breastCount: Int = 0
@@ -1251,6 +1335,7 @@ struct FeedDraft: Equatable, Codable {
     var formulaSessionEnd: Date? = nil
     var formulaMilliliters: Int = 210
     var formulaTime: Date = .now
+    var notes: String? = nil
 
     var hasActiveState: Bool {
         breastPhase != .idle || formulaPhase != .idle
@@ -1263,6 +1348,292 @@ struct FeedDraft: Equatable, Codable {
         case .formula:
             return formulaSubMode == .timer && (formulaPhase == .running || formulaPhase == .paused)
         }
+    }
+}
+
+/// A presentation-neutral snapshot of an in-progress care session. Both the
+/// home priority card and the global floating dock use this source of truth.
+enum ActiveCareState: Equatable {
+    case sleep(RunningTimer)
+    case feed(FeedDraft)
+
+    var kind: EventKind {
+        switch self {
+        case .sleep: return .sleep
+        case .feed: return .feed
+        }
+    }
+
+    var destination: SubScreen {
+        switch self {
+        case .sleep: return .sleep
+        case .feed: return .feed
+        }
+    }
+
+    var startedAt: Date {
+        switch self {
+        case .sleep(let timer):
+            return timer.startedAt
+        case .feed(let draft):
+            switch draft.mode {
+            case .breast:
+                return draft.breastSessionStart ?? draft.breastSegmentStart ?? .distantPast
+            case .formula:
+                return draft.formulaSessionStart ?? draft.formulaSegmentStart ?? .distantPast
+            }
+        }
+    }
+
+    var activityLabel: String {
+        switch self {
+        case .sleep:
+            return "睡眠"
+        case .feed(let draft):
+            return draft.mode == .breast ? "母乳喂养" : "奶粉喂养"
+        }
+    }
+
+    var isRunning: Bool {
+        switch self {
+        case .sleep(let timer):
+            return timer.isRunning
+        case .feed(let draft):
+            switch draft.mode {
+            case .breast: return draft.breastPhase == .running
+            case .formula: return draft.formulaPhase == .running
+            }
+        }
+    }
+
+    func elapsed(at now: Date) -> TimeInterval {
+        switch self {
+        case .sleep(let timer):
+            return timer.isRunning ? timer.elapsed(at: now) : timer.accumulated
+        case .feed(let draft):
+            switch draft.mode {
+            case .breast:
+                let live = draft.breastPhase == .running
+                    ? draft.breastSegmentStart.map { max(0, now.timeIntervalSince($0)) } ?? 0
+                    : 0
+                return draft.breastLeftDuration + draft.breastRightDuration + live
+            case .formula:
+                let live = draft.formulaPhase == .running
+                    ? draft.formulaSegmentStart.map { max(0, now.timeIntervalSince($0)) } ?? 0
+                    : 0
+                return draft.formulaDuration + live
+            }
+        }
+    }
+}
+
+// MARK: — Health tasks
+
+enum HealthTaskPriority: Int, CaseIterable, Comparable, Hashable {
+    case critical = 0
+    case overdue = 1
+    case today = 2
+    case upcoming = 3
+    case recommendation = 4
+
+    static func < (lhs: HealthTaskPriority, rhs: HealthTaskPriority) -> Bool {
+        lhs.rawValue < rhs.rawValue
+    }
+}
+
+enum HealthTaskKind: Hashable {
+    case foodAllergy
+    case medicationAllergy
+    case overdueVaccine
+    case foodObservationDue
+    case upcomingVaccine
+    case medicationReview
+    case growthCheck
+}
+
+enum HealthTaskDestination: Hashable {
+    case vaccine
+    case foodList
+    case medication
+    case growth
+}
+
+struct HealthTask: Identifiable, Hashable {
+    let id: String
+    let kind: HealthTaskKind
+    let priority: HealthTaskPriority
+    let title: String
+    let detail: String
+    let actionTitle: String
+    let destination: HealthTaskDestination
+    let dueDate: Date
+}
+
+extension AppStore {
+    /// Health actions are derived from the existing source records so every
+    /// screen stays in sync without maintaining a second mutable task list.
+    func healthTasks(
+        referenceDate now: Date = .now,
+        calendar: Calendar = .current
+    ) -> [HealthTask] {
+        let startOfToday = calendar.startOfDay(for: now)
+        let upcomingRecommendationLimit = calendar.date(
+            byAdding: .day,
+            value: 7,
+            to: startOfToday
+        ) ?? now
+        var tasks: [HealthTask] = []
+
+        tasks += foods
+            .filter { $0.status == .allergic }
+            .map { food in
+                HealthTask(
+                    id: "food-allergy-\(food.id)",
+                    kind: .foodAllergy,
+                    priority: .critical,
+                    title: "复核\(food.name)过敏记录",
+                    detail: healthTaskNote(
+                        food.notes,
+                        fallback: "已标记疑似食物过敏，请复核症状并避免再次食用"
+                    ),
+                    actionTitle: "查看食材",
+                    destination: .foodList,
+                    dueDate: food.firstUsedAt
+                )
+            }
+
+        tasks += medications
+            .filter { $0.reaction == .allergic }
+            .map { record in
+                HealthTask(
+                    id: "medication-allergy-\(record.id)",
+                    kind: .medicationAllergy,
+                    priority: .critical,
+                    title: "复核\(record.name)过敏记录",
+                    detail: healthTaskNote(
+                        record.reactionNote,
+                        fallback: "已记录疑似药物过敏，请复核症状并在就医时主动说明"
+                    ),
+                    actionTitle: "查看用药",
+                    destination: .medication,
+                    dueDate: record.takenAt
+                )
+            }
+
+        for vaccine in vaccines where !vaccine.done {
+            guard let scheduledDate = vaccine.scheduledDate else { continue }
+            switch vaccine.status(referenceDate: now) {
+            case .overdue:
+                let days = max(1, calendar.dateComponents(
+                    [.day],
+                    from: calendar.startOfDay(for: scheduledDate),
+                    to: startOfToday
+                ).day ?? 1)
+                tasks.append(HealthTask(
+                    id: "vaccine-overdue-\(vaccine.id)",
+                    kind: .overdueVaccine,
+                    priority: .overdue,
+                    title: "\(vaccine.name)已逾期",
+                    detail: "原计划\(healthTaskDate(scheduledDate))接种，已逾期\(days)天",
+                    actionTitle: "处理计划",
+                    destination: .vaccine,
+                    dueDate: scheduledDate
+                ))
+            case .due:
+                tasks.append(HealthTask(
+                    id: "vaccine-upcoming-\(vaccine.id)",
+                    kind: .upcomingVaccine,
+                    priority: .upcoming,
+                    title: "准备接种\(vaccine.name)",
+                    detail: "计划\(healthTaskDate(scheduledDate))接种 · \(vaccine.ageLabel)",
+                    actionTitle: "查看计划",
+                    destination: .vaccine,
+                    dueDate: scheduledDate
+                ))
+            case .done, .upcoming:
+                break
+            }
+        }
+
+        tasks += foods.compactMap { food -> HealthTask? in
+            guard food.status == .observing,
+                  let observationEnd = calendar.date(
+                    byAdding: .day,
+                    value: food.observationDays,
+                    to: food.firstUsedAt
+                  ),
+                  observationEnd <= now else { return nil }
+            return HealthTask(
+                id: "food-observation-\(food.id)",
+                kind: .foodObservationDue,
+                priority: .today,
+                title: "确认\(food.name)排敏结果",
+                detail: "已完成\(food.observationDays)天观察，请确认安全或标记过敏",
+                actionTitle: "立即确认",
+                destination: .foodList,
+                dueDate: observationEnd
+            )
+        }
+
+        if let medication = medications
+            .filter({ $0.reaction == .observing })
+            .sorted(by: { $0.takenAt < $1.takenAt })
+            .first,
+           let reviewDate = calendar.date(byAdding: .day, value: 1, to: medication.takenAt),
+           reviewDate <= now {
+            tasks.append(HealthTask(
+                id: "medication-review-\(medication.id)",
+                kind: .medicationReview,
+                priority: .recommendation,
+                title: "确认\(medication.name)用药反应",
+                detail: "用药已满一天，建议补充有无异常及相关症状",
+                actionTitle: "去确认",
+                destination: .medication,
+                dueDate: reviewDate
+            ))
+        }
+
+        let latestGrowth = growth.max { $0.date < $1.date }
+        let nextGrowthDate = latestGrowth.flatMap {
+            calendar.date(byAdding: .day, value: 30, to: $0.date)
+        } ?? startOfToday
+        if nextGrowthDate <= upcomingRecommendationLimit {
+            let isDue = nextGrowthDate <= now
+            tasks.append(HealthTask(
+                id: "growth-check",
+                kind: .growthCheck,
+                priority: .recommendation,
+                title: latestGrowth == nil ? "记录第一次身高体重" : "准备下一次成长记录",
+                detail: isDue
+                    ? "建议今天记录身高和体重，便于持续观察成长趋势"
+                    : "建议在\(healthTaskDate(nextGrowthDate))前记录身高和体重",
+                actionTitle: "去记录",
+                destination: .growth,
+                dueDate: nextGrowthDate
+            ))
+        }
+
+        return tasks.sorted { lhs, rhs in
+            if lhs.priority != rhs.priority { return lhs.priority < rhs.priority }
+            if lhs.priority == .critical, lhs.dueDate != rhs.dueDate {
+                return lhs.dueDate > rhs.dueDate
+            }
+            if lhs.dueDate != rhs.dueDate { return lhs.dueDate < rhs.dueDate }
+            return lhs.id < rhs.id
+        }
+    }
+
+    private func healthTaskNote(_ note: String?, fallback: String) -> String {
+        guard let note = note?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !note.isEmpty else { return fallback }
+        return note
+    }
+
+    private func healthTaskDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.dateFormat = "M月d日"
+        return formatter.string(from: date)
     }
 }
 
@@ -1288,8 +1659,15 @@ enum ShortcutStartStatus: Equatable {
 }
 
 enum SubScreen: String, Identifiable {
-    case sleep, feed, diaper, solid, vaccine, medication, foodList, recipeList, teeth, settings, backup
+    case nightQuick, sleep, feed, diaper, solid, vaccine, medication, foodList, recipeList, teeth, settings, backup
     var id: String { rawValue }
+
+    var isQuickRecord: Bool {
+        switch self {
+        case .nightQuick, .sleep, .feed, .diaper, .solid: return true
+        case .vaccine, .medication, .foodList, .recipeList, .teeth, .settings, .backup: return false
+        }
+    }
 }
 
 enum MainTab: String, CaseIterable, Identifiable, Hashable {

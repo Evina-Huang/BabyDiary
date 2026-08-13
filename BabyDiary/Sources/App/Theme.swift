@@ -25,7 +25,7 @@ enum AppAppearance: String, CaseIterable, Identifiable, Codable {
     }
 }
 
-enum AppTheme: String, CaseIterable, Identifiable {
+enum AppTheme: String, CaseIterable, Identifiable, Codable {
     case coral, lavender, sky, blossom
     var id: String { rawValue }
 
@@ -103,10 +103,15 @@ enum AppRadius {
     static let surface: CGFloat = 20
 }
 
-enum SurfaceElevation {
-    case flat
-    case raised
-    case floating
+/// Semantic surface roles. Keep elevation attached to meaning instead of
+/// choosing shadows independently in each screen.
+enum SurfaceStyle {
+    /// Background or divider only. Use for lists and secondary information.
+    case plain
+    /// Light border and the subtle card shadow. Use for standalone cards.
+    case card
+    /// Stronger elevation reserved for live status, overlays, and key actions.
+    case elevated
 }
 
 extension Color {
@@ -155,19 +160,25 @@ extension View {
             .shadow(color: Color.adaptive(light: 0x2B2520, dark: 0x000000, lightAlpha: 0.04, darkAlpha: 0.22), radius: 4, x: 0, y: 2)
             .shadow(color: Color.adaptive(light: 0x2B2520, dark: 0x000000, lightAlpha: 0.05, darkAlpha: 0.18), radius: 20, x: 0, y: 8)
     }
-    /// Primary pills share the subtle elevation instead of introducing a third glow style.
-    func shadowPill(tint _: Color) -> some View {
-        shadowCard()
+    /// Enabled primary actions share the subtle elevation instead of
+    /// introducing a third glow style. Secondary and disabled controls stay flat.
+    @ViewBuilder
+    func shadowPill(tint _: Color, isEnabled: Bool = true) -> some View {
+        if isEnabled {
+            shadowCard()
+        } else {
+            self
+        }
     }
 
     @ViewBuilder
-    func surfaceElevation(_ elevation: SurfaceElevation) -> some View {
-        switch elevation {
-        case .flat:
+    func appSurface(_ style: SurfaceStyle) -> some View {
+        switch style {
+        case .plain:
             self
-        case .raised:
+        case .card:
             shadowCard()
-        case .floating:
+        case .elevated:
             shadowSurface()
         }
     }
@@ -278,7 +289,7 @@ private struct AppFontModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content.font(.system(
-            size: min(scaledSize, baseSize * Self.maximumScale(for: baseSize)),
+            size: scaledSize,
             weight: hierarchyWeight,
             design: design
         ))
@@ -309,14 +320,6 @@ private struct AppFontModifier: ViewModifier {
         }
     }
 
-    private static func maximumScale(for size: CGFloat) -> CGFloat {
-        switch size {
-        case ...12: return 1.5
-        case ...17: return 1.55
-        case ...24: return 1.45
-        default: return 1.35
-        }
-    }
 }
 
 private struct ReduceMotionModifier: ViewModifier {

@@ -18,9 +18,15 @@ struct ContentView: View {
         Group {
             switch tab {
             case .home:    HomeView(onOpen: { sub = $0 })
-            case .records: RecordsView()
+            case .records: RecordsView(onOpen: { sub = $0 })
             case .growth:  GrowthView(onOpen: { sub = $0 }, onOpenHealth: { tab = .health })
-            case .health:  HealthView(onOpen: { sub = $0 })
+            case .health:  HealthView(
+                onOpen: { sub = $0 },
+                onOpenGrowth: {
+                    sub = nil
+                    tab = .growth
+                }
+            )
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -31,13 +37,14 @@ struct ContentView: View {
             AppTabBar(tab: $tab)
         }
         .overlay {
-            FloatingDockLayer(sub: $sub)
+            FloatingDockLayer(tab: tab, sub: $sub)
         }
         .ignoresSafeArea(.keyboard, edges: .bottom)
         .sheet(item: $sub) { s in
             subContent(for: s)
                 .environment(store)
-                .presentationDragIndicator(.hidden)
+                .respectReduceMotion()
+                .presentationDragIndicator(s.isQuickRecord ? .visible : .hidden)
         }
         .onOpenURL(perform: openDeepLink)
         .onReceive(NotificationCenter.default.publisher(for: .babyDiaryNotificationDestination)) { notification in
@@ -55,6 +62,9 @@ struct ContentView: View {
     @ViewBuilder
     private func subContent(for s: SubScreen) -> some View {
         switch s {
+        case .nightQuick:
+            NightQuickRecordScreen(onBack: { sub = nil })
+                .presentationDetents([.large])
         case .sleep:    SleepScreen(onBack:    { sub = nil })
         case .feed:     FeedScreen(onBack:     { sub = nil })
         case .diaper:   DiaperScreen(onBack:   { sub = nil })
@@ -71,6 +81,15 @@ struct ContentView: View {
 
     private func openDeepLink(_ url: URL) {
         guard url.scheme == "babydiary" else { return }
+        if url.host == "theme",
+           let value = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+            .queryItems?.first(where: { $0.name == "value" })?.value,
+           let theme = AppTheme(rawValue: value) {
+            store.updateTheme(theme)
+            tab = .home
+            sub = nil
+            return
+        }
         let destination = url.host ?? url.pathComponents.dropFirst().first
         openDestination(destination)
     }
@@ -97,6 +116,9 @@ struct ContentView: View {
 
     private func openDestination(_ destination: String?) {
         switch destination {
+        case "night":
+            tab = .home
+            sub = .nightQuick
         case BabyDiaryDestination.sleep.rawValue:
             sub = .sleep
         case BabyDiaryDestination.feed.rawValue:
@@ -108,6 +130,12 @@ struct ContentView: View {
         case BabyDiaryDestination.records.rawValue:
             tab = .records
             sub = nil
+        case BabyDiaryDestination.health.rawValue:
+            tab = .health
+            sub = nil
+        case "growth":
+            tab = .growth
+            sub = nil
         default:
             tab = .home
             sub = nil
@@ -117,6 +145,8 @@ struct ContentView: View {
 
 private struct FloatingDockLayer: View {
     @Environment(AppStore.self) private var store
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    let tab: MainTab
     @Binding var sub: SubScreen?
     @State private var dockSide: FloatingDockSide = .right
     @State private var dockY: CGFloat? = nil
@@ -159,7 +189,7 @@ private struct FloatingDockLayer: View {
 
     @ViewBuilder
     private var dockContent: some View {
-        switch activeDockItem {
+        switch activeDockState {
         case .feed(let draft):
             ActiveFeedDock(draft: draft,
                            onOpen: {
@@ -180,36 +210,16 @@ private struct FloatingDockLayer: View {
     }
 
     private var hasFloatingDock: Bool {
-        activeDockItem != nil
+        activeDockState != nil
     }
 
-    private var activeDockItem: FloatingDockItem? {
-        let feedDraft = store.feedDraft.flatMap { draft in
-            draft.hasActiveState && sub != .feed ? draft : nil
-        }
-        let sleepTimer = store.activeTimer.flatMap { timer in
-            timer.kind == .sleep && sub != .sleep ? timer : nil
-        }
-
-        switch (feedDraft, sleepTimer) {
-        case let (.some(feed), .some(sleep)):
-            return feedDraftStart(feed) >= sleep.startedAt ? .feed(feed) : .sleep(sleep)
-        case let (.some(feed), nil):
-            return .feed(feed)
-        case let (nil, .some(sleep)):
-            return .sleep(sleep)
-        case (nil, nil):
-            return nil
-        }
-    }
-
-    private func feedDraftStart(_ draft: FeedDraft) -> Date {
-        switch draft.mode {
-        case .breast:
-            return draft.breastSessionStart ?? draft.breastSegmentStart ?? .distantPast
-        case .formula:
-            return draft.formulaSessionStart ?? draft.formulaSegmentStart ?? .distantPast
-        }
+    private var activeDockState: ActiveCareState? {
+        // Home owns the prominent status card. Keep the dock global on the
+        // other tabs without presenting the same action twice on Home.
+        guard tab != .home,
+              let state = store.activeCareState,
+              sub != state.destination else { return nil }
+        return state
     }
 
     private func displayedDockOrigin(in containerSize: CGSize) -> CGPoint {
@@ -264,10 +274,15 @@ private struct FloatingDockLayer: View {
                 let snappedSide = snappedDockSide(in: containerSize, origin: currentOrigin)
 
                 dragStartOrigin = nil
-                withAnimation(.spring(response: 0.24, dampingFraction: 0.88)) {
+                let updateDockPosition = {
                     dockSide = snappedSide
                     dockY = currentOrigin.y
                     dragOrigin = nil
+                }
+                if reduceMotion {
+                    updateDockPosition()
+                } else {
+                    withAnimation(.spring(response: 0.24, dampingFraction: 0.88), updateDockPosition)
                 }
 
                 if isDockDrag(value.translation) {
@@ -330,7 +345,7 @@ private struct FloatingDockLayer: View {
 
     private func horizontalLimits(in containerSize: CGSize) -> ClosedRange<CGFloat> {
         let minX = FloatingDockMetrics.horizontalInset
-        let maxX = max(minX, containerSize.width - FloatingDockMetrics.width - FloatingDockMetrics.horizontalInset)
+        let maxX = max(minX, containerSize.width - effectiveDockSize.width - FloatingDockMetrics.horizontalInset)
         return minX...maxX
     }
 
@@ -346,14 +361,10 @@ private enum FloatingDockSide {
     case right
 }
 
-private enum FloatingDockItem {
-    case feed(FeedDraft)
-    case sleep(RunningTimer)
-}
-
 private struct ActiveSleepDock: View {
     let timer: RunningTimer
     let onOpen: () -> Void
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { ctx in
@@ -401,13 +412,13 @@ private struct ActiveSleepDock: View {
                     .background(Palette.card.opacity(0.78), in: Capsule())
             }
             .padding(.horizontal, 10)
-            .frame(width: FloatingDockMetrics.width, alignment: .leading)
+            .frame(width: dynamicTypeSize.isAccessibilitySize ? 300 : FloatingDockMetrics.width, alignment: .leading)
             .frame(minHeight: 64)
             .background(Palette.lavender, in: Capsule())
             .overlay {
                 Capsule().stroke(Palette.lavenderInk.opacity(0.12), lineWidth: 1)
             }
-            .shadowCard()
+            .appSurface(.elevated)
             .contentShape(Capsule())
         }
         .buttonStyle(PressableStyle())
@@ -419,6 +430,7 @@ private struct ActiveSleepDock: View {
 private struct ActiveFeedDock: View {
     let draft: FeedDraft
     let onOpen: () -> Void
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { ctx in
@@ -464,13 +476,13 @@ private struct ActiveFeedDock: View {
                     .background(Palette.card.opacity(0.78), in: Capsule())
             }
             .padding(.horizontal, 10)
-            .frame(width: FloatingDockMetrics.width, alignment: .leading)
+            .frame(width: dynamicTypeSize.isAccessibilitySize ? 300 : FloatingDockMetrics.width, alignment: .leading)
             .frame(minHeight: 64)
             .background(Palette.pink, in: Capsule())
             .overlay {
                 Capsule().stroke(Palette.pinkInk.opacity(0.12), lineWidth: 1)
             }
-            .shadowCard()
+            .appSurface(.elevated)
             .contentShape(Capsule())
         }
         .buttonStyle(PressableStyle())
@@ -536,13 +548,18 @@ private struct FloatingDockSizeKey: PreferenceKey {
 
 struct AppTabBar: View {
     @Environment(AppStore.self) private var store
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Binding var tab: MainTab
 
     var body: some View {
-        HStack(spacing: 2) {
+        HStack(spacing: 6) {
             ForEach(MainTab.allCases) { t in
                 TabButton(tab: t, selected: tab == t, theme: store.theme) {
-                    withAnimation(.spring(response: 0.32, dampingFraction: 0.78)) { tab = t }
+                    if reduceMotion {
+                        tab = t
+                    } else {
+                        withAnimation(.spring(response: 0.32, dampingFraction: 0.78)) { tab = t }
+                    }
                 }
             }
         }
@@ -571,7 +588,7 @@ struct AppTabBar: View {
             Button(action: action) {
                 VStack(spacing: 3) {
                     icon
-                        .frame(width: 36, height: 30)
+                        .frame(width: 52, height: 32)
                         .background(selected ? theme.primaryTint : Color.clear,
                                     in: Capsule())
                     Text(tab.label)
@@ -582,6 +599,8 @@ struct AppTabBar: View {
                 .frame(minHeight: 52)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("\(tab.label)标签")
+            .accessibilityValue(selected ? "已选中" : "")
             .accessibilityAddTraits(selected ? .isSelected : [])
         }
 
