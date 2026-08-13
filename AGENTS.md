@@ -1,20 +1,22 @@
 # AGENTS.md
 
-This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
+This file provides guidance to Codex when working with code in this repository.
 
 ## Project
 
-iOS-only SwiftUI app for logging baby-care events (feed / diaper / sleep / solids, plus vaccines and growth). UI is Chinese (`zh_CN`). All data is in-memory — there is no persistence layer; `AppStore.seed()` populates demo data on launch.
+BabyDiary is a Chinese-first, iOS-only SwiftUI app for recording baby care. It covers feeding, sleep, diapers, solids, growth, vaccines, medication, food observation, recipes, teeth, and milestones. It also includes reminders, widgets, Live Activities, App Shortcuts, local backup/restore, and PDF export.
 
-## Build / test
+Target: iOS 18, Swift 5.10, Xcode 16. Bundle ID `com.evina.BabyDiary`, team `5WF2DNSHC6`.
 
-The Xcode project is **generated from `project.yml` via [XcodeGen](https://github.com/yonaskolb/XcodeGen)**. If you edit `project.yml` (or add source files in a way that would change the project), regenerate:
+## Build and test
+
+The Xcode project is generated from `project.yml` with [XcodeGen](https://github.com/yonaskolb/XcodeGen). If `project.yml`, target membership, resources, or source layout changes, regenerate it:
 
 ```bash
 xcodegen generate
 ```
 
-Build & test from the command line:
+Build and test from the command line:
 
 ```bash
 # Build
@@ -25,33 +27,92 @@ xcodebuild -project BabyDiary.xcodeproj -scheme BabyDiary \
 xcodebuild -project BabyDiary.xcodeproj -scheme BabyDiary \
   -destination 'platform=iOS Simulator,name=iPhone 17' test
 
-# Single test (Swift Testing — match by test name, not XCTest method path)
+# Single Swift Testing test (match by test name)
 xcodebuild -project BabyDiary.xcodeproj -scheme BabyDiary \
   -destination 'platform=iOS Simulator,name=iPhone 17' test \
   -only-testing:BabyDiaryTests/BabyDiaryTests/eventCreation
 ```
 
-Tests use the **Swift Testing** framework (`import Testing`, `@Test`, `#expect`) — not XCTest. Follow that style when adding tests in `BabyDiaryTests/`.
+Tests use Swift Testing (`import Testing`, `@Test`, `#expect`), not XCTest. Follow that style in `BabyDiaryTests/`.
 
-Target: iOS 18, Swift 5.10, Xcode 16. Bundle ID `com.evina.BabyDiary`, team `5WF2DNSHC6`.
+## Runtime and persistence
 
-## Architecture
+`BabyDiaryApp.swift` creates one `AppStore` with `AppStore.loadedOrSeeded()` and injects it through `.environment(store)`. Views read it with:
 
-**State flow.** A single `@Observable` class `AppStore` ([BabyDiary/Sources/App/AppStore.swift](BabyDiary/Sources/App/AppStore.swift)) holds all app state (`baby`, `events`, `vaccines`, `growth`, `theme`, `timerStart`). It is created once in [BabyDiaryApp.swift](BabyDiary/Sources/App/BabyDiaryApp.swift) and injected with `.environment(store)`. Views read it with `@Environment(AppStore.self) private var store`. This is the iOS 17+ Observation API — **do not** use `ObservableObject` / `@Published` / `@StateObject`; follow the existing pattern.
+```swift
+@Environment(AppStore.self) private var store
+```
 
-Mutations go through store methods (`addEvent`, `deleteEvent`, `toggleVaccine`, `addGrowth`). Screens should not mutate `store.events` etc. directly.
+Use the iOS Observation API (`@Observable`). Do not introduce `ObservableObject`, `@Published`, or `@StateObject` for app state.
 
-**Navigation.** `ContentView` owns two pieces of state: the current `MainTab` (home / records / growth / stats) and an optional `SubScreen` (sleep / feed / diaper / solid / vaccine) presented as a sheet. Tab switching is handled by the **custom** floating `AppTabBar` — there is no `TabView`. Sub-screens are opened by calling the `onOpen:` closure passed down from `ContentView` to `HomeView` (and `onOpenVaccines` from `GrowthView`).
+The app is local-first, not memory-only:
 
-**Layer layout.**
-- `Sources/App/` — entry point, `AppStore`, `ContentView` + tab bar, `Theme.swift` (color tokens `Palette.*`, `AppTheme` enum with 4 skins, shadow view modifiers, `Color(hex:)` helper).
-- `Sources/Models/` — plain value types: `Event` + `EventKind`, `Vaccine` + `VaccineStatus`, `GrowthPoint`, `Baby`.
-- `Sources/Components/` — shared building blocks used by every screen:
-  - `Primitives.swift` — `ScreenHeader`, `ScreenBody`, `Card`, `CTAButton`, `SegPill`, `FormField`, `EventRow`, `SinceLastBanner`, `EmptyStateView`, `PressableStyle`, plus the Chinese formatters `formatTime` / `formatDur` / `formatDurShort` / `formatDateLabel`.
-  - `Icons.swift` — the `AppIcon.*` set. Icons are **drawn as `Canvas` paths** on a 24×24 / 32×32 grid to match the original React/CSS design exactly. Prefer reusing these over SF Symbols; add new ones in the same style if needed. Also contains `CategoryStyle.forKind(_:iconSize:)`, a factory that maps `EventKind` → `(label, tint, ink, icon)` — every view that renders a category color should call this instead of reimplementing the mapping.
-- `Sources/Views/` — one file per feature screen (`HomeView`, `RecordsView`, `GrowthView`, `StatsView`, and the modal sheet screens `SleepScreen`, `FeedScreen`, `DiaperScreen`, `SolidScreen`, `VaccineScreen`). Note: `TabTitleHeader` (the kicker + large-title header used by the tab screens) is defined at the bottom of `GrowthView.swift` but is shared across RecordsView, StatsView, and GrowthView.
-- `Sources/ViewModels/` — currently empty; logic lives in the store or inline in views.
+- `Backup.swift` persists a Codable `DataSnapshot` as `BabyDiary.json` in the app Documents directory.
+- The snapshot includes domain data, active sleep/feed state, reminder settings, recent formula amounts, appearance, and theme.
+- Mutations normally call `persist()` through `AppStore` methods.
+- JSON export/import is backup and full replacement, not merge.
+- PDF export is a readable report, not a medical record.
+- A recovery copy is maintained as `BabyDiary.previous.json` when appropriate.
+- A normal real-device start uses empty personal data. Simulator builds merge dedicated demo data for UI testing.
 
-**Theming.** Never hard-code brand colors. Primary color comes from `store.theme.primary` / `primary600` / `primaryTint` (4 skins in `AppTheme`). Neutrals and category accents come from `Palette.*`. Shadows come from the `.shadowCard()` / `.shadowSurface()` / `.shadowPill(tint:)` view modifiers — they encode the design's two-layer soft shadows and should be used instead of raw `.shadow(...)`.
+When adding persisted state, update `DataSnapshot`, `snapshot()`, `apply(_:)`, migration defaults, and relevant tests together. New optional snapshot fields should decode older backups safely.
 
-**Styling conventions, from the existing code.** Typography is `.system(size:weight:)` with negative `tracking` on headings and `0.6–0.72` tracking + `.textCase(.uppercase)` on micro-labels (see `MicroLabel`). Screens follow `ScreenHeader` + `ScreenBody` + `Card(...)` composition. Tap affordance is `PressableStyle` (0.97 scale). The design is a port of a React/CSS reference, so matching the existing visual tokens matters more than inventing new ones.
+## State and mutation rules
+
+`AppStore.swift` is the single state center. It owns:
+
+- Baby profile and appearance: `baby`, `theme`, `appearance`
+- Daily records: `events`
+- Health and growth: `vaccines`, `growth`, `foods`, `recipes`, `medications`, `teeth`, `milestones`
+- Active care: `activeTimer`, `feedDraft`
+- Reminders and convenience state: `feedReminder`, `sleepReminder`, `formulaMlHistory`
+
+Prefer store methods such as `addEvent`, `updateEvent`, `deleteEvent`, `updateBaby`, `addGrowth`, `updateVaccine`, `recordSolidFood`, and the reminder update methods. Views should not directly mutate store collections or manually reimplement persistence side effects.
+
+`Event` is the common timeline model for feeding, sleep, diapers, and solids. Long-lived or specialist records use dedicated models (`Vaccine`, `GrowthPoint`, `FoodItem`, `Recipe`, `MedicationRecord`, `ToothRecord`, `Milestone`). Before adding a new feature, decide whether it belongs in the event timeline or in a specialist model.
+
+## Navigation
+
+`ContentView` owns the current `MainTab` and optional `SubScreen`. It uses the custom `AppTabBar`; there is no `TabView`.
+
+The four main tabs are:
+
+- `home`
+- `records`
+- `growth`
+- `health`
+
+Sheets are represented by `SubScreen`: night quick record, sleep, feed, diaper, solids, vaccines, medication, food list, recipes, teeth, settings, and backup. Open these through the closures passed by `ContentView` instead of creating a second navigation source of truth.
+
+Deep links, notifications, widgets, and App Shortcuts route back through destinations handled by `ContentView` and the shared types in `Sources/Shared/`.
+
+## Source layout
+
+- `BabyDiary/Sources/App/` — app entry, global store, persistence/export, navigation, themes, reminders, Live Activity controllers.
+- `BabyDiary/Sources/Models/` — value models for events, health, growth, food, recipes, teeth, and milestones.
+- `BabyDiary/Sources/Components/` — reusable UI primitives, accessibility helpers, formatting, record feedback, and custom icons.
+- `BabyDiary/Sources/Shared/` — data and ActivityAttributes shared by the app and widget extension.
+- `BabyDiary/Sources/Views/` — tab screens, record sheets, settings, and feature screens.
+- `BabyDiaryWidgets/` — configurable widgets and feed/sleep Live Activities.
+- `BabyDiaryTests/` — Swift Testing coverage for state, persistence compatibility, reminders, shortcuts, summaries, and health flows.
+
+## UI and theming
+
+Match the existing light, warm, status-first design language.
+
+- Never hard-code brand colors. Use `store.theme`, `Palette.*`, and semantic surface/text roles from `Theme.swift`.
+- Use `.shadowCard()`, `.shadowSurface()`, and `.shadowPill(tint:)` instead of ad-hoc shadows.
+- Reuse `ScreenHeader`, `ScreenBody`, `Card`, `CTAButton`, `SegPill`, `FormField`, `EventRow`, save bars, toasts, and accessibility helpers from `Primitives.swift`.
+- Prefer the Canvas icons in `AppIcon` over unrelated SF Symbols. Category rendering should use `CategoryStyle.forKind(_:iconSize:)`.
+- Preserve typography conventions: system fonts, tight tracking on headings, uppercase micro-labels with wider tracking.
+- Use `PressableStyle` for matching tap feedback.
+- Preserve Dynamic Type, VoiceOver labels/status, Reduce Motion handling, large-screen, compact-screen, and landscape behavior.
+
+Visual consistency with the existing React/CSS-derived design tokens matters more than introducing a new component style.
+
+## Safety boundaries
+
+- Health, vaccination, medication, allergy, and growth information is record-keeping only; do not present it as diagnosis or medical advice.
+- Keep app and widget App Group identifiers aligned when changing entitlements or bundle identifiers.
+- Reminder scheduling changes should continue respecting authorization, quiet hours, and cancellation behavior.
+- Active timer/feed changes should remain consistent across persistence, widgets, Live Activities, shortcuts, and in-app status surfaces.
