@@ -1,6 +1,10 @@
+<a id="readme-zh"></a>
+
 <div align="center">
 
 # BabyDiary 宝宝日记
+
+[简体中文](#readme-zh) · [English](#readme-en)
 
 一款轻量、温暖、本地优先的 iOS 宝宝照护记录 App。
 
@@ -12,9 +16,9 @@
 
 <table>
   <tr>
-    <td align="center"><img src="promo-output/real-screens/home.png" alt="BabyDiary 首页" width="240"><br><sub>今天的照护状态</sub></td>
-    <td align="center"><img src="promo-output/real-screens/night-quick.png" alt="BabyDiary 夜间快速记录" width="240"><br><sub>夜间快速记录</sub></td>
-    <td align="center"><img src="promo-output/real-screens/records.png" alt="BabyDiary 记录时间线" width="240"><br><sub>完整记录时间线</sub></td>
+    <td align="center"><img src="promo-output/real-screens/home.png" alt="BabyDiary 首页" width="240"><br><sub>今天的照护状态 · Today's care</sub></td>
+    <td align="center"><img src="promo-output/real-screens/night-quick.png" alt="BabyDiary 夜间快速记录" width="240"><br><sub>夜间快速记录 · Night logging</sub></td>
+    <td align="center"><img src="promo-output/real-screens/records.png" alt="BabyDiary 记录时间线" width="240"><br><sub>完整记录时间线 · Timeline</sub></td>
   </tr>
 </table>
 
@@ -114,3 +118,114 @@ BabyDiary/
 - 仅支持 iOS 18+，界面以中文为主。
 - 暂无 iCloud、账号系统、家庭成员实时同步、Android 或 Web 版本。
 - PDF 报告用于阅读与分享，不是正式医疗文书。
+
+---
+
+<a id="readme-en"></a>
+
+# BabyDiary (English)
+
+[简体中文](#readme-zh) · [English](#readme-en)
+
+A lightweight, warm, and local-first baby-care journal for iOS.
+
+Quickly log feeding, sleep, diapers, and solids while keeping growth, vaccinations, medication, and food observations together in one place.
+
+`iOS 18+` · `SwiftUI` · `Chinese-first UI` · `Local storage`
+
+## August 2026 Major Update
+
+This release reorganizes BabyDiary's information hierarchy, logging flows, and nighttime experience. The goal is to make active care easier to understand, reduce the steps needed to save a record, and protect in-progress or recently deleted data.
+
+- **A status-first interface:** Home, Records, Growth, and Health were redesigned so active sleep or feeding sessions stay visible.
+- **Night Quick Record:** A low-attention flow for sleep, feeding, diapers, and solids that reuses recent choices when helpful.
+- **Safer logging:** Consistent save states, error and success feedback, confirmation before discarding changes, and immediate undo after deletion.
+- **Flexible reminders:** Feeding supports interval or schedule-based reminders; sleep supports awake-duration or fixed-time reminders. Both include quiet hours.
+- **Focused health tasks:** Vaccinations, medication, and food observations are collected and ordered by priority.
+- **A complete appearance system:** Coral, Lavender, Sky, and Blossom themes support light, dark, and system appearance modes.
+- **Accessibility and device support:** Improved VoiceOver, Dynamic Type, Reduce Motion, landscape layouts, and adaptation across iPhone sizes.
+
+## Design Principles
+
+Caring for a baby rarely leaves time for a complex form. BabyDiary is built around three everyday questions:
+
+- **What is happening now?** Active sleep and feeding sessions remain easy to find.
+- **What happened recently?** The latest feeding, sleep, diaper, or solid-food record is always close at hand.
+- **Where is the important information?** Growth and health records stay organized, easy to review, and ready to export.
+
+The interface is intentionally light, warm, and clear. Logging should interrupt care as little as possible, especially at night.
+
+## Core Features
+
+- **Daily care logging:** Feeding, sleep, diapers, and solids with timers, manual entries, editing, and undo deletion.
+- **Night mode:** A low-attention shortcut for starting or continuing common records.
+- **Growth journal:** Height, weight, head circumference, growth charts, teeth, and milestones.
+- **Health tracking:** Vaccination plans, medication records, food introduction, allergy observations, and prioritized tasks.
+- **System integrations:** Widgets, Live Activities, feeding and sleep reminders, App Shortcuts, and deep links.
+- **Appearance and accessibility:** Four themes, light and dark modes, Dynamic Type, VoiceOver, and Reduce Motion support.
+- **Backup and reports:** Automatic local saving, JSON backup and restore, and PDF report export.
+
+## Data and Privacy
+
+BabyDiary is a local-first, single-device app:
+
+- Data is stored in the app's local space on the current device.
+- There is no account system, server upload, or real-time family sync.
+- JSON is intended for complete backup and restore; PDF is intended for reading and sharing.
+- Importing a JSON backup replaces the current data, so keep a copy of existing records first.
+
+> BabyDiary is a record-keeping tool, not a source of medical diagnosis or treatment advice. Consult a qualified healthcare professional about vaccinations, medication, or allergic reactions.
+
+## Getting Started
+
+You will need macOS, Xcode 16 or later, an iOS 18 simulator, and [XcodeGen](https://github.com/yonaskolb/XcodeGen).
+
+```bash
+git clone https://github.com/Evina-Huang/BabyDiary.git
+cd BabyDiary
+brew install xcodegen
+xcodegen generate
+open BabyDiary.xcodeproj
+```
+
+Select the `BabyDiary` scheme in Xcode and run it. For a physical device, replace the signing Team with your own Apple Developer Team.
+
+### Build and Test from the Command Line
+
+```bash
+# Build
+xcodebuild -project BabyDiary.xcodeproj -scheme BabyDiary \
+  -destination 'platform=iOS Simulator,name=iPhone 17' build
+
+# Test
+xcodebuild -project BabyDiary.xcodeproj -scheme BabyDiary \
+  -destination 'platform=iOS Simulator,name=iPhone 17' test
+```
+
+Tests use Swift Testing (`@Test` / `#expect`).
+
+## Technical Overview
+
+- SwiftUI + Observation
+- WidgetKit + ActivityKit + AppIntents
+- Charts
+- Codable JSON + UIKit PDF rendering
+- Swift Testing
+- XcodeGen
+
+```text
+BabyDiary/
+├── BabyDiary/Sources/       # App, models, components, and screens
+├── BabyDiary/Resources/     # Icons, sounds, and configuration
+├── BabyDiaryWidgets/        # Widgets and Live Activities
+├── BabyDiaryTests/          # Swift Testing test suite
+└── project.yml              # Source of truth for XcodeGen
+```
+
+The app is driven by a single `@Observable AppStore`. `BabyDiary.xcodeproj` is generated from `project.yml`; rerun `xcodegen generate` after changing targets, resources, or the source layout.
+
+## Current Scope
+
+- iOS 18+ only, with a Chinese-first interface.
+- No iCloud, account system, real-time family sharing, Android app, or web app yet.
+- PDF exports are readable reports, not official medical documents.
