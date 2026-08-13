@@ -10,6 +10,7 @@ BabyDiary 是一个 iOS 宝宝照护记录 App。它想做的事情很简单：�
 
 ## 目录
 
+- [2026 年 8 月大版本更新](#2026-年-8-月大版本更新)
 - [项目亮点](#项目亮点)
 - [适合谁使用](#适合谁使用)
 - [主要功能](#主要功能)
@@ -20,6 +21,61 @@ BabyDiary 是一个 iOS 宝宝照护记录 App。它想做的事情很简单：�
 - [开发说明](#开发说明)
 - [当前限制](#当前限制)
 - [English Version](#english-version)
+
+---
+
+## 2026 年 8 月大版本更新
+
+这次更新不是单纯换一套皮肤，而是重新整理了 BabyDiary 的信息层级、记录流程和夜间使用体验。目标是让照护者更快看懂当前状态、更少填写重复内容，也更不容易误删或丢失正在进行的记录。
+
+### 全新界面与外观系统
+
+- 重做首页、记录、成长、健康、统计及各类记录页面，减少过度卡片化，让重要状态更突出。
+- 新增浅色、深色和跟随系统三种外观模式。
+- 珊瑚、薰衣、天空、樱花四套主题现已完整适配浅色与深色界面。
+- 统一字体层级、圆角、间距、阴影和交互反馈，在不同尺寸 iPhone 及横屏下保持清晰。
+
+### 夜间快速记录
+
+- 首页新增「夜间快速记录」入口，专门用于低注意力、少操作的夜间场景。
+- 睡眠和喂奶可一键开始或继续计时。
+- 尿布会沿用最近使用的类型，确认后即可保存。
+- 辅食会优先带入最近记录的常用食物，减少重复选择。
+
+### 更可靠的记录流程
+
+- 进行中的睡眠或喂奶会优先显示在首页和记录页，当前状态更容易找到。
+- 统一新增、编辑页面的保存状态、错误提示、成功反馈和触觉反馈。
+- 退出未保存表单或进行中的计时时会先确认，可选择保留计时或放弃。
+- 删除记录后支持立即撤销，降低误操作风险。
+- 记录页重新整合时间线与趋势入口，按天分组、筛选和回看更清楚。
+
+### 更灵活的照护提醒
+
+- 喂养提醒支持「固定间隔」和「作息表」两种模式，作息表可混合安排喝奶与辅食。
+- 哄睡提醒支持按清醒时长或固定时间提醒。
+- 两类提醒都可设置夜间免打扰；喂养作息还支持首餐时间范围和当天最晚提醒时间。
+
+### 健康待办与状态优先
+
+- 健康页会优先汇总需要处理的疫苗、用药和食物观察事项。
+- 疫苗按逾期、即将到期和后续计划分层展示，待办顺序更明确。
+- 辅食排敏进度、疑似过敏状态和食谱入口更集中，方便快速复查。
+
+### 无障碍与适配
+
+- 主要流程补充 VoiceOver 标签、状态播报和更明确的选中语义。
+- 支持更大的动态字体；在辅助功能字号下，关键页面会自动切换为单列或紧凑布局。
+- 尊重「减弱动态效果」设置，并扩大关键按钮的触控区域。
+- 已覆盖浅色/深色、四套主题、iPhone 17e、iPhone 17 Pro Max、横屏及超大字体场景的界面检查。
+
+<table>
+  <tr>
+    <td align="center"><img src="promo-output/real-screens/home.png" alt="新版首页" width="240"><br><sub>新版首页</sub></td>
+    <td align="center"><img src="promo-output/real-screens/night-quick.png" alt="夜间快速记录" width="240"><br><sub>夜间快速记录</sub></td>
+    <td align="center"><img src="promo-output/real-screens/records.png" alt="记录时间线" width="240"><br><sub>记录时间线</sub></td>
+  </tr>
+</table>
 
 ---
 
@@ -454,6 +510,20 @@ BabyDiary is an iOS baby-care journal app. It helps caregivers record feeding, s
 The goal is not to create a perfect spreadsheet. The goal is to make daily care easier to remember, easier to review, and easier to share when needed.
 
 The app is currently Chinese-first and built for iOS 18+ with SwiftUI.
+
+---
+
+## August 2026 Major Update
+
+This release refreshes BabyDiary's full interface and makes active care easier to see, record, and recover:
+
+- Redesigned Home, Records, Growth, Health, Stats, and logging flows with a clearer status-first hierarchy.
+- Added light, dark, and system appearance modes across all four color themes.
+- Added a low-attention Night Quick Record flow for sleep, feeding, diapers, and solids.
+- Added safer save, discard, active-timer preservation, success feedback, and undo-delete behavior.
+- Expanded feeding and sleep reminders with interval or schedule modes and quiet hours.
+- Reorganized Health around actionable vaccine, medication, and food-observation tasks.
+- Improved VoiceOver, Dynamic Type, Reduce Motion, large-screen, compact-screen, and landscape support.
 
 ---
 
