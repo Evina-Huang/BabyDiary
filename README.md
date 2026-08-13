@@ -14,13 +14,7 @@
 
 </div>
 
-<table>
-  <tr>
-    <td align="center"><img src="promo-output/real-screens/home.png" alt="BabyDiary 首页" width="240"><br><sub>今天的照护状态 · Today's care</sub></td>
-    <td align="center"><img src="promo-output/real-screens/night-quick.png" alt="BabyDiary 夜间快速记录" width="240"><br><sub>夜间快速记录 · Night logging</sub></td>
-    <td align="center"><img src="promo-output/real-screens/records.png" alt="BabyDiary 记录时间线" width="240"><br><sub>完整记录时间线 · Timeline</sub></td>
-  </tr>
-</table>
+![BabyDiary：把每天的小事稳稳接住](promo-output/readme/hero.png)
 
 ## 2026 年 8 月大版本更新
 
@@ -33,6 +27,10 @@
 - **健康待办更集中**：按优先级汇总疫苗、用药和食物观察事项，让需要处理的内容先出现。
 - **完整外观系统**：珊瑚、薰衣、天空、樱花四套主题适配浅色、深色和跟随系统模式。
 - **无障碍与设备适配**：完善 VoiceOver、动态字体、减弱动态效果、横屏，以及不同尺寸 iPhone 的布局表现。
+
+![BabyDiary 夜间快速记录流程](promo-output/readme/night-recording.png)
+
+![BabyDiary 四套主题的浅色与深色外观](promo-output/readme/themes.png)
 
 ## 设计出发点
 
@@ -53,6 +51,10 @@
 - **系统能力**：Widget、Live Activity、喂养与哄睡提醒、快捷指令和深链接。
 - **外观与无障碍**：四套主题、深浅色模式、动态字体、VoiceOver 与减弱动态效果。
 - **备份与报告**：本地自动保存，支持 JSON 备份恢复和 PDF 报告导出。
+
+![BabyDiary 四类日常记录与时间线](promo-output/readme/care-timeline.png)
+
+![BabyDiary 成长曲线、里程碑与健康档案](promo-output/readme/growth-health.png)
 
 ## 数据与隐私
 
